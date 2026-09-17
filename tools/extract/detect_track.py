@@ -1,8 +1,13 @@
 """Find a track's racing line and cell divisions from its board image.
 
-Turning a board image into the space graph docs/track-format.md describes.
-Work in progress: this gets as far as the divisions across the road; placing
-the per-lane spaces and their connections comes next.
+Turning a board image into the space graph docs/track-format.md describes:
+the racing line, the divisions between cells, and a space per lane per cell
+with its facing and the cells it leads to.
+
+What it does not know yet: which way round the track runs (pass --reverse if
+the facings come out backwards), where the corners are and how many stops
+they need, the start grid, the finish line and the pit lane. Those are read
+off the board by eye and added to the track file afterwards.
 
 The image is read from the local TTS cache, the same way extract_dice.py does
 it, so load the mod in TTS once first.
@@ -10,6 +15,7 @@ it, so load the mod in TTS once first.
 Run:  python tools/extract/detect_track.py FDMonaco
 """
 import json
+import math
 import os
 import pathlib
 import re
@@ -227,8 +233,117 @@ def divisions(gray, line, norm, widths, lanes, step, min_gap=30, prominence=3.0)
     return np.unique(pk[pk < len(line)]), score
 
 
+def fill_divisions(div, n, window=5):
+    """Put back divisions the detector missed.
+
+    Cells are near enough evenly spaced, so a gap that is a clean multiple of
+    its neighbours is one the filter skipped rather than a longer cell.
+    """
+    gaps = np.diff(np.r_[div, div[0] + n]).astype(float)
+    out, added = [], 0
+    for i, g in enumerate(gaps):
+        local = np.median(np.take(gaps, range(i - window, i + window + 1), mode="wrap"))
+        k = max(1, int(round(g / local))) if local > 0 else 1
+        out.append(float(div[i]))
+        for j in range(1, k):
+            out.append((div[i] + g * j / k) % n)
+            added += 1
+    return np.sort(np.array(out)), added
+
+
+def at(arr, idx):
+    """Sample a per-step array at fractional steps, wrapping round the loop."""
+    n = len(arr)
+    i0 = np.floor(idx).astype(int) % n
+    i1 = (i0 + 1) % n
+    f = (idx - np.floor(idx))[:, None] if arr.ndim > 1 else (idx - np.floor(idx))
+    return arr[i0] * (1 - f) + arr[i1] * f
+
+
+def inner_side(line, norm):
+    """Which way the normals point: +1 if towards the inside of the loop."""
+    poly = line.astype(np.float32)
+    probe = line + norm * 12.0
+    inside = sum(cv2.pointPolygonTest(poly, (float(x), float(y)), False) > 0
+                 for x, y in probe[::7])
+    return 1 if inside > len(probe[::7]) / 2 else -1
+
+
+def build_spaces(line, norm, widths, div, lanes, reverse=False):
+    """A space per lane per cell, in running order."""
+    n = len(line)
+    centres = []
+    for i in range(len(div)):
+        a, b = div[i], div[(i + 1) % len(div)]
+        if b < a:
+            b += n
+        centres.append(((a + b) / 2) % n)
+    centres = np.array(centres)
+    if reverse:
+        centres = centres[::-1]
+
+    pos = at(line, centres)
+    tan = at(line, (centres + 1) % n) - at(line, (centres - 1) % n)
+    if reverse:
+        tan = -tan
+    tan /= np.linalg.norm(tan, axis=1, keepdims=True) + 1e-9
+    nrm = at(norm, centres)
+    wid = at(widths, centres)
+    side = inner_side(line, norm)
+
+    spaces = []
+    for c in range(len(centres)):
+        for lane in range(1, lanes + 1):
+            # Lane 1 is the innermost, so step out from the inside edge.
+            frac = (0.5 - (lane - 0.5) / lanes) * side
+            p = pos[c] + nrm[c] * frac * wid[c] * 0.92
+            heading = math.degrees(math.atan2(tan[c][1], tan[c][0]))
+            nxt = []
+            for other in (lane - 1, lane, lane + 1):
+                if 1 <= other <= lanes:
+                    nxt.append(((c + 1) % len(centres)) * lanes + other)
+            spaces.append({
+                "id": c * lanes + lane,
+                "pos": [round(float(p[0]), 1), round(float(p[1]), 1)],
+                "rot": round(heading, 1),
+                "lane": lane,
+                "next": nxt,
+                "corner": None,
+                "sector": c + 1,
+            })
+    return spaces
+
+
+def write_track(info, im, spaces, lanes, path, reverse):
+    track = {
+        "detect": {"reverse": reverse},
+        "id": info["id"],
+        "name": info["name"],
+        "ruleset": "formula_d" if info["category"] == "formula_d" else "formula_de",
+        "image": {"width": im.shape[1], "height": im.shape[0]},
+        "lanes": lanes,
+        "laps": 2,
+        "spaces": spaces,
+        "corners": [],
+        "start": [],
+        "finish": {"line": []},
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(track, indent=1), encoding="utf-8")
+
+
 def main():
-    map_id = sys.argv[1] if len(sys.argv) > 1 else "FDMonaco"
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    map_id = args[0] if args else "FDMonaco"
+    # Which way round the track runs cannot be read off the image, so it is
+    # remembered in the track file once set.
+    existing = ROOT / "tracks" / f"{map_id}.json"
+    reverse = False
+    if existing.exists():
+        reverse = json.loads(existing.read_text(encoding="utf-8")).get("detect", {}).get("reverse", False)
+    if "--reverse" in sys.argv:
+        reverse = not reverse
+    print("running direction:", "reversed" if reverse else "as traced")
     info, im = board_image(map_id)
     print(f"{info['name']}  {im.shape[1]}x{im.shape[0]}")
 
@@ -262,17 +377,34 @@ def main():
     print("divisions: %d, spacing median %.1f  p10 %.1f  p90 %.1f"
           % (len(div), np.median(gaps), np.percentile(gaps, 10), np.percentile(gaps, 90)))
 
+    div, added = fill_divisions(div, len(line))
+    print("filled in %d skipped division(s) -> %d cells" % (added, len(div)))
+
+    spaces = build_spaces(line, norm, widths, div, lanes, reverse)
+    track_path = ROOT / "tracks" / f"{map_id}.json"
+    write_track(info, im, spaces, lanes, track_path, reverse)
+    print("%d spaces -> %s" % (len(spaces), track_path.relative_to(ROOT)))
+
     OUT.mkdir(parents=True, exist_ok=True)
     np.savez(OUT / f"{map_id}_line.npz", line=line, widths=widths, mask=mask,
              divisions=div, score=score, step=step)
     vis = im.copy()
     for x, y in line.astype(int):
         cv2.circle(vis, (x, y), 1, (0, 0, 255), -1)
-    for i in div:
+    for i in div.astype(int):
         p, nn, w = line[i], norm[i], widths[i] * 0.5
-        cv2.line(vis, tuple((p - nn * w).astype(int)), tuple((p + nn * w).astype(int)), (255, 0, 0), 2)
-    cv2.imwrite(str(OUT / f"{map_id}_divisions.png"), vis)
-    print(f"  -> {(OUT / (map_id + '_divisions.png')).relative_to(ROOT)}")
+        cv2.line(vis, tuple((p - nn * w).astype(int)), tuple((p + nn * w).astype(int)), (255, 0, 0), 1)
+    lane_colour = [(0, 220, 255), (0, 255, 120), (255, 120, 0)]
+    for sp in spaces:
+        x, y = int(sp["pos"][0]), int(sp["pos"][1])
+        cv2.circle(vis, (x, y), 4, lane_colour[(sp["lane"] - 1) % 3], -1)
+        if sp["lane"] == 1:
+            a = math.radians(sp["rot"])
+            cv2.arrowedLine(vis, (x, y),
+                            (int(x + 26 * math.cos(a)), int(y + 26 * math.sin(a))),
+                            (255, 255, 255), 2, tipLength=0.4)
+    cv2.imwrite(str(OUT / f"{map_id}_spaces.png"), vis)
+    print(f"  -> {(OUT / (map_id + '_spaces.png')).relative_to(ROOT)}")
     return 0
 
 
