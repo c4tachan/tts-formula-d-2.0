@@ -16,6 +16,14 @@ plus Python tooling for data extraction.
 - **`reference/original-2020/` is a read-only snapshot** of the mod as inherited.
   Useful for checking behaviour was preserved; not part of the build.
 
+## Module resolution
+
+`require("fd.…")` resolves because `tools/setup-dev.ps1` junctions `src/fd` into
+`~/Documents/Tabletop Simulator/`, which the extension always searches. Do not
+rely on `.vscode/settings.json` alone — it only applies when VS Code has this
+repo open as its workspace root, and entry scripts are usually opened from the
+temp folder instead.
+
 ## Before pushing to the game
 
 ```powershell

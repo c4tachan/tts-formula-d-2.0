@@ -42,6 +42,13 @@ reference/      verbatim snapshot of the 2020 mod
 
 ## Working on it
 
+First time on a machine:
+
+```powershell
+pwsh tools/setup-dev.ps1     # junction src/fd into the folder the bundler always searches
+```
+
+
 The TTS extension (`rolandostar.tabletopsimulator-lua`) exchanges scripts through
 a folder under `%TEMP%`, which Windows can clear at any time — so this repo is the
 source of truth and `tools/sync.ps1` moves files in and out.
@@ -52,8 +59,11 @@ pwsh tools/sync.ps1 push       # repo -> TTS, then "TTSLua: Save And Play"
 pwsh tools/sync.ps1 pull       # TTS -> repo, after "Get Lua Scripts"
 ```
 
-`.vscode/settings.json` points the extension's bundler at `src/`, so an entry
-script can `require("fd.data.maps")` and the extension inlines it on Save & Play.
+An entry script can `require("fd.data.maps")` and the extension inlines it on
+Save & Play. `setup-dev.ps1` is what makes that resolve — the extension also
+honours `.vscode/settings.json` and open workspace folders, but only when VS Code
+has this repo open as its root, and entry scripts are usually opened from the
+temp folder instead.
 
 Before pushing:
 
