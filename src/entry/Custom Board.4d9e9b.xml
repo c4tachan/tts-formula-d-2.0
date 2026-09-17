@@ -1,0 +1,28 @@
+
+<!-- Cleanup/Show Maps button -->
+<Panel id="cleanup2"
+    offsetXY="0 0"
+    raycastTarget="true"
+    width="150"
+    height="180"
+    allowDragging="true"
+    padding="3 3 3 3"
+    showAnimation="FadeIn"
+    showAnimationDelay="2"
+    returnToOriginalPositionWhenReleased="false">
+    <VerticalLayout>
+        <Text fontStyle="bold" resizeTextForBestFit="true" resizeTextMaxSize="25">Map Select</Text>
+        <Button id="fdmapsButton"
+            text="Formula D Maps"
+            onClick="mapSelectorFD">
+        </Button>
+        <Button id="fdemapsButton"
+            text="Formula De Maps"
+            onClick="mapSelectorFDe">
+        </Button>
+        <Button id="custommapButton"
+            text="Custom Maps"
+            onClick="mapSelectorCustom">
+        </Button>
+    </VerticalLayout>
+</Panel>

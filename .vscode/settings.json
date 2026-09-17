@@ -1,0 +1,16 @@
+{
+    // Lets the Tabletop Simulator Lua extension resolve require("fd.…") in the
+    // entry scripts against this repo's src/ tree when it bundles on Save & Play.
+    "TTSLua.includeOtherFiles": true,
+    "TTSLua.includeOtherFilesPaths": [
+        "C:/Users/c4tac/source/repos/tts-formula-d-2.0/src"
+    ],
+    "TTSLua.bundleSearchPattern": [
+        "?.ttslua",
+        "?.lua"
+    ],
+    "TTSLua.autoOpen": "Global",
+    "files.associations": {
+        "*.ttslua": "lua"
+    }
+}
