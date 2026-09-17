@@ -12,16 +12,64 @@ That original is preserved verbatim in [`reference/original-2020/`](reference/or
 | Objective | State |
 |---|---|
 | Project scaffold, build pipeline | done |
-| Auto gear dice selection | not started |
-| Rules automation | not started |
+| Auto gear dice selection | done (shared dice set, results read automatically) |
+| Rules automation | Formula D basic rules, except those needing track positions |
 | Space snapping + facings | blocked on track data |
-| Damage tracking | not started |
+| Damage tracking | done for the basic rules' single 18 WP pool |
 | Movement limits + highlighting | blocked on track data |
+
+### What the basic rules cover today
+
+- **Dashboards are the controls.** Each dashboard carries a row of buttons
+  past its bottom edge: *Join race* when free; once claimed, a status line
+  plus Brake, Overshoot, Collision?, WP −1/+1 (right-click to add), Pit stop
+  and Leave.
+- **Cars:** the **Car** button claims the nearest free car, or takes one from
+  the bag and tints it your colour; dropping a car on your dashboard claims it
+  too. Nothing uses the claim yet -- it is what movement and snapping will
+  hang off.
+- **Gears:** drop your gear stick on a slot to change gear. That die comes
+  from the shared set to your dashboard; an off-gate drop snaps back.
+- **A copy of your dashboard on screen**, bottom right, visible only to you:
+  the real texture with your gear stick and WP marker drawn on it, and the
+  same action buttons. Clicking a gear slot shifts and clicking a wear number
+  sets it, so the table copy and the screen copy stay in step. TTS cannot
+  render a camera view of an object, so this is redrawn from the same slot
+  data as the physical dashboard rather than being a true picture-in-picture.
+- **Dice:** the six gear dice now have face values (derived from their meshes
+  and textures; see `tools/extract/gen_dice.py`), so a roll is read when the die
+  settles. Skipped-gear wear is charged when the die is rolled, not when the
+  gear is clicked.
+- **Black die checks:** start (stall / great start), engine strain (queued
+  automatically for every car in 5th/6th on a 20 or 30), collision (on request)
+  and grid position (ties re-roll). Whoever rolls the black die resolves their
+  own oldest check, or the table's oldest if they have none.
+- **Wear:** brake, overshoot, pit stop and manual ±1 buttons; elimination at
+  0 WP. The WP marker follows on the beginner side of the dashboard, and
+  dropping it on a number sets WP to that number.
+- **Rounds:** a round ends once every running car has moved (stalled cars sit
+  it out).
+- **Undo** on the race panel covers any of the above.
+
+Not yet automated, because they need to know where the spaces are: corner
+stops and overshoot distance, collision adjacency, turn order, laps, and the
+pit lane. The buttons stand in for them until track data exists.
+
+### Playing
+
+1. Take a car and a dashboard from the Beginner Dashboard bag.
+2. Click **Join race** under the dashboard. It gets a gear stick and WP
+   marker in your colour.
+3. Optionally **Grid roll** on the race panel (top left), then **Start**; each
+   player rolls the black die for their start.
+4. On your turn move the gear stick, roll the die that arrives, move your car.
 
 ## Design decisions
 
 - **Rulesets:** Formula D (modern) and Formula Dé (classic), switchable at setup,
-  with individual toggles for the optional rules each supports.
+  with individual toggles for the optional rules each supports. Only the modern
+  basic rules exist so far (`src/fd/rules/beginner.lua`). A ruleset states all
+  wear as zone → points, so the advanced rules' six zones fit the same engine.
 - **Enforcement:** advisory. The mod highlights legal spaces, warns on illegal
   moves and applies damage automatically, but never blocks a player. Bad track
   data or a rules bug must not be able to wedge a game.
@@ -34,7 +82,13 @@ That original is preserved verbatim in [`reference/original-2020/`](reference/or
 src/entry/      one file per TTS object, named <Object>.<guid>.lua — these are
                 what the TTS extension exchanges with the game
 src/fd/         modules pulled in via require(); never edited in game
+  core/           rules bookkeeping -- no TTS calls, unit tested
+  rules/          one module per ruleset (beginner so far)
+  tts/            dice, dashboards, on-screen panels -- the TTS-facing side
   data/maps.lua   generated map registry (339 tracks)
+  data/dice.lua   generated gear dice rotation values
+  data/dashboard.lua  slot positions on the dashboard model
+tests/          Lua tests, run under real Lua 5.2 with a fake TTS API
 tracks/         per-track space graphs (see docs/track-format.md)
 tools/          extraction, generation and sync scripts
 reference/      verbatim snapshot of the 2020 mod
@@ -59,6 +113,11 @@ pwsh tools/sync.ps1 push       # repo -> TTS, then "TTSLua: Save And Play"
 pwsh tools/sync.ps1 pull       # TTS -> repo, after "Get Lua Scripts"
 ```
 
+Use **TTSLua: Save And Play** from the command palette. If the TTS Editor
+extension (`sebaestschjin.tts-editor`) is also installed, it shares the
+Ctrl+Alt+S shortcut and fails here looking for a `.tts` folder. Disable it for
+this workspace, or run the command by name.
+
 An entry script can `require("fd.data.maps")` and the extension inlines it on
 Save & Play. The junction from `setup-dev.ps1` is what makes that resolve, and it
 works whatever VS Code has open — run it before anything else.
@@ -70,7 +129,9 @@ a folder-level `.vscode/settings.json` is ignored in a multi-root workspace. Ope
 Before pushing:
 
 ```powershell
+pip install -r tools/requirements-dev.txt   # once
 python tools/check_lua.py      # syntax-check everything under src/
+python tools/test_lua.py       # rules and Global wiring tests
 ```
 
 ### Regenerating the map registry
@@ -87,6 +148,19 @@ Re-deriving `maps.json` from the 2020 originals (rarely needed):
 ```powershell
 python tools/extract/extract_maps.py
 ```
+
+### Regenerating the dice data
+
+`tools/extract/dice_faces.json` holds the number on every gear die face. To
+turn it into `src/fd/data/dice.lua`:
+
+```powershell
+python tools/extract/gen_dice.py
+```
+
+`extract_dice.py` redraws the numbered face crops the values were read from
+(it needs the mod in the local TTS cache; set `TTS_MODS` if Documents is
+redirected).
 
 ## Note on the 2020 map selector
 
