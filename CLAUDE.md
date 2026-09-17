@@ -19,19 +19,23 @@ plus Python tooling for data extraction.
 ## Module resolution
 
 The extension searches, in order: `~/Documents/Tabletop Simulator/`, then
-`TTSLua.includeOtherFilesPaths`, then each open workspace folder. Two of those
-are wired up here and both land on the same file:
+`TTSLua.includeOtherFilesPaths`, then each open workspace folder.
 
-- `.vscode/settings.json` points `includeOtherFilesPaths` at `src/`. This works
-  while VS Code has the repo open as its root, which is the normal setup.
-- `tools/setup-dev.ps1` junctions `src/fd` into the Documents folder, which is
-  searched unconditionally. This is the fallback for when a script is opened
-  from the temp folder in its own window, where the workspace setting does not
-  apply.
+**The junction created by `tools/setup-dev.ps1` is what actually resolves
+`require("fd.…")` here.** It puts `src/fd` under `~/Documents/Tabletop Simulator/`,
+which is searched unconditionally. Do not remove it.
 
-Note the setting takes an **absolute** path — the extension does not expand
-`${workspaceFolder}` — so on a fresh clone either edit that path or just run
-`setup-dev.ps1`, which derives it from the repo location.
+`.vscode/settings.json` does *not* help in the current setup. TTSLua's settings
+are window-scoped (their `scope` is unset, which defaults to `window`), and
+window-scoped settings are ignored in a folder-level `.vscode/settings.json` once
+the workspace is multi-root — which this one is, since it holds both the repo and
+the TTS temp folder. Opening `formula-d.code-workspace` puts the same settings at
+workspace level, where they do apply; the file is kept in sync with
+`.vscode/settings.json`, which covers the single-folder case.
+
+Note the path must be **absolute** — the extension does not expand
+`${workspaceFolder}` — which is why `setup-dev.ps1`, deriving it from the repo
+location, is the portable one.
 
 ## Before pushing to the game
 

@@ -60,13 +60,12 @@ pwsh tools/sync.ps1 pull       # TTS -> repo, after "Get Lua Scripts"
 ```
 
 An entry script can `require("fd.data.maps")` and the extension inlines it on
-Save & Play. `.vscode/settings.json` makes that resolve while the repo is open as
-the VS Code workspace root; `setup-dev.ps1` adds a junction that resolves it
-regardless, for when a script is opened from the temp folder in its own window.
+Save & Play. The junction from `setup-dev.ps1` is what makes that resolve, and it
+works whatever VS Code has open — run it before anything else.
 
-The setting needs an **absolute** path (the extension does not expand
-`${workspaceFolder}`), so `setup-dev.ps1` is the portable one — it derives the
-path from the repo location.
+`TTSLua.includeOtherFilesPaths` can do the same job, but it is window-scoped, so
+a folder-level `.vscode/settings.json` is ignored in a multi-root workspace. Open
+`formula-d.code-workspace` to get it at workspace level where it applies.
 
 Before pushing:
 

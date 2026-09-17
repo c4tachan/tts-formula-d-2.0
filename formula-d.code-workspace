@@ -1,0 +1,33 @@
+{
+    "folders": [
+        {
+            "name": "formula-d (repo)",
+            "path": "."
+        },
+        {
+            "name": "TTS scripts (temp, generated)",
+            "path": "C:\Users\c4tac\AppData\Local\Temp\TabletopSimulator\Tabletop Simulator Lua"
+        }
+    ],
+    "settings": {
+        // TTSLua's settings are window-scoped, so a folder-level
+        // .vscode/settings.json is ignored once the workspace is multi-root.
+        // They have to live here to take effect.
+        "TTSLua.includeOtherFiles": true,
+        "TTSLua.includeOtherFilesPaths": [
+            "C:/Users/c4tac/source/repos/tts-formula-d-2.0/src"
+        ],
+        "TTSLua.bundleSearchPattern": [
+            "?.ttslua",
+            "?.lua"
+        ],
+        "TTSLua.autoOpen": "Global",
+        "files.associations": {
+            "*.ttslua": "lua"
+        },
+        // The temp folder is a view of what TTS produced; edit src/entry instead.
+        "files.readonlyInclude": {
+            "**/AppData/Local/Temp/TabletopSimulator/**": true
+        }
+    }
+}
