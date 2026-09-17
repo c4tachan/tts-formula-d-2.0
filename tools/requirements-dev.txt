@@ -1,0 +1,3 @@
+luaparser   # tools/check_lua.py
+lupa        # tools/test_lua.py
+pillow      # tools/extract/extract_dice.py

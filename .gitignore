@@ -10,3 +10,6 @@ __pycache__/
 *.pyc
 .DS_Store
 Thumbs.db
+
+# Dice extraction contact sheets
+tools/extract/out/
