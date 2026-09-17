@@ -18,11 +18,20 @@ plus Python tooling for data extraction.
 
 ## Module resolution
 
-`require("fd.…")` resolves because `tools/setup-dev.ps1` junctions `src/fd` into
-`~/Documents/Tabletop Simulator/`, which the extension always searches. Do not
-rely on `.vscode/settings.json` alone — it only applies when VS Code has this
-repo open as its workspace root, and entry scripts are usually opened from the
-temp folder instead.
+The extension searches, in order: `~/Documents/Tabletop Simulator/`, then
+`TTSLua.includeOtherFilesPaths`, then each open workspace folder. Two of those
+are wired up here and both land on the same file:
+
+- `.vscode/settings.json` points `includeOtherFilesPaths` at `src/`. This works
+  while VS Code has the repo open as its root, which is the normal setup.
+- `tools/setup-dev.ps1` junctions `src/fd` into the Documents folder, which is
+  searched unconditionally. This is the fallback for when a script is opened
+  from the temp folder in its own window, where the workspace setting does not
+  apply.
+
+Note the setting takes an **absolute** path — the extension does not expand
+`${workspaceFolder}` — so on a fresh clone either edit that path or just run
+`setup-dev.ps1`, which derives it from the repo location.
 
 ## Before pushing to the game
 
