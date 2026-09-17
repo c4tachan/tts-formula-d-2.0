@@ -1,0 +1,12 @@
+# Bundled output produced by the TTS extension on Save & Play
+*.bundled.lua
+
+# Track-extraction scratch (large source images, intermediate crops)
+tracks/**/raw/
+tracks/**/*.png
+tracks/**/*.jpg
+
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
