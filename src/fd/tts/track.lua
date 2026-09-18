@@ -5,6 +5,7 @@
 -- snapped to it follows the board when a player drags or turns it.
 
 local Maps = require("fd.data.maps")
+local Graph = require("fd.core.trackgraph")
 
 local Track = {}
 
@@ -114,6 +115,57 @@ end
 
 function Track.angleOf(tile, track, world, yaw)
     return Track.angleIn(tile, Track.frame(tile, track), world, yaw)
+end
+
+-- Snapping cars ----------------------------------------------------------------
+
+-- Cell length per track, in image pixels; worked out on first use. Keyed
+-- weakly, so an edited copy of a track that is thrown away takes its entry
+-- with it.
+local cellOf = setmetatable({}, { __mode = "k" })
+
+local function cellLength(track)
+    local c = cellOf[track]
+    if not c then
+        c = Graph.cellLength(track.spaces)
+        cellOf[track] = c
+    end
+    return c
+end
+
+--- The space nearest `world`, within `reach` cells of it, skipping any id
+-- listed in `taken`. Returns the space and the frame, or nil.
+function Track.spaceNear(tile, f, track, world, reach, taken)
+    local px, py = Track.pixelIn(tile, f, world)
+    local limit = cellLength(track) * reach
+    local best, bestD = nil, limit * limit
+    for _, s in ipairs(track.spaces) do
+        if not (taken and taken[s.id]) then
+            local dx, dy = s.pos[1] - px, s.pos[2] - py
+            local d = dx * dx + dy * dy
+            if d <= bestD then best, bestD = s, d end
+        end
+    end
+    return best
+end
+
+--- Where a car put down at `world` belongs: the nearest free space within
+-- `reach` cells, as a world position and the yaw that faces the way the
+-- track runs. `others` are world positions of cars already on the track;
+-- the spaces they sit on are not offered. Returns nil if there is no space
+-- close enough -- a car put down off the track stays where it was put.
+function Track.snap(tile, track, world, reach, others)
+    local f = Track.frame(tile, track)
+    local taken = {}
+    for _, p in ipairs(others or {}) do
+        local s = Track.spaceNear(tile, f, track, p, 0.5, taken)
+        if s then taken[s.id] = true end
+    end
+    local s = Track.spaceNear(tile, f, track, world, reach, taken)
+    if not s then
+        return nil
+    end
+    return s, Track.worldIn(tile, f, s.pos[1], s.pos[2]), Track.yawIn(tile, f, s.pos[1], s.pos[2], s.rot)
 end
 
 -- Footprint drawn at each space, in image pixels: roughly a car's outline, so

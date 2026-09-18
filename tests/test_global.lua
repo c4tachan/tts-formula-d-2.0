@@ -340,6 +340,83 @@ function T.track_overlay_maps_pixels_onto_the_board()
     eq(#S.board.getVectorLines(), 0, "toggles back off")
 end
 
+-- Cars on the track ---------------------------------------------------------------
+
+--- Where `space` is on the board, and whether `car` sits on it facing its way.
+local function onSpace(S, car, space)
+    local Track = require("fd.tts.track")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local at = Track.worldOf(S.board, FDMonaco, space.pos[1], space.pos[2])
+    if math.abs(car.pos.x - at.x) > 1e-6 or math.abs(car.pos.z - at.z) > 1e-6 then
+        return false
+    end
+    local facing = Track.angleOf(S.board, FDMonaco, car.pos, car.rot.y)
+    return math.abs(((facing - space.rot) + 180) % 360 - 180) < 1e-6
+end
+
+--- Put `car` down a few pixels off `space`.
+local function putNear(S, car, space, dx, dy, color)
+    local Track = require("fd.tts.track")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    car.pos = Track.worldOf(S.board, FDMonaco, space.pos[1] + (dx or 4), space.pos[2] + (dy or -3))
+    car.rot = S.vec(4, 123, -3)
+    onObjectDrop(color or "Red", car)
+end
+
+function T.a_car_put_down_on_the_track_settles_onto_the_space()
+    local S = world()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local car = S.object("Formula 1 Solid", { pos = S.vec(0, 1, 40) })
+    for _, i in ipairs({ 1, 100, 252, 400 }) do
+        local space = FDMonaco.spaces[i]
+        putNear(S, car, space)
+        assert(onSpace(S, car, space), "car on space " .. space.id .. ", facing " .. space.rot)
+        eq(car.rot.x, 0, "set down level")
+        eq(car.rot.z, 0)
+    end
+end
+
+function T.a_claimed_car_snaps_and_is_not_parked_on()
+    local S = redRacing()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    S.beginner.click("fdDashCar", "Red")
+    local mine = getObjectFromGUID(state().cars.Red.tts.car)
+    assert(mine and mine.name:find("Red"), "Red has a named car")
+    local space = FDMonaco.spaces[100]
+    putNear(S, mine, space)
+    assert(onSpace(S, mine, space), "a renamed car still snaps")
+
+    -- A second car put down on the same space goes beside it instead.
+    local other = S.object("Formula 1 Solid", { pos = S.vec(0, 1, 40) })
+    putNear(S, other, space, 1, 1)
+    assert(not onSpace(S, other, space), "not stacked on Red")
+    local moved = false
+    for _, sp in ipairs(FDMonaco.spaces) do
+        if sp.id ~= space.id and onSpace(S, other, sp) then moved = true end
+    end
+    assert(moved, "settled on a neighbouring space")
+end
+
+function T.a_car_put_down_off_the_track_stays_put()
+    local S = world()
+    local car = S.object("Formula 1 Solid", { pos = S.vec(0, 1, 40) })
+    car.pos = S.vec(60, 1, 0)
+    car.rot = S.vec(0, 17, 0)
+    onObjectDrop("Red", car)
+    eq(car.pos.x, 60)
+    eq(car.rot.y, 17)
+end
+
+function T.no_snapping_on_a_map_without_track_data()
+    local S = world()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local car = S.object("Formula 1 Solid", { pos = S.vec(0, 1, 40) })
+    S.board.custom = { image = "http://example.invalid/other-map.png" }
+    local space = FDMonaco.spaces[100]
+    putNear(S, car, space)
+    assert(not onSpace(S, car, space))
+end
+
 -- Track editor ------------------------------------------------------------------
 
 local function editor(S)

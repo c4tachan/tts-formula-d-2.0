@@ -25,6 +25,7 @@ setup_packed = false
 
 local race
 local syncCars -- defined with the rest of the car handling, below
+local snapCar -- defined with the track, below
 local undo = {}
 local UNDO_LIMIT = 30
 
@@ -321,6 +322,16 @@ local function nearestCar(pos, taken, range)
     return best
 end
 
+--- The car in the race driving the car object `guid`, if any.
+local function carOwning(guid)
+    for _, c in ipairs(race:cars()) do
+        if c.tts and c.tts.car == guid then
+            return c
+        end
+    end
+    return nil
+end
+
 --- Where a player's own things belong: their seat, or their dashboard.
 local function basePosition(car)
     local dash = car.tts and car.tts.dash and getObjectFromGUID(car.tts.dash)
@@ -423,6 +434,11 @@ function onObjectDrop(color, obj)
                 end
             end
         end
+        snapCar(obj)
+        return
+    end
+    if carOwning(obj.getGUID()) then
+        snapCar(obj)
         return
     end
     local car, kind = markerOwner(obj.getGUID())
@@ -685,6 +701,40 @@ function fdTrack(player)
     else
         broadcastToColor("Cannot show the track: " .. why, player.color, LEVEL_RGB.warn)
     end
+end
+
+-- How far from a space a car may be put down and still be moved onto it, in
+-- cells. Put down further off -- off the track, or between spaces with no
+-- free one near -- it stays where it was put.
+local SNAP_REACH = 0.9
+-- How far above the board face a snapped car is set down; it drops from there.
+local SNAP_LIFT = 0.3
+
+--- A car put down on the track: settle it onto the nearest free space, facing
+-- the way the track runs. Advisory like the rest -- it only helps a car land
+-- neatly on a space the player chose, and does nothing off the track.
+snapCar = function(obj)
+    local tile = Track.tile()
+    local track = tile and trackOnBoard()
+    if not track then
+        return false
+    end
+    track = Editor.trackFor(track)
+    local others = {}
+    for _, c in ipairs(race:cars()) do
+        local o = c.tts and c.tts.car ~= obj.getGUID() and c.tts.car and getObjectFromGUID(c.tts.car)
+        if o then
+            others[#others + 1] = o.getPosition()
+        end
+    end
+    local space, pos, yaw = Track.snap(tile, track, obj.getPosition(), SNAP_REACH, others)
+    if not space then
+        return false
+    end
+    obj.setPositionSmooth({ x = pos.x, y = pos.y + SNAP_LIFT, z = pos.z }, false, true)
+    -- The car models' noses point along their local +Z.
+    obj.setRotationSmooth({ x = 0, y = yaw, z = 0 }, false, true)
+    return true
 end
 
 local function pickUpAt(color, pos)
