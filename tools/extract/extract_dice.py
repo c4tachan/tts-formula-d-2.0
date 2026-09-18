@@ -10,7 +10,7 @@ The first gear die is a d4 read at its top vertex, so its entries are vertex
 directions, and the value is the number printed next to that vertex.
 
 Run:  python tools/extract/extract_dice.py          (pip install pillow)
-Output goes to tools/extract/out/ (not committed).
+Output goes to tools/extract/out/dice/ (not committed).
 """
 import json
 import math
@@ -22,7 +22,7 @@ import sys
 from PIL import Image, ImageDraw
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-OUT = ROOT / "tools" / "extract" / "out"
+OUT = ROOT / "tools" / "extract" / "out" / "dice"
 MODS = pathlib.Path(os.path.expanduser("~")) / "Documents" / "My Games" / "Tabletop Simulator" / "Mods"
 SAVE_ID = "2092460061"
 

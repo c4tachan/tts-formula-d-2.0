@@ -11,6 +11,7 @@
 
 local Layout = require("fd.data.dashboard")
 local Race = require("fd.core.race")
+local Ui = require("fd.tts.ui")
 
 local Mini = {}
 
@@ -192,17 +193,18 @@ function Mini.registerAsset()
     UI.setCustomAssets(assets)
 end
 
-function Mini.setReady()
-    ready = true
+--- Mark the screen dashboards ready for updates, or (false) not yet.
+function Mini.setReady(on)
+    ready = on ~= false
 end
 
 local function moveMarker(id, slot, n)
     local x, y = slotOffset(slot, n)
     if x then
-        UI.setAttribute(id, "offsetXY", xy(x, y))
-        UI.setAttribute(id, "active", "true")
+        Ui.set(id, "offsetXY", xy(x, y))
+        Ui.set(id, "active", "true")
     else
-        UI.setAttribute(id, "active", "false")
+        Ui.set(id, "active", "false")
     end
 end
 
@@ -213,7 +215,7 @@ function Mini.refresh(race)
     for _, color in ipairs(COLORS) do
         local p = "fdm_" .. color .. "_"
         local car = race:car(color)
-        UI.setAttribute("fdm_" .. color, "active", tostring(car ~= nil))
+        Ui.set("fdm_" .. color, "active", tostring(car ~= nil))
         if car then
             local bits = { race:label(car) }
             bits[#bits + 1] = car.gear > 0 and (Race.gearName(car.gear) .. " gear") or "on the grid"
@@ -229,7 +231,7 @@ function Mini.refresh(race)
                     break
                 end
             end
-            UI.setValue(p .. "label", table.concat(bits, "  -  "))
+            Ui.value(p .. "label", table.concat(bits, "  -  "))
             moveMarker(p .. "gearMark", "gear", math.max(car.gear, 1))
             for _, z in ipairs(race.rules.zones) do
                 moveMarker(p .. "wpMark", z.id, math.max(0, car.wear[z.id]))

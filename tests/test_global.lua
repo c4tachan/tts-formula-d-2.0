@@ -26,6 +26,12 @@ local function world()
     -- A beginner dashboard (flipped) near Red's seat, an advanced one near Blue's.
     S.beginner = S.object("Beginner Dashboard", { pos = S.vec(0, 1, -30), up = S.vec(0, -1, 0) })
     S.advanced = S.object("Advanced Dashboard", { pos = S.vec(0, 1, 30) })
+    -- The board tile, showing Monaco at 44 units across.
+    local Maps = require("fd.data.maps")
+    S.board = S.object("Game Board Tile", {
+        guid = "ebde54", pos = S.vec(0, 1, 0), size = S.vec(44, 1, 44), scale = S.vec(44, 1, 44),
+        custom = { image = Maps.byId.FDMonaco.url },
+    })
     S.player("Red", S.vec(0, 1, -38))
     S.player("Blue", S.vec(0, 1, 38))
     assert(loadfile(ROOT .. "/src/entry/Global.-1.lua"))()
@@ -219,7 +225,6 @@ function T.the_screen_copy_follows_the_car()
 
     local gearAt = {}
     for g = 1, 6 do
-        S.ui["fdm_Red_gearMark"] = nil
         fdUiShift({ color = "Red" }, tostring(g))
         gearAt[g] = S.ui["fdm_Red_gearMark"].offsetXY
     end
@@ -309,6 +314,314 @@ function T.the_status_line_asks_for_a_car()
     assert(S.beginner.buttons[1].label:find("no car"))
     S.beginner.click("fdDashCar", "Red")
     assert(not S.beginner.buttons[1].label:find("no car"))
+end
+
+function T.track_overlay_maps_pixels_onto_the_board()
+    local S = world()
+    local Track = require("fd.tts.track")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    -- The middle of the image sits at the middle of the tile, and the edges
+    -- at its edges, in the tile's own local space.
+    local mid = Track.localOf(S.board, FDMonaco, FDMonaco.image.width / 2, FDMonaco.image.height / 2)
+    eq(mid.x, 0)
+    eq(mid.z, 0)
+    -- The tile shows its image turned half a turn from its local axes.
+    local topleft = Track.localOf(S.board, FDMonaco, 0, 0)
+    eq(topleft.x, 0.5)
+    eq(topleft.z, -0.5)
+
+    fdTrack({ color = "Red", steam_name = "RedPlayer" })
+    local lines = S.board.getVectorLines()
+    eq(#lines, #FDMonaco.outer + #FDMonaco.spaces, "a line per piece of edge and one per space")
+    assert(lines[1].thickness < 0.01, "thickness is in the tile's local space")
+    assert(S.logged(FDMonaco.name))
+
+    fdTrack({ color = "Red", steam_name = "RedPlayer" })
+    eq(#S.board.getVectorLines(), 0, "toggles back off")
+end
+
+-- Track editor ------------------------------------------------------------------
+
+local function editor(S)
+    fdEdit({ color = "Red", steam_name = "RedPlayer" })
+    return require("fd.tts.track_editor"), require("fd.tts.track"), require("fd.data.tracks.FDMonaco")
+end
+
+local function markersOut(S)
+    local n = 0
+    for _, o in ipairs(S.objects) do
+        if o.name:find("^Space %d+") then n = n + 1 end
+    end
+    return n
+end
+
+function T.converting_to_the_board_and_back_is_exact()
+    local S = world()
+    local Track = require("fd.tts.track")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local w = Track.worldOf(S.board, FDMonaco, 700, 300)
+    local x, y = Track.pixelOf(S.board, FDMonaco, w)
+    assert(math.abs(x - 700) < 1e-6 and math.abs(y - 300) < 1e-6, x .. "," .. y)
+    for _, rot in ipairs({ 0, 35, 90, 200, 300 }) do
+        local yaw = Track.yawOf(S.board, FDMonaco, 700, 300, rot)
+        local back = Track.angleOf(S.board, FDMonaco, w, yaw)
+        local d = math.abs(((back - rot) + 180) % 360 - 180)
+        assert(d < 1e-6, "facing " .. rot .. " came back as " .. back)
+    end
+end
+
+function T.editor_keys_need_the_editor_open()
+    local S = world()
+    S.press("Track editor: pick up spaces here", "Red", nil, S.vec(0, 1, 0))
+    assert(S.logged("Open the track editor first"))
+    eq(markersOut(S), 0)
+end
+
+function T.picking_up_spaces_only_takes_those_near_the_pointer()
+    local S = world()
+    local Editor, Track, FDMonaco = editor(S)
+    local sp = FDMonaco.spaces[100]
+    local w = Track.worldOf(S.board, FDMonaco, sp.pos[1], sp.pos[2])
+    S.press("Track editor: pick up spaces here", "Red", nil, w)
+    local n = markersOut(S)
+    assert(n > 0 and n < #FDMonaco.spaces / 4, "picked up " .. n)
+    assert(S.find("Space " .. sp.id .. " (lane " .. sp.lane .. ")"), "the space under the pointer")
+end
+
+function T.moving_a_marker_moves_its_space()
+    local S = world()
+    local Editor, Track, FDMonaco = editor(S)
+    local sp = FDMonaco.spaces[100]
+    local w = Track.worldOf(S.board, FDMonaco, sp.pos[1], sp.pos[2])
+    S.press("Track editor: pick up spaces here", "Red", nil, w)
+    local m = S.find("Space " .. sp.id .. " (lane " .. sp.lane .. ")")
+    local target = Track.worldOf(S.board, FDMonaco, sp.pos[1] + 5, sp.pos[2] - 3)
+    m.pos = S.vec(target.x, m.pos.y, target.z)
+    S.press("Track editor: apply", "Red")
+    eq(markersOut(S), 0, "markers cleared")
+    local edited = Editor.trackFor(FDMonaco)
+    local moved
+    for _, s in ipairs(edited.spaces) do
+        if s.id == sp.id then moved = s end
+    end
+    assert(math.abs(moved.pos[1] - (sp.pos[1] + 5)) < 1e-6 and math.abs(moved.pos[2] - (sp.pos[2] - 3)) < 1e-6)
+    eq(#edited.spaces, #FDMonaco.spaces)
+    eq(sp.pos[1] ~= moved.pos[1], true, "the original track data is untouched")
+end
+
+function T.deleting_a_marker_deletes_its_space()
+    local S = world()
+    local Editor, Track, FDMonaco = editor(S)
+    local sp = FDMonaco.spaces[100]
+    S.press("Track editor: pick up spaces here", "Red", nil, Track.worldOf(S.board, FDMonaco, sp.pos[1], sp.pos[2]))
+    S.find("Space " .. sp.id .. " (lane " .. sp.lane .. ")").destruct()
+    S.press("Track editor: apply", "Red")
+    eq(#Editor.trackFor(FDMonaco).spaces, #FDMonaco.spaces - 1)
+end
+
+function T.adding_a_space_takes_the_nearest_lane()
+    local S = world()
+    local Editor, Track, FDMonaco = editor(S)
+    local sp = FDMonaco.spaces[100]
+    local w = Track.worldOf(S.board, FDMonaco, sp.pos[1] + 2, sp.pos[2] + 2)
+    S.press("Track editor: add a space here", "Red", nil, w)
+    assert(S.logged("in lane " .. sp.lane))
+    S.press("Track editor: apply", "Red")
+    eq(#Editor.trackFor(FDMonaco).spaces, #FDMonaco.spaces + 1)
+end
+
+function T.a_marker_can_change_lane()
+    local S = world()
+    local Editor, Track, FDMonaco = editor(S)
+    local sp = FDMonaco.spaces[100]
+    S.press("Track editor: pick up spaces here", "Red", nil, Track.worldOf(S.board, FDMonaco, sp.pos[1], sp.pos[2]))
+    local m = S.find("Space " .. sp.id .. " (lane " .. sp.lane .. ")")
+    local to = sp.lane == 3 and 1 or 3
+    S.press("Track editor: move space to lane " .. to, "Red", m)
+    S.press("Track editor: apply", "Red")
+    for _, s in ipairs(Editor.trackFor(FDMonaco).spaces) do
+        if s.id == sp.id then eq(s.lane, to) end
+    end
+end
+
+function T.edits_are_saved_with_the_game_and_come_back()
+    local S = world()
+    local Editor, Track, FDMonaco = editor(S)
+    local sp = FDMonaco.spaces[100]
+    S.press("Track editor: pick up spaces here", "Red", nil, Track.worldOf(S.board, FDMonaco, sp.pos[1], sp.pos[2]))
+    S.find("Space " .. sp.id .. " (lane " .. sp.lane .. ")").destruct()
+    -- Saved mid-edit, markers still out: the save sees the edit, the markers stay.
+    local saved = onSave()
+    assert(saved.json.edits.FDMonaco, "edits are in the save")
+    eq(#saved.json.edits.FDMonaco.spaces, #FDMonaco.spaces - 1)
+    assert(markersOut(S) > 0, "autosave leaves the markers alone")
+
+    -- A fresh load from that save sees the edited track.
+    local S2 = world()
+    onLoad(saved)
+    local Editor2 = require("fd.tts.track_editor")
+    eq(#Editor2.trackFor(require("fd.data.tracks.FDMonaco")).spaces, #FDMonaco.spaces - 1)
+end
+
+function T.the_editor_works_from_right_click_menus()
+    local S = world()
+    local Editor, Track, FDMonaco = editor(S)
+    local sp = FDMonaco.spaces[100]
+    local w = Track.worldOf(S.board, FDMonaco, sp.pos[1], sp.pos[2])
+    S.board.rightClick("Pick up spaces here", "Red", w)
+    local m = S.find("Space " .. sp.id .. " (lane " .. sp.lane .. ")")
+    assert(m, "picked up from the board's menu")
+    local to = sp.lane == 3 and 1 or 3
+    m.rightClick("Lane " .. to, "Red")
+    eq(m.name, "Space " .. sp.id .. " (lane " .. to .. ")")
+    local other = nil
+    for _, o in ipairs(S.objects) do
+        if o ~= m and o.name:find("^Space %d+") then other = o break end
+    end
+    other.rightClick("Delete space", "Red")
+    S.board.rightClick("Add a space here", "Red", w)
+    S.board.rightClick("Apply track edits", "Red")
+    eq(#Editor.trackFor(FDMonaco).spaces, #FDMonaco.spaces, "one deleted, one added")
+
+    fdEdit({ color = "Red", steam_name = "RedPlayer" })
+    eq(next(S.board.menu), nil, "the board menu goes when the editor closes")
+end
+
+function T.deleting_every_marker_before_apply_is_still_saved()
+    local S = world()
+    local Editor, Track, FDMonaco = editor(S)
+    local sp = FDMonaco.spaces[100]
+    S.press("Track editor: pick up spaces here", "Red", nil, Track.worldOf(S.board, FDMonaco, sp.pos[1], sp.pos[2]))
+    local gone = 0
+    for i = #S.objects, 1, -1 do
+        local o = S.objects[i]
+        if o.name:find("^Space %d+") then o.destruct() gone = gone + 1 end
+    end
+    assert(gone > 0)
+    -- No markers left and no Apply: the deletions must still reach the save.
+    local saved = onSave()
+    assert(saved.json.edits.FDMonaco, "the edit is saved")
+    eq(#saved.json.edits.FDMonaco.spaces, #FDMonaco.spaces - gone)
+end
+
+function T.markers_saved_on_the_table_are_cleared_on_load()
+    local S = world()
+    local Editor, Track, FDMonaco = editor(S)
+    local sp = FDMonaco.spaces[100]
+    S.press("Track editor: pick up spaces here", "Red", nil, Track.worldOf(S.board, FDMonaco, sp.pos[1], sp.pos[2]))
+    local out = markersOut(S)
+    assert(out > 0)
+    local saved = onSave()
+    eq(#saved.json.markers, out, "the save lists the markers still out")
+    -- Loading that save: the blocks are still on the table, but nothing
+    -- tracks them any more, so they go -- without taking their spaces along.
+    onLoad(saved)
+    eq(markersOut(S), 0)
+    eq(#Editor.trackFor(FDMonaco).spaces, #FDMonaco.spaces)
+end
+
+function T.links_can_be_set_by_hand_and_handed_back()
+    local S = world()
+    local Editor, Track, FDMonaco = editor(S)
+    local a, b = FDMonaco.spaces[100], FDMonaco.spaces[103]
+    S.board.rightClick("Pick up spaces here", "Red", Track.worldOf(S.board, FDMonaco, a.pos[1], a.pos[2]))
+    local ma = S.find("Space " .. a.id .. " (lane " .. a.lane .. ")")
+    local mb = S.find("Space " .. b.id .. " (lane " .. b.lane .. ")")
+    assert(ma and mb, "both picked up")
+
+    ma.rightClick("Start a link here", "Red")
+    mb.rightClick("Link to here", "Red")
+    assert(S.logged("now leads to space " .. b.id))
+    local function space(id)
+        for _, s in ipairs(Editor.trackFor(FDMonaco).spaces) do
+            if s.id == id then return s end
+        end
+    end
+    local function leadsTo(s, id)
+        for _, n in ipairs(s.next) do if n == id then return true end end
+        return false
+    end
+    assert(leadsTo(space(a.id), b.id))
+    eq(space(a.id).fixed, true)
+
+    -- Apply relinks everything else, but a hand-made link stays put.
+    S.board.rightClick("Apply track edits", "Red")
+    assert(leadsTo(space(a.id), b.id), "kept through Apply")
+    local saved = onSave().json.edits.FDMonaco.spaces
+    local found = false
+    for _, s in ipairs(saved) do
+        if s.id == a.id then found = s.fixed end
+    end
+    eq(found, true, "the hand-made link is in the save, for the export")
+
+    -- Clicking the same link again takes it away; Automatic links hands back.
+    S.board.rightClick("Pick up spaces here", "Red", Track.worldOf(S.board, FDMonaco, a.pos[1], a.pos[2]))
+    ma = S.find("Space " .. a.id .. " (lane " .. a.lane .. ")")
+    mb = S.find("Space " .. b.id .. " (lane " .. b.lane .. ")")
+    ma.rightClick("Start a link here", "Red")
+    mb.rightClick("Link to here", "Red")
+    assert(not leadsTo(space(a.id), b.id), "toggled off")
+    ma.rightClick("Automatic links", "Red")
+    eq(space(a.id).fixed, nil)
+end
+
+function T.problems_are_counted_on_the_panel()
+    local S = world()
+    editor(S)
+    assert(S.ui.fdr_editor.value:find("problem"), S.ui.fdr_editor.value)
+    fdEdit({ color = "Red", steam_name = "RedPlayer" })
+    eq(S.ui.fdr_editor.value, "", "status cleared when the editor closes")
+end
+
+function T.track_overlay_refuses_another_map()
+    local S = world()
+    S.board.custom = { image = "https://example.invalid/other-map/" }
+    fdTrack({ color = "Red", steam_name = "RedPlayer" })
+    assert(S.logged("No track data for the map"))
+end
+
+function T.a_late_joiner_gets_the_panels_again()
+    local S = redRacing()
+    S.xml = {}
+    S.ui = {}
+    onPlayerConnect({ color = "Grey" })
+    onPlayerChangeColor("Blue")
+    local ids = {}
+    for _, node in ipairs(S.xml) do
+        ids[node.attributes.id or ""] = (ids[node.attributes.id or ""] or 0) + 1
+    end
+    eq(ids.fdr, 1, "race panel sent once")
+    eq(ids.fdm_Red, 1, "screen dashboards sent once")
+    eq(S.ui.fdm_Red.active, "true", "filled in again")
+    assert(S.ui.fdr_title, "race panel refreshed")
+end
+
+function T.a_deleted_marker_comes_back_on_the_next_action()
+    local S = redRacing()
+    S.find("Wear Tracker").destruct()
+    eq(S.count("Wear Tracker"), 0)
+    -- Nothing about the car changed when the marker went, but it is replaced
+    -- as soon as anything happens.
+    S.beginner.click("fdDashBrake", "Red")
+    eq(S.count("Wear Tracker"), 1)
+end
+
+function T.a_dashboard_taken_out_later_gets_its_buttons()
+    local S = world()
+    local late = S.object("Beginner Dashboard", { pos = S.vec(0, 1, -60), up = S.vec(0, -1, 0) })
+    onObjectSpawn(late)
+    eq(late.buttons[1] and late.buttons[1].click_function, "fdDashJoin")
+    -- And into a bag: no longer drawn, and no error.
+    late.destruct()
+    S.beginner.click("fdDashJoin", "Red")
+end
+
+function T.unchanged_ui_is_not_sent_again()
+    local S = redRacing()
+    S.beginner.click("fdDashBrake", "Red")
+    S.resetCounts()
+    refresh()
+    eq(S.counts.ui, 0, "a refresh with nothing new sends nothing")
 end
 
 function T.undo_restores_the_previous_state()

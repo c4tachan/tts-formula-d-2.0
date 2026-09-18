@@ -1,8 +1,8 @@
 # Track data format
 
-*Draft. Nothing consumes this yet — it is the target the vision-based extraction
-and the movement code are both being written against, and it will change once
-the first real track goes through the pipeline.*
+*Monaco is the first track through the pipeline; `corners`, `start`,
+`finish` and `pit` are still empty there, and will settle once they are
+filled in.*
 
 Everything in objectives 3 and 5 (snapping, facings, movement limits,
 highlighting) reduces to one problem: the mod has no idea where the spaces are.
@@ -37,6 +37,9 @@ the only thing needing measurement in game is the tile itself — not each track
   "lanes": 3,                    // widest point of the track
   "laps": 2,
 
+  "edited": true,                // hand-edited in game: the detector leaves it alone
+  "edited_from": "TS_Save_3.json (2026-09-18 15:27)",
+
   "spaces": [
     {
       "id": 1,
@@ -44,6 +47,7 @@ the only thing needing measurement in game is the tile itself — not each track
       "rot": 47.5,               // degrees; car's facing when parked here
       "lane": 1,                 // 1 = innermost
       "next": [2, 14],           // legal successors (lane changes included)
+      "fixed": true,             // optional: `next` was set by hand; never recomputed
       "corner": null,            // corner id when this space is inside one
       "sector": 0                // ordinal along the lap, for lap counting
     }
@@ -78,11 +82,18 @@ and they are exactly the cases players notice.
 
 ## Extraction
 
-Track files are produced by reading the map image and identifying spaces
-visually, then calibrating against the tile. The scale reference has to come
-from the game — measuring the tile once yields the pixels-per-world-unit figure
-every track then reuses.
+`tools/extract/find_grid.py` reads the grid printed on the board: it removes
+everything that is not track, paints out the direction arrows, redraws the red
+corner lines as grid lines, and cuts the road along its printed lines so each
+cell comes out as one piece. A cell's lane comes from where it sits on its own
+chord across the road, which stays right through corners where a traced racing
+line drifts.
 
-Tracks are expected to need hand correction after extraction; the advisory
-enforcement model means an imperfect track file degrades gracefully rather than
-blocking play, which is why it was chosen.
+Links are worked out from positions and facings (`fd.core.trackgraph`), the
+same rules the in-game editor uses; a space whose links were set by hand keeps
+them (`fixed`).
+
+Tracks are expected to need hand correction after extraction -- the editor in
+TTS is for that, and `tools/extract/import_track.py` brings the result back
+from a saved game. The advisory enforcement model means an imperfect track file
+degrades gracefully rather than blocking play, which is why it was chosen.

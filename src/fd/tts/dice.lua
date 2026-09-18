@@ -21,12 +21,17 @@ function Dice.isBlack(obj)
     return obj.getName() == Dice.BLACK_DIE
 end
 
+-- GUID of each gear die, found as they are prepared, so finding one does not
+-- mean scanning every object on the table.
+local known = {}
+
 --- Give a gear die its rotation values. The models ship without any, so TTS
 -- cannot read them until this runs; it is idempotent and cheap.
 function Dice.prepare(obj)
     local gear = Dice.gearOf(obj)
     if gear then
         obj.setRotationValues(DiceData[gear])
+        known[gear] = obj.getGUID()
     end
 end
 
@@ -37,10 +42,16 @@ function Dice.prepareAll()
 end
 
 function Dice.find(gear)
+    local obj = known[gear] and getObjectFromGUID(known[gear])
+    if obj then
+        return obj
+    end
+    -- Not seen yet, or put back in its bag and taken out again: look for it.
     local name = DiceData.names[gear]
-    for _, obj in ipairs(getObjects()) do
-        if obj.getName() == name then
-            return obj
+    for _, o in ipairs(getObjects()) do
+        if o.getName() == name then
+            known[gear] = o.getGUID()
+            return o
         end
     end
     return nil

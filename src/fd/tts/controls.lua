@@ -83,11 +83,22 @@ local function drawCar(dash, face, tint)
     end
 end
 
+local faces = {}   -- guid -> which face was up when last drawn
+local labels = {}  -- guid -> the status label last written
+
 --- Draw the right buttons for `dash`. `car` is the race car claiming it, or
 -- nil; `label` is the status text for a claimed dashboard.
+--
+-- Called after every click, so it does as little as it can: the buttons are
+-- only rebuilt when the owner changes or the board is flipped over (which
+-- invalidate() reports), and the label is only rewritten when it changes.
 function Controls.render(dash, car, label)
     local guid = dash.getGUID()
-    local face = Dashboard.face(dash)
+    local face = faces[guid]
+    if not face then
+        face = Dashboard.face(dash)
+        faces[guid] = face
+    end
     local key = face .. "|" .. (car and car.color or "-")
     if rendered[guid] ~= key then
         dash.clearButtons()
@@ -97,15 +108,18 @@ function Controls.render(dash, car, label)
             drawJoin(dash, face)
         end
         rendered[guid] = key
+        labels[guid] = nil
     end
-    if car then
+    if car and labels[guid] ~= (label or "") then
         dash.editButton({ index = 0, label = label or "" })
+        labels[guid] = label or ""
     end
 end
 
 --- Forget what was drawn, so the next render starts from scratch (after a flip).
 function Controls.invalidate(dash)
-    rendered[dash.getGUID()] = nil
+    local guid = dash.getGUID()
+    rendered[guid], faces[guid], labels[guid] = nil, nil, nil
 end
 
 return Controls

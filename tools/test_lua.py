@@ -7,6 +7,7 @@ Each tests/test_*.lua file returns a table of name -> function. A test fails
 by raising an error.
 
 Run:  python tools/test_lua.py            (pip install lupa)
+      python tools/test_lua.py --bench    call counts and timings, not tests
 """
 import pathlib
 import sys
@@ -19,7 +20,18 @@ except ImportError:
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
+def bench():
+    """Run tests/bench.lua: call counts and timings for common actions."""
+    lua = lua52.LuaRuntime(unpack_returned_tuples=True)
+    lua.execute(f'package.path = "{(ROOT / "src").as_posix()}/?.lua;{(ROOT / "tests").as_posix()}/?.lua;" .. package.path')
+    lua.globals().ROOT = ROOT.as_posix()
+    lua.execute((ROOT / "tests" / "bench.lua").read_text(encoding="utf-8"))
+    return 0
+
+
 def main():
+    if "--bench" in sys.argv:
+        return bench()
     failed = total = 0
     for f in sorted((ROOT / "tests").glob("test_*.lua")):
         lua = lua52.LuaRuntime(unpack_returned_tuples=True)

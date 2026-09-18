@@ -14,9 +14,10 @@ That original is preserved verbatim in [`reference/original-2020/`](reference/or
 | Project scaffold, build pipeline | done |
 | Auto gear dice selection | done (shared dice set, results read automatically) |
 | Rules automation | Formula D basic rules, except those needing track positions |
-| Space snapping + facings | blocked on track data |
+| Track data | Monaco done: 497 spaces, detected then hand-edited in game |
+| Space snapping + facings | next -- the data it needs now exists for Monaco |
 | Damage tracking | done for the basic rules' single 18 WP pool |
-| Movement limits + highlighting | blocked on track data |
+| Movement limits + highlighting | next, on the same track data |
 
 ### What the basic rules cover today
 
@@ -64,6 +65,28 @@ pit lane. The buttons stand in for them until track data exists.
    player rolls the black die for their start.
 4. On your turn move the gear stick, roll the die that arrives, move your car.
 
+### Track data: detect, then edit in game
+
+A track's spaces start from `python tools/extract/find_grid.py <mapId>`, which
+reads the grid printed on the board image and writes `tracks/<mapId>.json`.
+Each numbered image it leaves in `tools/extract/out/` is one step, for
+checking by eye. Detection is a starting point; the cleanup happens in TTS:
+
+1. Put the map on the board and press **Edit track** on the race panel. Every
+   space is drawn with a tick to the space ahead in its lane; red ones need a
+   look.
+2. **Right-click the board > Pick up spaces here** turns the nearby spaces
+   into blocks. Drag them, turn them with Q/E, and right-click one for its
+   lane, to delete it, or to link it by hand (*Start a link here*, then *Link
+   to here* on the next space; *Automatic links* hands it back). **Add a space
+   here** puts a new one down. **Apply** puts the blocks back and relinks.
+3. Save the game (*Menu > Save*), then `python tools/extract/import_track.py`
+   writes the edits to `tracks/<mapId>.json` and regenerates the Lua module.
+   A hand-edited file is never overwritten by the detector.
+
+The editor's keys can also be bound in *Options > Game Keys*, under "Track
+editor".
+
 ## Design decisions
 
 - **Rulesets:** Formula D (modern) and Formula Dé (classic), switchable at setup,
@@ -82,12 +105,13 @@ pit lane. The buttons stand in for them until track data exists.
 src/entry/      one file per TTS object, named <Object>.<guid>.lua — these are
                 what the TTS extension exchanges with the game
 src/fd/         modules pulled in via require(); never edited in game
-  core/           rules bookkeeping -- no TTS calls, unit tested
+  core/           rules bookkeeping and the track graph -- no TTS calls, unit tested
   rules/          one module per ruleset (beginner so far)
   tts/            dice, dashboards, on-screen panels -- the TTS-facing side
   data/maps.lua   generated map registry (339 tracks)
   data/dice.lua   generated gear dice rotation values
   data/dashboard.lua  slot positions on the dashboard model
+  data/tracks/    generated from tracks/*.json by gen_tracks.py
 tests/          Lua tests, run under real Lua 5.2 with a fake TTS API
 tracks/         per-track space graphs (see docs/track-format.md)
 tools/          extraction, generation and sync scripts

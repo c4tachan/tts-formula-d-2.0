@@ -1,13 +1,19 @@
 """Find a track's racing line and cell divisions from its board image.
 
-Turning a board image into the space graph docs/track-format.md describes:
-the racing line, the divisions between cells, and a space per lane per cell
-with its facing and the cells it leads to.
+Turning a board image into the space graph docs/track-format.md describes.
 
-What it does not know yet: which way round the track runs (pass --reverse if
-the facings come out backwards), where the corners are and how many stops
-they need, the start grid, the finish line and the pit lane. Those are read
-off the board by eye and added to the track file afterwards.
+The spaces are printed on the board as a grid of dark grey lines, right down
+to the line inside the white track limit, so each cell is simply the asphalt
+left over once those lines are taken away. Reading them straight off the
+artwork gets the radial cells in corners right, and keeps the lanes in step
+with one another, which offsetting from a racing line never managed.
+
+The racing line is still traced, but only to say which lane a cell is in and
+what order the cells come in.
+
+What it does not know: which way round the track runs (pass --reverse if the
+facings come out backwards), where the corners are and how many stops they
+need, the start grid, the finish line and the pit lane.
 
 The image is read from the local TTS cache, the same way extract_dice.py does
 it, so load the mod in TTS once first.
@@ -23,6 +29,7 @@ import sys
 
 import cv2
 import numpy as np
+from scipy.ndimage import median_filter
 from scipy.signal import find_peaks
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import dijkstra
@@ -33,9 +40,24 @@ LANES = 3  # widest point of the track; per-track once more maps are done
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT = ROOT / "tools" / "extract" / "out"
-MODS = pathlib.Path(os.environ.get(
-    "TTS_MODS",
-    pathlib.Path(os.path.expanduser("~")) / "Documents" / "My Games" / "Tabletop Simulator" / "Mods"))
+def documents_dir():
+    """The user's Documents folder, wherever Windows has put it.
+
+    Often redirected (OneDrive), so ask the registry rather than assume
+    ~/Documents.
+    """
+    try:
+        import winreg
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                             r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders")
+        value, _ = winreg.QueryValueEx(key, "Personal")
+        return pathlib.Path(os.path.expandvars(value))
+    except (ImportError, OSError):
+        return pathlib.Path(os.path.expanduser("~")) / "Documents"
+
+
+TTS_DIR = documents_dir() / "My Games" / "Tabletop Simulator"
+MODS = pathlib.Path(os.environ.get("TTS_MODS", TTS_DIR / "Mods"))
 
 
 def board_image(map_id):
@@ -197,67 +219,56 @@ def normals(line):
     return np.c_[-t[:, 1], t[:, 0]]
 
 
-def lane_darkness(gray, line, norm, widths, lanes):
-    """Median grey within each lane band, at every step along the line."""
-    out = np.zeros((len(line), lanes))
-    for li in range(lanes):
-        lo = -0.45 + 0.9 * li / lanes
-        hi = -0.45 + 0.9 * (li + 1) / lanes
-        cols = []
-        for f in np.linspace(lo + 0.03, hi - 0.03, 9):
-            xs = np.clip((line[:, 0] + norm[:, 0] * f * widths).astype(int), 0, gray.shape[1] - 1)
-            ys = np.clip((line[:, 1] + norm[:, 1] * f * widths).astype(int), 0, gray.shape[0] - 1)
-            cols.append(gray[ys, xs])
-        out[:, li] = np.median(np.stack(cols, 1), axis=1)
+def keep_long(binary, min_extent):
+    """Only the components that run further than `min_extent` pixels."""
+    n, lab, stats, _ = cv2.connectedComponentsWithStats(binary.astype(np.uint8), 8)
+    out = np.zeros(binary.shape, np.uint8)
+    for i in range(1, n):
+        if max(stats[i, cv2.CC_STAT_WIDTH], stats[i, cv2.CC_STAT_HEIGHT]) >= min_extent:
+            out[lab == i] = 1
     return out
 
 
-def darker_than_neighbours(sig, half=1, gap=2, side=3):
-    """How much darker the road is here than a little before and after."""
-    def mean_over(lo, hi):
-        return np.mean([np.roll(sig, -k) for k in range(lo, hi + 1)], axis=0)
-    return np.minimum(mean_over(-(gap + side), -gap), mean_over(gap, gap + side)) - mean_over(-half, half)
+def interior_marks(grey, white_small, surround=0.85):
+    """Small white marks that sit inside the road rather than along its edge.
 
-
-def divisions(gray, line, norm, widths, lanes, step, min_gap=30, prominence=3.0):
-    """Where the lines dividing one cell from the next cross the road.
-
-    A division crosses every lane, while the arrows printed inside corner
-    cells sit within one, so each lane votes and the weakest one wins.
+    The grid boxes and the checkered band are printed on the asphalt and are
+    road; the white dashes of a dashed kerb are the edge itself. They are told
+    apart by what surrounds them -- a mark ringed by asphalt is road.
     """
-    per_lane = np.stack([darker_than_neighbours(d) for d in
-                         lane_darkness(gray, line, norm, widths, lanes).T], 1)
-    score = smooth_closed(per_lane.min(axis=1), 3)
-    wrapped = np.r_[score, score[:int(min_gap / step) + 10]]
-    pk, _ = find_peaks(wrapped, distance=min_gap / step, prominence=prominence)
-    return np.unique(pk[pk < len(line)]), score
+    n, lab, stats, _ = cv2.connectedComponentsWithStats(white_small, 8)
+    out = np.zeros(grey.shape, np.uint8)
+    pad = 4
+    for i in range(1, n):
+        x, y, w, h, area = stats[i]
+        x0, y0 = max(0, x - pad), max(0, y - pad)
+        x1, y1 = min(grey.shape[1], x + w + pad), min(grey.shape[0], y + h + pad)
+        sub = (lab[y0:y1, x0:x1] == i).astype(np.uint8)
+        ring = cv2.dilate(sub, np.ones((2 * pad + 1, 2 * pad + 1), np.uint8)) - sub
+        if ring.sum() and (grey[y0:y1, x0:x1][ring > 0] > 0).mean() >= surround:
+            out[y0:y1, x0:x1][sub > 0] = 1
+    return out
 
 
-def fill_divisions(div, n, window=5):
-    """Put back divisions the detector missed.
+def surface_mask(im):
+    """The road as a player sees it: asphalt, plus the marks printed on it.
 
-    Cells are near enough evenly spaced, so a gap that is a clean multiple of
-    its neighbours is one the filter skipped rather than a longer cell.
+    road_mask has to cut every white pixel to keep neighbouring stretches
+    apart; here the marks that sit inside the road are put back, so the shape
+    of the road is not full of holes.
     """
-    gaps = np.diff(np.r_[div, div[0] + n]).astype(float)
-    out, added = [], 0
-    for i, g in enumerate(gaps):
-        local = np.median(np.take(gaps, range(i - window, i + window + 1), mode="wrap"))
-        k = max(1, int(round(g / local))) if local > 0 else 1
-        out.append(float(div[i]))
-        for j in range(1, k):
-            out.append((div[i] + g * j / k) % n)
-            added += 1
-    return np.sort(np.array(out)), added
-
-
-def at(arr, idx):
-    """Sample a per-step array at fractional steps, wrapping round the loop."""
-    n = len(arr)
-    i0 = np.floor(idx).astype(int) % n
-    i1 = (i0 + 1) % n
-    f = (idx - np.floor(idx))[:, None] if arr.ndim > 1 else (idx - np.floor(idx))
-    return arr[i0] * (1 - f) + arr[i1] * f
+    hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV).astype(int)
+    S, V = hsv[..., 1], hsv[..., 2]
+    grey = ((S < 50) & (V > 105) & (V < 205)).astype(np.uint8)
+    white = ((S < 60) & (V >= 205)).astype(np.uint8)
+    kerbs = keep_long(white, 60)
+    marks = interior_marks(grey, (white - kerbs).astype(np.uint8))
+    m = ((grey | marks) > 0).astype(np.uint8) * 255
+    m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+    # Closing can smear across a kerb into whatever lies beyond it, so put the
+    # kerb lines back afterwards: they are the edge of the road.
+    m[cv2.dilate(kerbs, np.ones((3, 3), np.uint8)) > 0] = 0
+    return (m > 0).astype(np.uint8)
 
 
 def inner_side(line, norm):
@@ -269,54 +280,315 @@ def inner_side(line, norm):
     return 1 if inside > len(probe[::7]) / 2 else -1
 
 
-def build_spaces(line, norm, widths, div, lanes, reverse=False):
-    """A space per lane per cell, in running order."""
+
+def printed_cells(im, surface, contrast=8, blur=21):
+    """Segment the cells printed on the road.
+
+    The grid is drawn in dark grey on lighter asphalt, so anything darker than
+    its surroundings is a line; what is left over, cell by cell, is a space.
+    The arrows inside corner cells are dark too, but they are islands within a
+    cell and leave it in one piece.
+    """
+    gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+    background = cv2.medianBlur(gray, blur).astype(np.float32)
+    lines = ((background - gray.astype(np.float32)) > contrast) & (surface > 0)
+    lines = cv2.morphologyEx(lines.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
+    cells = ((surface > 0) & (lines == 0)).astype(np.uint8)
+    return cv2.morphologyEx(cells, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+
+
+def on_track(labels, stats, centroids, line, reach, area=(250, 8000)):
+    """Keep the blobs that are cells of the track itself.
+
+    Rules out the buildings and crowds either side, and for now the pit road,
+    which sits further from the racing line than any lane of the track.
+    """
+    rail = np.zeros(labels.shape, np.uint8)
+    cv2.polylines(rail, [line.astype(np.int32).reshape(-1, 1, 2)], True, 255, 1)
+    dist = cv2.distanceTransform(255 - rail, cv2.DIST_L2, 5)
+    keep = []
+    for i in range(1, len(stats)):
+        if not area[0] <= stats[i, 4] <= area[1]:
+            continue
+        cx, cy = centroids[i]
+        if dist[int(round(cy)), int(round(cx))] <= reach:
+            keep.append(i)
+    return keep, dist
+
+
+def neighbours_of(labels, wanted, reach=3):
+    """Which cells touch which, across the line drawn between them."""
+    want = np.zeros(labels.max() + 2, bool)
+    want[list(wanted)] = True
+    pairs = set()
+    for dy, dx in ((0, 1), (1, 0), (1, 1), (1, -1)):
+        a = labels[reach:-reach, reach:-reach]
+        b = labels[reach + dy * reach:labels.shape[0] - reach + dy * reach,
+                   reach + dx * reach:labels.shape[1] - reach + dx * reach]
+        m = (a > 0) & (b > 0) & (a != b) & want[a] & want[b]
+        for u, v in zip(a[m], b[m]):
+            pairs.add((int(min(u, v)), int(max(u, v))))
+    adj = {}
+    for u, v in pairs:
+        adj.setdefault(u, set()).add(v)
+        adj.setdefault(v, set()).add(u)
+    return adj
+
+
+def cell_points(labels, stats, centroids, keep, line, tangent, merge=1.6):
+    """One point per printed cell.
+
+    Where a division line is too faint to register, neighbouring cells come
+    out as one blob -- two, three, even four cells long. A blob that is a clean
+    multiple of the usual cell size is cut into that many pieces along the
+    direction of travel.
+    """
+    typical = float(np.median([stats[i, 4] for i in keep]))
+    tree = cKDTree(line)
+    points, split = [], 0
+    for i in keep:
+        k = int(round(stats[i, 4] / typical)) if stats[i, 4] > merge * typical else 1
+        if k <= 1:
+            points.append(tuple(centroids[i]))
+            continue
+        ys, xs = np.nonzero(labels == i)
+        _, at = tree.query(centroids[i])
+        t = xs * tangent[at][0] + ys * tangent[at][1]
+        cuts = np.quantile(t, np.linspace(0, 1, k + 1))
+        for a, b in zip(cuts[:-1], cuts[1:]):
+            part = (t >= a) & (t <= b)
+            points.append((float(xs[part].mean()), float(ys[part].mean())))
+        split += 1
+    return points, typical, split
+
+
+def place_cells(points, line, norm, side, tangent):
+    """Where each cell sits: along the lap, across the road, and facing where."""
+    tree = cKDTree(line)
+    info = {}
+    for i, (cx, cy) in enumerate(points):
+        _, at = tree.query([cx, cy])
+        off = np.array([cx, cy]) - line[at]
+        info[i] = {
+            "along": int(at),                                   # step along the lap
+            "across": float(np.dot(off, norm[at]) * side),      # + is towards the inside
+            "pos": (float(cx), float(cy)),
+            "rot": float(math.degrees(math.atan2(tangent[at][1], tangent[at][0]))),
+        }
+    return info
+
+
+def sort_lanes(keep, info, lanes, lane_width, n_steps, window=20):
+    """Number the lanes from the inside out.
+
+    Distance from the racing line alone will not do it: through a corner the
+    traced line drifts off the middle, so a fixed threshold puts whole
+    stretches in the wrong lane. Instead each cell is compared with the cells
+    around it along the road: locally, the middle of those is the middle lane,
+    and a cell's lane is how many lane widths it sits either side of that.
+    """
+    along = np.array([info[i]["along"] for i in keep])
+    across = np.array([info[i]["across"] for i in keep])
+    middle = (lanes + 1) / 2
+    lane = {}
+    for k, i in enumerate(keep):
+        gap = np.abs(along - along[k])
+        gap = np.minimum(gap, n_steps - gap)            # the lap wraps round
+        near = across[gap <= window]
+        centre = float(np.median(near))
+        l = int(round(middle - (across[k] - centre) / lane_width))
+        lane[i] = min(max(l, 1), lanes)
+    return lane
+
+
+def corner_lines(im, min_extent=40):
+    """The red lines painted across the road where a corner starts and ends.
+
+    They are road, and leaving them out cuts the track at every corner. The
+    red dashes of a kerb are red too, but each is a short block; a corner line
+    runs the width of the road.
+    """
+    hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV).astype(int)
+    H, S, V = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+    red = ((H <= 10) | (H >= 168)) & (S > 90) & (V > 80)
+    return keep_long(red, min_extent)
+
+
+def edge_line(im, surface, contrast=6):
+    """The thin dark line printed along the track limit.
+
+    It runs just inside the kerb all the way round, a pixel or two wide and
+    close to one colour, broken only at the start/finish band. Found as dark
+    pixels with kerb on one side and road on the other -- which leaves out the
+    division lines between cells, and the red corner lines that run out onto
+    the kerb and would otherwise drag the edge off the track.
+    """
+    gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+    background = cv2.medianBlur(gray, 15).astype(np.float32)
+    dark = (background - gray.astype(np.float32)) > contrast
+    hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV).astype(int)
+    H, S, V = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+    # A kerb is a long white line, or the red blocks of a dashed one. The
+    # white squares of the start/finish band and the outlines of the grid
+    # boxes are short, and the dark squares and lines beside them are not
+    # the track edge.
+    white = keep_long((S < 60) & (V >= 205), 60) > 0
+    red = ((H <= 10) | (H >= 168)) & (S > 90) & (V > 80)
+    kerb = (white | (red & (corner_lines(im) == 0))).astype(np.uint8)
+    beside = np.ones((5, 5), np.uint8)
+    near_kerb = cv2.dilate(kerb, beside) > 0
+    near_road = cv2.dilate(surface, beside) > 0
+    return (dark & near_kerb & near_road).astype(np.uint8)
+
+
+def outer_edge(edge_pixels, line, norm, side, width, reverse, step=6.0, jump=2.5, min_run=3):
+    """The outside edge of the track, as one ordered loop.
+
+    "Outside" means the same side of the road all the way round -- the
+    driver's outer hand -- not the outside of the shape. Where the track folds
+    into the infield, as Loews does, every edge of the fold faces inwards and
+    an outline would cut straight across the pinch. So take every pixel of the
+    printed edge line, keep those on the outer side of the racing line, and
+    read them off in running order.
+    """
+    pts = np.argwhere(edge_pixels > 0)[:, ::-1].astype(float)
+    _, at = cKDTree(line).query(pts)
+    off = np.einsum("ij,ij->i", pts - line[at], norm[at]) * side   # + is inwards
+    # The edge sits about half a road out. Much nearer is a hole inside the
+    # road; much further is somebody else's road.
+    ok = (off < -0.3 * width) & (off > -0.85 * width)
+    pts, at, off = pts[ok], at[ok], off[ok]
     n = len(line)
-    centres = []
-    for i in range(len(div)):
-        a, b = div[i], div[(i + 1) % len(div)]
-        if b < a:
-            b += n
-        centres.append(((a + b) / 2) % n)
-    centres = np.array(centres)
-    if reverse:
-        centres = centres[::-1]
+    edge = np.full((n, 2), np.nan)
+    offset = np.full(n, np.nan)
+    for a in range(n):
+        hit = at == a
+        if hit.any():
+            edge[a] = np.median(pts[hit], axis=0)
+            offset[a] = np.median(off[hit])
+    have = ~np.isnan(offset)
+    idx = np.arange(n)
 
-    pos = at(line, centres)
-    tan = at(line, (centres + 1) % n) - at(line, (centres - 1) % n)
-    if reverse:
-        tan = -tan
-    tan /= np.linalg.norm(tan, axis=1, keepdims=True) + 1e-9
-    nrm = at(norm, centres)
-    wid = at(widths, centres)
-    side = inner_side(line, norm)
+    # Where a corner line is painted over the edge line there is nothing to
+    # find, and a dark fleck in the kerb can stand in for it. The edge's
+    # distance from the racing line changes smoothly, so a step that jumps
+    # away from its neighbours is thrown out and filled from either side.
+    filled = np.interp(idx, idx[have], offset[have], period=n)
+    expected = median_filter(filled, size=15, mode="wrap")
+    have &= np.abs(filled - expected) <= jump
 
+    # Only what was actually found: runs of steps where the edge line was
+    # seen, left as separate pieces. Gaps stay gaps so they can be looked at.
+    pieces, run = [], []
+    order = range(n - 1, -1, -1) if reverse else range(n)
+    for a in order:
+        if have[a]:
+            run.append(edge[a])
+        elif run:
+            pieces.append(run)
+            run = []
+    if run:
+        # The lap wraps round: join the last run onto the first if they meet.
+        if pieces and have[order[0]]:
+            pieces[0] = run + pieces[0]
+        else:
+            pieces.append(run)
+    thin = max(1, int(round(step / (np.hypot(*np.diff(line, axis=0).T).mean()))))
+    pieces = [np.array(p)[::thin] for p in pieces if len(p) >= min_run]
+    return pieces, have.mean()
+
+
+def racing_line(im):
+    """The middle of the road, as one closed loop, plus the road width."""
+    mask = road_mask(im)
+    dist = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
+    skel = skeletonize(mask > 0)
+    # The pit road is one lane wide (~25 px on Monaco) and the track three
+    # (~73); cut between them, low enough to keep the track in one piece.
+    keep = skel & (dist * 2 > 35)
+    lab = cv2.connectedComponents(keep.astype(np.uint8), 8)[1]
+    sizes = np.bincount(lab[keep])
+    pts = np.argwhere(lab == int(np.argmax(sizes[1:])) + 1)
+    loop = find_cycle(pts, extra=bridge_ends(pts))
+    line, length = resample(loop, 3.0)
+    width = float(np.median([dist[int(round(y)), int(round(x))] * 2 for x, y in line]))
+    return smooth_closed(line, 7), length, width
+
+
+def link(keep, info, lane, reverse, n_steps, reach=45):
+    """Order each lane round the lap and connect every cell to the ones ahead.
+
+    A car moves to the next cell in its lane, or diagonally into a lane beside
+    it. The diagonal target is the cell in that lane closest to where the
+    straight-on move lands, looked for only ahead and only nearby -- touching
+    blobs alone are too loose, since a split cell touches several.
+    """
+    direction = -1 if reverse else 1
+
+    def ahead_by(a, b):
+        return ((info[b]["along"] - info[a]["along"]) * direction) % n_steps
+
+    order = {}
+    for i in keep:
+        order.setdefault(lane[i], []).append(i)
+    for l in order:
+        order[l].sort(key=lambda i: info[i]["along"], reverse=reverse)
+
+    nxt = {}
+    for l, cells in order.items():
+        for k, i in enumerate(cells):
+            straight = cells[(k + 1) % len(cells)]
+            targets = {straight}
+            for side_lane in (l - 1, l + 1):
+                best, best_d = None, None
+                for j in order.get(side_lane, ()):
+                    g = ahead_by(i, j)
+                    if not 2 <= g <= reach:
+                        continue
+                    d = abs(((info[j]["along"] - info[straight]["along"]) + n_steps / 2) % n_steps - n_steps / 2)
+                    if best is None or d < best_d:
+                        best, best_d = j, d
+                if best is not None:
+                    targets.add(best)
+            nxt[i] = targets
+    return order, nxt
+
+
+def find_spaces(labels, stats, centroids, blobs, line, norm, side, tangent, width, reverse):
+    """Spaces from the printed cells. Parked behind --spaces for now: the
+    outer edge is being checked first."""
+    points, typical, split = cell_points(labels, stats, centroids, blobs, line, tangent)
+    print("cell size %.0f px; split %d merged blob(s)" % (typical, split))
+    info = place_cells(points, line, norm, side, tangent)
+    keep = list(info)
+    lane = sort_lanes(keep, info, LANES, width / LANES, len(line))
+    order, nxt = link(keep, info, lane, reverse, len(line))
+    print("cells on the track: %d  -- per lane: %s"
+          % (len(keep), ", ".join("%d: %d" % (l, len(order[l])) for l in sorted(order))))
+    ids = {}
+    for l in sorted(order):
+        for i in order[l]:
+            ids[i] = len(ids) + 1
     spaces = []
-    for c in range(len(centres)):
-        for lane in range(1, lanes + 1):
-            # Lane 1 is the innermost, so step out from the inside edge.
-            frac = (0.5 - (lane - 0.5) / lanes) * side
-            p = pos[c] + nrm[c] * frac * wid[c] * 0.92
-            heading = math.degrees(math.atan2(tan[c][1], tan[c][0]))
-            nxt = []
-            for other in (lane - 1, lane, lane + 1):
-                if 1 <= other <= lanes:
-                    nxt.append(((c + 1) % len(centres)) * lanes + other)
+    for l in sorted(order):
+        for k, i in enumerate(order[l]):
             spaces.append({
-                "id": c * lanes + lane,
-                "pos": [round(float(p[0]), 1), round(float(p[1]), 1)],
-                "rot": round(heading, 1),
-                "lane": lane,
-                "next": nxt,
+                "id": ids[i],
+                "pos": [round(info[i]["pos"][0], 1), round(info[i]["pos"][1], 1)],
+                "rot": round(info[i]["rot"], 1),
+                "lane": l,
+                "next": sorted(ids[j] for j in nxt[i]),
                 "corner": None,
-                "sector": c + 1,
+                "sector": k + 1,
             })
-    return spaces
+    return sorted(spaces, key=lambda sp: sp["id"])
 
 
-def write_track(info, im, spaces, lanes, path, reverse):
+def write_track(info, im, spaces, lanes, path, reverse, outer=()):
     track = {
         "detect": {"reverse": reverse},
+        # The outside edge of the road, as the pieces where it was found.
+        "outer": [[[round(float(x), 1), round(float(y), 1)] for x, y in piece] for piece in outer],
         "id": info["id"],
         "name": info["name"],
         "ruleset": "formula_d" if info["category"] == "formula_d" else "formula_de",
@@ -333,79 +605,10 @@ def write_track(info, im, spaces, lanes, path, reverse):
 
 
 def main():
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    map_id = args[0] if args else "FDMonaco"
-    # Which way round the track runs cannot be read off the image, so it is
-    # remembered in the track file once set.
-    existing = ROOT / "tracks" / f"{map_id}.json"
-    reverse = False
-    if existing.exists():
-        reverse = json.loads(existing.read_text(encoding="utf-8")).get("detect", {}).get("reverse", False)
-    if "--reverse" in sys.argv:
-        reverse = not reverse
-    print("running direction:", "reversed" if reverse else "as traced")
-    info, im = board_image(map_id)
-    print(f"{info['name']}  {im.shape[1]}x{im.shape[0]}")
-
-    mask = road_mask(im)
-    dist = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
-    skel = skeletonize(mask > 0)
-    # The pit road is one lane wide (~25 px here) and the track three (~73);
-    # cut between them, low enough to keep the track itself in one piece.
-    keep = skel & (dist * 2 > 35)
-    lab = cv2.connectedComponents(keep.astype(np.uint8), 8)[1]
-    sizes = np.bincount(lab[keep])
-    pts = np.argwhere(lab == int(np.argmax(sizes[1:])) + 1)
-
-    bridges = bridge_ends(pts)
-    print("bridged %d gap(s) in the road" % len(bridges))
-    loop = find_cycle(pts, extra=bridges)
-    line, length = resample(loop, 3.0)
-    widths = np.array([dist[int(round(y)), int(round(x))] * 2 for x, y in line])
-    line = smooth_closed(line, 9)
-    widths = smooth_closed(widths, 15)
-    step = length / len(line)
-    print("centreline: %d points, %.0f px round" % (len(line), length))
-    print("road width: median %.1f  p10 %.1f  p90 %.1f"
-          % (np.median(widths), np.percentile(widths, 10), np.percentile(widths, 90)))
-
-    lanes = LANES
-    norm = normals(line)
-    gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY).astype(np.float32)
-    div, score = divisions(gray, line, norm, widths, lanes, step)
-    gaps = np.diff(np.r_[div, div[0] + len(line)]) * step
-    print("divisions: %d, spacing median %.1f  p10 %.1f  p90 %.1f"
-          % (len(div), np.median(gaps), np.percentile(gaps, 10), np.percentile(gaps, 90)))
-
-    div, added = fill_divisions(div, len(line))
-    print("filled in %d skipped division(s) -> %d cells" % (added, len(div)))
-
-    spaces = build_spaces(line, norm, widths, div, lanes, reverse)
-    track_path = ROOT / "tracks" / f"{map_id}.json"
-    write_track(info, im, spaces, lanes, track_path, reverse)
-    print("%d spaces -> %s" % (len(spaces), track_path.relative_to(ROOT)))
-
-    OUT.mkdir(parents=True, exist_ok=True)
-    np.savez(OUT / f"{map_id}_line.npz", line=line, widths=widths, mask=mask,
-             divisions=div, score=score, step=step)
-    vis = im.copy()
-    for x, y in line.astype(int):
-        cv2.circle(vis, (x, y), 1, (0, 0, 255), -1)
-    for i in div.astype(int):
-        p, nn, w = line[i], norm[i], widths[i] * 0.5
-        cv2.line(vis, tuple((p - nn * w).astype(int)), tuple((p + nn * w).astype(int)), (255, 0, 0), 1)
-    lane_colour = [(0, 220, 255), (0, 255, 120), (255, 120, 0)]
-    for sp in spaces:
-        x, y = int(sp["pos"][0]), int(sp["pos"][1])
-        cv2.circle(vis, (x, y), 4, lane_colour[(sp["lane"] - 1) % 3], -1)
-        if sp["lane"] == 1:
-            a = math.radians(sp["rot"])
-            cv2.arrowedLine(vis, (x, y),
-                            (int(x + 26 * math.cos(a)), int(y + 26 * math.sin(a))),
-                            (255, 255, 255), 2, tipLength=0.4)
-    cv2.imwrite(str(OUT / f"{map_id}_spaces.png"), vis)
-    print(f"  -> {(OUT / (map_id + '_spaces.png')).relative_to(ROOT)}")
-    return 0
+    # The spaces now come from find_grid.py, which reads the printed grid
+    # directly; this module keeps the pieces it builds on (the road mask, the
+    # racing line) and no longer writes track files itself.
+    sys.exit("Use tools/extract/find_grid.py to find a track's spaces.")
 
 
 if __name__ == "__main__":

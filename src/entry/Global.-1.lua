@@ -10,11 +10,15 @@
 
 local Race = require("fd.core.race")
 local Rules = require("fd.rules.beginner")
+local Maps = require("fd.data.maps")
 local Dice = require("fd.tts.dice")
 local Dashboard = require("fd.tts.dashboard")
 local Hud = require("fd.tts.hud")
 local Controls = require("fd.tts.controls")
 local Mini = require("fd.tts.minidash")
+local Track = require("fd.tts.track")
+local Editor = require("fd.tts.track_editor")
+local TRACKS = { FDMonaco = require("fd.data.tracks.FDMonaco") }
 
 mod_packed = false
 setup_packed = false
@@ -51,7 +55,17 @@ function onLoad(saved_data)
 
     race = Race.new(Rules, saved.race)
     Dice.prepareAll()
+    Dashboard.scan()
     Mini.registerAsset()
+    setupTrackEditor(saved.edits, saved.markers)
+    buildUi()
+end
+
+--- (Re)build the race panel and the screen dashboards, then fill them in.
+function buildUi()
+    -- Until the new XML has loaded, updates would go to elements on their way
+    -- out and then be skipped as repeats once it has (see fd.tts.ui).
+    Mini.setReady(false)
     Hud.build(Rules.name, Mini.panels(Rules), function()
         applyModMenuButton()
         Mini.setReady()
@@ -59,8 +73,39 @@ function onLoad(saved_data)
     end)
 end
 
+-- Players who join after onLoad get the XML saved with the game, not the panels
+-- the script added, and TTS does not re-check `visibility` when a player
+-- changes seat. Sending the whole UI again fixes both. Batched so a burst of
+-- joins and seat changes costs one rebuild.
+local rebuildPending = false
+
+local function rebuildUiSoon()
+    if rebuildPending then
+        return
+    end
+    rebuildPending = true
+    Wait.time(function()
+        rebuildPending = false
+        buildUi()
+    end, 1)
+end
+
+function onPlayerConnect()
+    rebuildUiSoon()
+end
+
+function onPlayerChangeColor()
+    rebuildUiSoon()
+end
+
 function onSave()
-    return JSON.encode({ mp = mod_packed, sp = setup_packed, race = race and race:serialize() })
+    return JSON.encode({
+        mp = mod_packed, sp = setup_packed, race = race and race:serialize(),
+        -- Hand edits to track spaces; tools/extract/import_track.py reads them.
+        edits = Editor.save(),
+        -- Editor markers out on the board; removed on load (see Editor.load).
+        markers = Editor.markerGuids(),
+    })
 end
 
 function showModMenu()
@@ -92,11 +137,27 @@ local function tintOf(color)
     return Color.fromString(color)
 end
 
-local function syncDashboards()
+-- What each car's dashboard last showed, so an action that leaves a car alone
+-- does not move all of its markers again.
+local synced = {}
+
+local function dashState(car)
+    local parts = { car.tts.dash or "", car.gear }
+    for _, z in ipairs(Rules.zones) do parts[#parts + 1] = car.wear[z.id] end
+    return table.concat(parts, "|")
+end
+
+--- Put every car's gear stick and wear markers where the race says.
+-- `force` re-places them even if nothing changed: after a player drops one
+-- somewhere it should not be, or moves the dashboard.
+local function syncDashboards(force)
+    if force then synced = {} end
     for _, car in ipairs(race:cars()) do
         car.tts = car.tts or {}
-        local dash = car.tts.dash and getObjectFromGUID(car.tts.dash)
+        local state = dashState(car)
+        local dash = synced[car.color] ~= state and car.tts.dash and getObjectFromGUID(car.tts.dash)
         if dash then
+            synced[car.color] = state
             if Dashboard.fits(dash, Rules) then
                 car.tts.markers = car.tts.markers or {}
                 Dashboard.sync(dash, car.tts.markers, car, Rules, tintOf(car.color))
@@ -144,11 +205,9 @@ local function dashLabel(car)
 end
 
 local function renderDashboards()
-    for _, obj in ipairs(getObjects()) do
-        if Dashboard.is(obj) then
-            local car = carOnDash(obj.getGUID())
-            Controls.render(obj, car, car and dashLabel(car))
-        end
+    for _, obj in ipairs(Dashboard.all()) do
+        local car = carOnDash(obj.getGUID())
+        Controls.render(obj, car, car and dashLabel(car))
     end
 end
 
@@ -202,7 +261,7 @@ local function ownerOf(color, gear)
     if race:car(color) then
         return color
     end
-    local match
+    local match = nil
     for _, car in ipairs(race:cars()) do
         if car.gear == gear then
             if match then return color end
@@ -340,7 +399,7 @@ local function dashboardMoved(dash)
     Wait.time(function()
         if dash == nil then return end
         Controls.invalidate(dash)
-        syncDashboards()
+        syncDashboards(true)
         renderDashboards()
     end, 0.8)
 end
@@ -377,14 +436,14 @@ function onObjectDrop(color, obj)
         if gear and gear ~= car.gear then
             shiftTo(car.color, gear)
         else
-            syncDashboards() -- same gear or off the gate: settle it back in its slot
+            syncDashboards(true) -- same gear or off the gate: settle it back in its slot
         end
     else
         local value = Dashboard.slotAt(dash, kind, pos, WEAR_REACH)
         if value then
             act(function() race:setWear(car.color, kind, value, "marker moved") end)
         else
-            syncDashboards()
+            syncDashboards(true)
         end
     end
 end
@@ -398,6 +457,7 @@ end
 function onObjectSpawn(obj)
     Dice.prepare(obj)
     if Dashboard.is(obj) then
+        Dashboard.track(obj)
         dashboardMoved(obj)
     end
 end
@@ -565,10 +625,196 @@ function fdUndo(player)
     end
     race = Race.new(Rules, JSON.decode(last))
     printToAll(player.steam_name .. " undid the last change", LEVEL_RGB.info)
-    syncDashboards()
+    syncDashboards(true)
     refresh()
 end
 
 function fdToggleRace()
     Hud.toggleRace()
+end
+
+-- Track overlay and editor -------------------------------------------------------
+
+local trackShown = nil
+
+--- The track data for the map on the board, if there is any.
+local function trackOnBoard()
+    local tile = Track.tile()
+    local custom = tile and tile.getCustomObject()
+    for id, track in pairs(TRACKS) do
+        local map = Maps and Maps.byId and Maps.byId[id]
+        if custom and map and custom.image == map.url then
+            return track
+        end
+    end
+    return nil
+end
+
+local function editorStatus()
+    if not Editor.isOpen() then
+        Hud.setEditor(nil)
+        return
+    end
+    local track = Editor.trackFor(TRACKS[Editor.openId()])
+    local _, problems = Editor.problems()
+    Hud.setEditor(string.format("Editing %s: %d spaces, %d problem(s) shown red, %d marker(s) out",
+        track.name, #track.spaces, #problems, Editor.markerCount()))
+end
+
+--- Draw the spaces over the board, to check them against the print.
+function fdTrack(player)
+    if Editor.isOpen() then
+        broadcastToColor("The editor is open; close it to hide the spaces.", player.color, LEVEL_RGB.info)
+        return
+    end
+    if trackShown then
+        Track.hide()
+        trackShown = nil
+        printToAll("Track overlay off", LEVEL_RGB.info)
+        return
+    end
+    local track = trackOnBoard()
+    if not track then
+        broadcastToColor("No track data for the map on the board yet.", player.color, LEVEL_RGB.warn)
+        return
+    end
+    local ok, why = Track.show(Editor.trackFor(track))
+    if ok then
+        trackShown = track.id
+        printToAll(string.format("%s: %d spaces", track.name, #Editor.trackFor(track).spaces), LEVEL_RGB.info)
+    else
+        broadcastToColor("Cannot show the track: " .. why, player.color, LEVEL_RGB.warn)
+    end
+end
+
+local function pickUpAt(color, pos)
+    local n = Editor.grab(pos)
+    broadcastToColor(n > 0 and ("Picked up " .. n .. " space(s).") or "No spaces nearby.", color, LEVEL_RGB.info)
+    editorStatus()
+end
+
+local function addAt(color, pos)
+    local s = Editor.add(pos)
+    if not s then
+        broadcastToColor("The board tile is missing.", color, LEVEL_RGB.warn)
+        return
+    end
+    broadcastToColor("Added space " .. s.id .. " in lane " .. s.lane .. ".", color, LEVEL_RGB.info)
+    editorStatus()
+end
+
+--- Right-click menu on the board while the editor is open: it knows where
+-- the player clicked, so nothing needs a key bound to it.
+local function boardMenu(on)
+    local tile = Track.tile()
+    if not tile then return end
+    tile.clearContextMenu()
+    if not on then return end
+    tile.addContextMenuItem("Pick up spaces here", function(color, pos) pickUpAt(color, pos) end)
+    tile.addContextMenuItem("Add a space here", function(color, pos) addAt(color, pos) end)
+    tile.addContextMenuItem("Apply track edits", function(color) fdApply({ color = color }) end)
+end
+
+--- Open or close the track editor for the map on the board.
+function fdEdit(player)
+    if Editor.isOpen() then
+        local n = Editor.markerCount()
+        Editor.close()
+        boardMenu(false)
+        Track.hide()
+        trackShown = nil
+        printToAll(string.format("Track editor closed%s. Save the game to keep the edits.",
+            n > 0 and (" (" .. n .. " marker(s) applied)") or ""), LEVEL_RGB.info)
+        editorStatus()
+        return
+    end
+    local track = trackOnBoard()
+    if not track then
+        broadcastToColor("No track data for the map on the board yet.", player.color, LEVEL_RGB.warn)
+        return
+    end
+    Editor.open(track)
+    Editor.onChange = editorStatus
+    boardMenu(true)
+    trackShown = track.id
+    editorStatus()
+    broadcastToColor("Track editor open. Right-click the board: Pick up spaces here. Drag the "
+        .. "blocks, Q/E to turn, right-click one for its lane or to delete it, then Apply. "
+        .. "(Keys for all of this can be bound in Options > Game Keys, under \"Track editor\".)",
+        player.color, LEVEL_RGB.info)
+end
+
+function fdApply(player)
+    if not Editor.isOpen() then
+        return
+    end
+    local n = Editor.apply()
+    editorStatus()
+    printToAll(string.format("Applied %d marker(s); links recomputed.", n), LEVEL_RGB.info)
+end
+
+--- Getting edits out of the game and into the repo.
+function fdExport(player)
+    local saved = Editor.save()
+    local names = {}
+    for id, e in pairs(saved) do
+        names[#names + 1] = string.format("%s (%d spaces)", id, #e.spaces)
+    end
+    if #names == 0 then
+        broadcastToColor("No track edits to export yet.", player.color, LEVEL_RGB.info)
+        return
+    end
+    printToAll("Edited: " .. table.concat(names, ", "), LEVEL_RGB.info)
+    broadcastToColor("To export: save the game (Menu > Save), then in the repo run "
+        .. "python tools/extract/import_track.py -- it writes tracks/<id>.json from the newest save.",
+        player.color, LEVEL_RGB.info)
+end
+
+local function editorKey(fn)
+    return function(color, hovered, pointer, up)
+        if up then return end
+        if not Editor.isOpen() then
+            broadcastToColor("Open the track editor first (Edit on the race panel).", color, LEVEL_RGB.warn)
+            return
+        end
+        fn(color, hovered, pointer)
+        editorStatus()
+    end
+end
+
+local function registerEditorKeys()
+    addHotkey("Track editor: pick up spaces here", editorKey(function(color, _, pointer)
+        pickUpAt(color, pointer)
+    end))
+    addHotkey("Track editor: add a space here", editorKey(function(color, _, pointer)
+        addAt(color, pointer)
+    end))
+    for lane = 1, 3 do
+        addHotkey("Track editor: move space to lane " .. lane, editorKey(function(color, hovered)
+            if not Editor.setLane(hovered, lane) then
+                broadcastToColor("Point at a space marker first.", color, LEVEL_RGB.warn)
+            end
+        end))
+    end
+    addHotkey("Track editor: apply", editorKey(function(color)
+        fdApply({ color = color })
+    end))
+end
+
+function onObjectDestroy(obj)
+    Dashboard.forget(obj)
+    -- A car's gear stick or wear marker gone: the next update brings a new one.
+    local car = markerOwner(obj.getGUID())
+    if car then
+        synced[car.color] = nil
+    end
+    if Editor.onDestroyed(obj) then
+        editorStatus()
+    end
+end
+
+--- Called from onLoad: restore saved edits and register the editor's keys.
+function setupTrackEditor(saved, strayMarkers)
+    Editor.load(saved, strayMarkers)
+    registerEditorKeys()
 end

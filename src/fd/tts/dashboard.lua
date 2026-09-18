@@ -61,11 +61,46 @@ function Dashboard.slotAt(dash, slot, pos, reach)
     return best
 end
 
+-- The dashboards on the table, by GUID. Kept up to date from Global's spawn
+-- and destroy events, because scanning every object on the table after each
+-- click adds up once the table is full of pieces.
+local known = {}
+
+--- Find the dashboards already on the table. Once, at load.
+function Dashboard.scan()
+    known = {}
+    for _, obj in ipairs(getObjects()) do
+        if Dashboard.is(obj) then known[obj.getGUID()] = true end
+    end
+end
+
+function Dashboard.track(obj)
+    if Dashboard.is(obj) then known[obj.getGUID()] = true end
+end
+
+function Dashboard.forget(obj)
+    known[obj.getGUID()] = nil
+end
+
+--- Every dashboard on the table.
+function Dashboard.all()
+    local out = {}
+    for guid in pairs(known) do
+        local obj = getObjectFromGUID(guid)
+        if obj then
+            out[#out + 1] = obj
+        else
+            known[guid] = nil        -- gone into a bag
+        end
+    end
+    return out
+end
+
 --- The closest dashboard to `pos` whose GUID is not in `taken`.
 function Dashboard.nearest(pos, taken)
     local best, bestDist = nil, nil
-    for _, obj in ipairs(getObjects()) do
-        if Dashboard.is(obj) and not taken[obj.getGUID()] then
+    for _, obj in ipairs(Dashboard.all()) do
+        if not taken[obj.getGUID()] then
             local p = obj.getPosition()
             local d = (p.x - pos.x) ^ 2 + (p.z - pos.z) ^ 2
             if not bestDist or d < bestDist then

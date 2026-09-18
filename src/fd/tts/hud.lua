@@ -4,6 +4,7 @@
 -- Big Box menu button survives.
 
 local Race = require("fd.core.race")
+local Ui = require("fd.tts.ui")
 
 local Hud = {}
 
@@ -37,7 +38,7 @@ end
 
 local function racePanel(rulesName)
     return el("Panel", {
-        id = "fdr", rectAlignment = "UpperLeft", offsetXY = "20 -120", width = "360", height = "340",
+        id = "fdr", rectAlignment = "UpperLeft", offsetXY = "20 -120", width = "380", height = "420",
         allowDragging = "true", returnToOriginalPositionWhenReleased = "false", color = PANEL_BG,
     }, {
         el("VerticalLayout", { padding = "8 8 6 6", spacing = "4", childForceExpandHeight = "false" }, {
@@ -45,7 +46,7 @@ local function racePanel(rulesName)
                 text("fdr_title", "Formula D", { fontSize = "18", fontStyle = "Bold", flexibleWidth = "1" }),
                 button("fdr_min", "_", "fdToggleRace", { preferredWidth = "30", flexibleWidth = "0", tooltip = "Collapse" }),
             }),
-            el("VerticalLayout", { id = "fdr_body", spacing = "4", childForceExpandHeight = "false", preferredHeight = "290" }, {
+            el("VerticalLayout", { id = "fdr_body", spacing = "4", childForceExpandHeight = "false", preferredHeight = "370" }, {
                 text("fdr_rules", rulesName, { fontSize = "12", color = "#AAB0B8", preferredHeight = "16" }),
                 text("fdr_cars", "No cars yet -- click Join race on a dashboard.", { preferredHeight = "180", fontSize = "15" }),
                 text("fdr_checks", "", { preferredHeight = "40", color = "#FFB74D" }),
@@ -54,14 +55,30 @@ local function racePanel(rulesName)
                     button("fdr_start", "Start", "fdStart", { tooltip = "Reset cars and roll for the start" }),
                     button("fdr_undo", "Undo", "fdUndo", { tooltip = "Undo the last change" }),
                     button("fdr_reset", "Reset", "fdReset", { tooltip = "Back to setup, keeping the drivers" }),
+                    button("fdr_track", "Track", "fdTrack", { tooltip = "Show or hide the detected spaces on the board" }),
                 }),
+                el("HorizontalLayout", { spacing = "4", preferredHeight = "30" }, {
+                    button("fdr_edit", "Edit track", "fdEdit", { tooltip = "Open or close the track editor for the map on the board" }),
+                    button("fdr_apply", "Apply", "fdApply", { tooltip = "Put the space markers back into the track" }),
+                    button("fdr_export", "Export", "fdExport", { tooltip = "How to get your edits into the repo" }),
+                }),
+                text("fdr_editor", "", { preferredHeight = "34", fontSize = "12", color = "#9FD3FF" }),
             }),
         }),
     })
 end
 
+local collapsed = false
+local editorText = ""
+
 --- Append the race panel and any `extras` to the Global UI, then call `onReady`.
+-- Safe to call again: it replaces the panels it added before.
 function Hud.build(rulesName, extras, onReady)
+    collapsed = false
+    -- Hold updates until the new XML has loaded: sent now, they would be lost
+    -- with the old elements yet remembered by fd.tts.ui, and the refresh in
+    -- onReady would then skip them as repeats.
+    ready = false
     Wait.condition(function()
         local xml = UI.getXmlTable() or {}
         local kept = {}
@@ -76,22 +93,31 @@ function Hud.build(rulesName, extras, onReady)
             kept[#kept + 1] = node
         end
         UI.setXmlTable(kept)
+        Ui.reset()           -- every element is back to what the XML says
         Wait.frames(function()
             Wait.condition(function()
                 ready = true
+                Ui.value("fdr_editor", editorText)
                 onReady()
             end, function() return not UI.loading end)
         end, 2)
     end, function() return not UI.loading end)
 end
 
-local collapsed = false
+--- The track editor's status line; nil hides it.
+function Hud.setEditor(textValue)
+    editorText = textValue or ""
+    if not ready then
+        return
+    end
+    Ui.value("fdr_editor", textValue or "")
+end
 
 function Hud.toggleRace()
     collapsed = not collapsed
-    UI.setAttribute("fdr_body", "active", tostring(not collapsed))
-    UI.setAttribute("fdr", "height", collapsed and "46" or "340")
-    UI.setValue("fdr_min", collapsed and "+" or "_")
+    Ui.set("fdr_body", "active", tostring(not collapsed))
+    Ui.set("fdr", "height", collapsed and "46" or "420")
+    Ui.value("fdr_min", collapsed and "+" or "_")
 end
 
 local function wearSummary(race, car)
@@ -104,7 +130,7 @@ end
 
 local function carLine(race, car, i)
     local hex = HEX[car.color] or "#FFFFFF"
-    local status
+    local status = nil
     if car.eliminated then
         status = "<color=#FF5252>OUT</color>"
     else
@@ -141,14 +167,14 @@ function Hud.refresh(race)
     elseif s.phase == "grid" then
         title = title .. "  -  Grid roll"
     end
-    UI.setValue("fdr_title", title)
+    Ui.value("fdr_title", title)
 
     local lines = {}
     for i, car in ipairs(race:cars()) do
         lines[i] = carLine(race, car, i)
     end
-    UI.setValue("fdr_cars", #lines > 0 and table.concat(lines, "\n") or "No cars yet -- click Join race on a dashboard.")
-    UI.setValue("fdr_checks", checkLine(race))
+    Ui.value("fdr_cars", #lines > 0 and table.concat(lines, "\n") or "No cars yet -- click Join race on a dashboard.")
+    Ui.value("fdr_checks", checkLine(race))
 end
 
 Hud.HEX = HEX

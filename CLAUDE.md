@@ -65,6 +65,7 @@ location, is the portable one.
 ```powershell
 python tools/check_lua.py      # luaparser syntax check over src/
 python tools/test_lua.py       # lupa: rules + Global wiring tests
+python tools/test_lua.py --bench   # optional: UI updates / game calls per action
 pwsh tools/sync.ps1 push
 ```
 
@@ -85,6 +86,16 @@ the two seconds.
 
 ## TTS gotchas worth remembering
 
+- TTS runs MoonSharp, not real Lua. Inside a function, a bare `local x` is not
+  reliably `nil` -- it can hold a leftover value from an earlier variable, which
+  real Lua (and so our tests) never shows. Write `local x = nil`;
+  `tools/check_lua.py` rejects the bare form.
+- Every `UI.setAttribute`/`setValue` goes to every player's client, and calls
+  into the game (`getObjects()`, object methods) are slow next to plain Lua.
+  Send UI updates through `fd.tts.ui` (`Ui.set`/`Ui.value`), which drops
+  repeats, and call `Ui.reset()` after any `UI.setXmlTable`. Keep lists of
+  objects you need (see `Dashboard.all()`, `Dice.find`) rather than scanning
+  the table. `python tools/test_lua.py --bench` counts these per action.
 - UI handlers are called as `(player, value, elementId)`, where `value` is the
   argument in the attribute: `onClick="selectMap(FDMonaco)"`.
 - `getObjectFromGUID` returns `nil` for objects inside containers or not yet
