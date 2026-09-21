@@ -175,7 +175,25 @@ function Graph.problems(spaces, cell)
     for _, s in ipairs(spaces) do byId[s.id] = s end
     local close = 0.3 * cell
     local g = close > 0 and newGrid(spaces, close) or nil
+    -- A space turned the wrong way round links backwards and parks cars
+    -- backwards, but nothing else about it looks odd; its neighbours give it
+    -- away, all facing the other way.
+    local near = 1.2 * cell
+    local wide = near > 0 and newGrid(spaces, near) or nil
     for _, s in ipairs(spaces) do
+        if wide then
+            local fx, fy = facing(s)
+            local along, against = 0, 0
+            around(wide, s.pos[1], s.pos[2], near, function(o)
+                if o ~= s and dist(s, o) < near then
+                    local ox, oy = facing(o)
+                    if fx * ox + fy * oy < 0 then against = against + 1 else along = along + 1 end
+                end
+            end)
+            if against >= 2 and against > along then
+                out[#out + 1] = { id = s.id, text = "faces against the spaces around it" }
+            end
+        end
         local straight = false
         for _, n in ipairs(s.next or {}) do
             local o = byId[n]

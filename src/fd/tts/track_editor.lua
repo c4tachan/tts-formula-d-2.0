@@ -38,7 +38,7 @@ local function copySpace(s)
     local nxt = {}
     for i, n in ipairs(s.next or {}) do nxt[i] = n end
     return { id = s.id, pos = { s.pos[1], s.pos[2] }, rot = s.rot, lane = s.lane, next = nxt,
-             fixed = s.fixed or nil }
+             fixed = s.fixed or nil, corner = s.corner }
 end
 
 --- The track as it stands: the edited copy if there is one, else the original.

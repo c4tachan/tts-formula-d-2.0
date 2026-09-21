@@ -172,6 +172,9 @@ end
 -- the marker shows which way a car parked there would face.
 local MARK_LONG, MARK_WIDE = 13, 7
 local PROBLEM_COLOUR = { 1, 0.15, 0.15 }
+-- Spaces inside a corner get a second, smaller outline in this colour.
+local CORNER_COLOUR = { 1, 0.3, 0.85 }
+local CORNER_INSET = 0.55
 
 --- A footprint on every space, with a tick out to the space straight ahead.
 --
@@ -221,6 +224,13 @@ function Track.overlay(tile, track, flagged)
             color = (flagged and flagged[s.id]) and PROBLEM_COLOUR or LANE_COLOUR[s.lane] or { 1, 1, 1 },
             thickness = thickness,
         }
+        if s.corner then
+            local l, w = MARK_LONG * CORNER_INSET, MARK_WIDE * CORNER_INSET
+            lines[#lines + 1] = {
+                points = { at(l, w), at(l, -w), at(-l, -w), at(-l, w), at(l, w) },
+                color = CORNER_COLOUR, thickness = thickness,
+            }
+        end
         -- Links set by hand are drawn out in full, in white.
         if s.fixed then
             for _, n in ipairs(s.next or {}) do

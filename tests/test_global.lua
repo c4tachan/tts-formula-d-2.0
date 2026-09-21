@@ -332,7 +332,13 @@ function T.track_overlay_maps_pixels_onto_the_board()
 
     fdTrack({ color = "Red", steam_name = "RedPlayer" })
     local lines = S.board.getVectorLines()
-    eq(#lines, #FDMonaco.outer + #FDMonaco.spaces, "a line per piece of edge and one per space")
+    local inCorners = 0
+    for _, s in ipairs(FDMonaco.spaces) do
+        if s.corner then inCorners = inCorners + 1 end
+    end
+    assert(inCorners > 0, "Monaco has corners")
+    eq(#lines, #FDMonaco.outer + #FDMonaco.spaces + inCorners,
+        "a line per piece of edge, one per space, and a second on each space inside a corner")
     assert(lines[1].thickness < 0.01, "thickness is in the tile's local space")
     assert(S.logged(FDMonaco.name))
 

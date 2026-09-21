@@ -35,14 +35,30 @@ def lua_track(track):
         L.append("    { " + ", ".join(f"{{ {x}, {y} }}" for x, y in piece) + " },")
     L += ["}", "",
           "-- id, x, y (image pixels), facing in degrees, lane, then the spaces",
-          "-- this one leads to. Ids run lane by lane in running order. `fixed`",
-          "-- marks links set by hand in the editor, which are never recomputed.",
+          "-- this one leads to. Ids run lane by lane in running order. `corner`",
+          "-- is the corner a space lies inside; `fixed` marks links set by hand",
+          "-- in the editor, which are never recomputed.",
           "T.spaces = {"]
     for s in track["spaces"]:
         nxt = ", ".join(str(n) for n in s["next"])
-        fixed = ", fixed = true" if s.get("fixed") else ""
+        extra = ""
+        if s.get("corner"):
+            extra += ", corner = {}".format(s["corner"])
+        if s.get("fixed"):
+            extra += ", fixed = true"
         L.append("    {{ id = {}, pos = {{ {}, {} }}, rot = {}, lane = {}, sector = {}, next = {{ {} }}{} }},".format(
-            s["id"], s["pos"][0], s["pos"][1], s["rot"], s["lane"], s["sector"], nxt, fixed))
+            s["id"], s["pos"][0], s["pos"][1], s["rot"], s["lane"], s["sector"], nxt, extra))
+    L += ["}", "",
+          "-- Corners in running order from the start. A space inside one carries",
+          "-- its id (`corner` above). `stops` is how many times a car must stop",
+          "-- inside it; `long` and `short` are the ways through it the board",
+          "-- prints in green and red.",
+          "T.corners = {"]
+    for c in track.get("corners", []):
+        stops = c["stops"] if c.get("stops") is not None else "nil"
+        name = ', name = "{}"'.format(c["name"]) if c.get("name") else ""
+        ways = ", long = {}, short = {}".format(c["long"], c["short"]) if c.get("long") else ""
+        L.append("    {{ id = {}, stops = {}{}{} }},".format(c["id"], stops, ways, name))
     L += ["}", "",
           "T.byId = {}",
           "for _, s in ipairs(T.spaces) do",

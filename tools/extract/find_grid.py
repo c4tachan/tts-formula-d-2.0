@@ -80,6 +80,14 @@ def paint_out_arrows(track, road):
     return cv2.inpaint(track, halo, 5, cv2.INPAINT_TELEA), len(keep)
 
 
+def track_proper(road, line, width):
+    """The road near the racing line: leaves out the pit road and scraps of
+    pavement that came along with the road."""
+    rail = np.zeros(road.shape, np.uint8)
+    cv2.polylines(rail, [line.astype(np.int32).reshape(-1, 1, 2)], True, 255, 1)
+    return ((cv2.distanceTransform(255 - rail, cv2.DIST_L2, 5) <= 0.62 * width) & (road > 0)).astype(np.uint8)
+
+
 # 3. Corner lines ----------------------------------------------------------------
 
 def divider_colour(img, road):
@@ -507,9 +515,7 @@ def main():
     tangent = np.c_[norm[:, 1], -norm[:, 0]]
     outward_line = -norm * side
     lane_w = width / LANES
-    rail = np.zeros(road.shape, np.uint8)
-    cv2.polylines(rail, [line.astype(np.int32).reshape(-1, 1, 2)], True, 255, 1)
-    main = ((cv2.distanceTransform(255 - rail, cv2.DIST_L2, 5) <= 0.62 * width) & (road > 0)).astype(np.uint8)
+    main = track_proper(road, line, width)
 
     grey, n_red = grey_corners(clean, road, main)
     cv2.imwrite(str(name("3_grey_corners")), grey)

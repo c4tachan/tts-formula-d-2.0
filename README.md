@@ -14,7 +14,7 @@ That original is preserved verbatim in [`reference/original-2020/`](reference/or
 | Project scaffold, build pipeline | done |
 | Auto gear dice selection | done (shared dice set, results read automatically) |
 | Rules automation | Formula D basic rules, except those needing track positions |
-| Track data | Monaco done: 497 spaces, detected then hand-edited in game |
+| Track data | Monaco done: 497 spaces (detected, then hand-edited in game) and its 10 corners with their stop counts |
 | Space snapping + facings | next -- the data it needs now exists for Monaco |
 | Damage tracking | done for the basic rules' single 18 WP pool |
 | Movement limits + highlighting | next, on the same track data |
@@ -68,7 +68,8 @@ pit lane. The buttons stand in for them until track data exists.
 ### Track data: detect, then edit in game
 
 A track's spaces start from `python tools/extract/find_grid.py <mapId>`, which
-reads the grid printed on the board image and writes `tracks/<mapId>.json`.
+reads the grid printed on the board image and writes `tracks/<mapId>.json`;
+`find_corners.py <mapId>` then marks which spaces lie inside each corner.
 Each numbered image it leaves in `tools/extract/out/` is one step, for
 checking by eye. Detection is a starting point; the cleanup happens in TTS:
 

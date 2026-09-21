@@ -40,24 +40,7 @@ LANES = 3  # widest point of the track; per-track once more maps are done
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT = ROOT / "tools" / "extract" / "out"
-def documents_dir():
-    """The user's Documents folder, wherever Windows has put it.
-
-    Often redirected (OneDrive), so ask the registry rather than assume
-    ~/Documents.
-    """
-    try:
-        import winreg
-        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
-                             r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders")
-        value, _ = winreg.QueryValueEx(key, "Personal")
-        return pathlib.Path(os.path.expandvars(value))
-    except (ImportError, OSError):
-        return pathlib.Path(os.path.expanduser("~")) / "Documents"
-
-
-TTS_DIR = documents_dir() / "My Games" / "Tabletop Simulator"
-MODS = pathlib.Path(os.environ.get("TTS_MODS", TTS_DIR / "Mods"))
+from tts_paths import MODS, TTS_DIR, documents_dir  # noqa: F401  (re-exported)
 
 
 def board_image(map_id):

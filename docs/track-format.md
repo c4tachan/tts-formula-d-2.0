@@ -1,8 +1,7 @@
 # Track data format
 
-*Monaco is the first track through the pipeline; `corners`, `start`,
-`finish` and `pit` are still empty there, and will settle once they are
-filled in.*
+*Monaco is the first track through the pipeline; `start`, `finish` and `pit`
+are still empty there, and will settle once they are filled in.*
 
 Everything in objectives 3 and 5 (snapping, facings, movement limits,
 highlighting) reduces to one problem: the mod has no idea where the spaces are.
@@ -53,11 +52,13 @@ the only thing needing measurement in game is the tile itself — not each track
     }
   ],
 
-  "corners": [
+  "corners": [                   // in running order from the start
     {
       "id": 1,
-      "stops": 2,                // mandatory stops required
-      "line": [41, 42, 43]       // the spaces forming the corner's stop line
+      "stops": 2,                // mandatory stops, from the corner's flag
+      "spaces": 15,              // how many spaces lie inside it
+      "lanes": [3, 5, 7],        // by lane, innermost first
+      "long": 7, "short": 3      // the ways through printed in green and red
     }
   ],
 
@@ -88,6 +89,18 @@ corner lines as grid lines, and cuts the road along its printed lines so each
 cell comes out as one piece. A cell's lane comes from where it sits on its own
 chord across the road, which stays right through corners where a traced racing
 line drifts.
+
+`tools/extract/find_corners.py` then finds the corners: it cuts the road along
+the red lines painted across it, which leaves a ring of pieces that are corners
+and straights in turn, and the piece with the start/finish band is a straight.
+Each space takes the corner of the piece it sits in. It only writes `corner`
+and `corners`, so it can be rerun on a hand-edited file.
+
+Stop counts are printed in each corner's flag, along with the longest and
+shortest way through it. They are read by eye off the crops the script leaves
+in `out/_work/` and passed back with `--stops` and `--paths`; the path lengths
+are then checked against the spaces found, since no lane may be shorter than
+the shortest way or longer than the longest.
 
 Links are worked out from positions and facings (`fd.core.trackgraph`), the
 same rules the in-game editor uses; a space whose links were set by hand keeps

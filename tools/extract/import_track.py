@@ -25,7 +25,7 @@ def saves_dir():
     if os.environ.get("TTS_SAVES"):
         return pathlib.Path(os.environ["TTS_SAVES"])
     sys.path.insert(0, str(ROOT / "tools" / "extract"))
-    from detect_track import TTS_DIR
+    from tts_paths import TTS_DIR
     return TTS_DIR / "Saves"
 
 

@@ -112,6 +112,17 @@ function T.a_hairpin_apex_links_round_the_turn()
     eq(table.concat(byId(s, 3).next, ","), "4")
 end
 
+function T.a_space_turned_round_is_reported()
+    local s = straight(5)
+    byId(s, 8).rot = 180
+    Graph.relink(s)
+    local found = {}
+    for _, p in ipairs(Graph.problems(s)) do
+        if p.text:find("faces against") then found[#found + 1] = p.id end
+    end
+    eq(table.concat(found, ","), "8", "only the turned space")
+end
+
 function T.nearest_finds_the_closest_space()
     local s = straight(4)
     local n, d = Graph.nearest(s, 81, 51)
