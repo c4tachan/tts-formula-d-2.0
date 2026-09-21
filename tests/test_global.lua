@@ -339,6 +339,7 @@ function T.track_overlay_maps_pixels_onto_the_board()
     assert(inCorners > 0, "Monaco has corners")
     eq(#lines, #FDMonaco.outer + #FDMonaco.spaces + inCorners,
         "a line per piece of edge, one per space, and a second on each space inside a corner")
+    assert(#lines < #FDMonaco.spaces * 2.5, "hand-set links are left off outside the editor")
     assert(lines[1].thickness < 0.01, "thickness is in the tile's local space")
     assert(S.logged(FDMonaco.name))
 

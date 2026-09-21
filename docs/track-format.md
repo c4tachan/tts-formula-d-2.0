@@ -102,9 +102,19 @@ in `out/_work/` and passed back with `--stops` and `--paths`; the path lengths
 are then checked against the spaces found, since no lane may be shorter than
 the shortest way or longer than the longest.
 
-Links are worked out from positions and facings (`fd.core.trackgraph`), the
-same rules the in-game editor uses; a space whose links were set by hand keeps
-them (`fixed`).
+`tools/extract/find_arrows.py` reads the arrows printed on the road, which
+are the rules in the corners: an arrow shows the moves out of the space it is
+printed in. Each is read at its head -- two barbs meeting at an apex, pointing
+the way they bisect -- because an arrow that curves round a hairpin finishes
+well round from where it started. Three things about the board pin the reading
+down: a move only ever goes to the next space along in this lane or the lane
+either side, every space leads on down its own lane whatever is printed on it,
+and a one-headed arrow means exactly that move, so only a second or third head
+crosses a lane. Those links are written `fixed`.
+
+Elsewhere links are worked out from positions and facings
+(`fd.core.trackgraph`), the same rules the in-game editor uses; a space whose
+links were set by hand, or read off an arrow, keeps them (`fixed`).
 
 Tracks are expected to need hand correction after extraction -- the editor in
 TTS is for that, and `tools/extract/import_track.py` brings the result back

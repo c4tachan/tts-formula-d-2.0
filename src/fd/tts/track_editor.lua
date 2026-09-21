@@ -100,7 +100,7 @@ end
 function Editor.draw()
     if not open then return end
     local flagged = Editor.problems()
-    Track.show(Editor.trackFor(base[open]), flagged)
+    Track.show(Editor.trackFor(base[open]), flagged, true)
 end
 
 function Editor.open(track)

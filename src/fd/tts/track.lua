@@ -181,7 +181,10 @@ local CORNER_INSET = 0.55
 -- One line per space: the outline, then on from its front edge towards the
 -- next space in its lane. Spaces listed in `flagged` (id -> true) are drawn
 -- red. The track's outside edge is drawn too, where the file has one.
-function Track.overlay(tile, track, flagged)
+-- `links` draws every hand-set link out in full, which is worth seeing while
+-- editing and far too busy otherwise: most of a corner is hand-set once its
+-- arrows have been read.
+function Track.overlay(tile, track, flagged, links)
     local thickness = THICKNESS / math.max(tile.getScale().x, 0.001)
     local f = Track.frame(tile, track)
     local lines = {}
@@ -232,7 +235,7 @@ function Track.overlay(tile, track, flagged)
             }
         end
         -- Links set by hand are drawn out in full, in white.
-        if s.fixed then
+        if links and s.fixed then
             for _, n in ipairs(s.next or {}) do
                 local o = byId[n]
                 if o then
@@ -249,7 +252,7 @@ end
 
 --- Draw the space graph on the board. Returns false if the board is showing
 -- a different map.
-function Track.show(track, flagged)
+function Track.show(track, flagged, links)
     local tile = Track.tile()
     if not tile then
         return false, "the board tile is missing"
@@ -257,7 +260,7 @@ function Track.show(track, flagged)
     if not Track.onBoard(track, tile) then
         return false, "the board is showing a different map"
     end
-    tile.setVectorLines(Track.overlay(tile, track, flagged))
+    tile.setVectorLines(Track.overlay(tile, track, flagged, links))
     return true
 end
 
