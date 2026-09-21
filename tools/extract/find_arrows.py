@@ -57,6 +57,11 @@ NEAR = 0.8
 # How far ahead to look for the next space along, in cells: about one, but
 # the lanes either side sit further off round a corner.
 STEP = 1.6
+# How far in front of a space another has to sit to be a move at all: one
+# squarely alongside is not one, whichever way an arrow leans.
+MIN_AHEAD = 0.3
+# And how far away it may be and still be touching.
+TOUCHING = 1.5
 
 
 def arrow_ink(im):
@@ -198,16 +203,25 @@ def read_arrows(lab, keep, spaces, cell):
 def ahead_of(src, spaces, pos, cell):
     """The three spaces a move can reach: the next one along in this lane and
     in the lane either side, each the nearest in its lane to a point one cell
-    in front."""
-    front = np.array(src["pos"], float) + facing(src) * cell
+    in front.
+
+    A space has to be both touching this one and properly in front of it to
+    count: one squarely alongside is not a move, however close it sits, and
+    nor is one further off than its neighbours.
+    """
+    ahead = facing(src)
+    front = np.array(src["pos"], float) + ahead * cell
     out = {}
     for lane in (src["lane"] - 1, src["lane"], src["lane"] + 1):
         best, best_d = None, STEP * cell
         for j, s in enumerate(spaces):
             if s is src or s["lane"] != lane:
                 continue
-            if np.dot(pos[j] - src["pos"], facing(src)) <= 0:
-                continue                    # behind: no move goes backwards
+            v = pos[j] - src["pos"]
+            if np.dot(v, ahead) < MIN_AHEAD * cell:
+                continue                    # alongside or behind: not a move
+            if np.hypot(*v) > TOUCHING * cell:
+                continue                    # too far off to be the next along
             d = float(np.hypot(*(pos[j] - front)))
             if d < best_d:
                 best, best_d = s, d

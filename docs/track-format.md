@@ -106,11 +106,11 @@ the shortest way or longer than the longest.
 are the rules in the corners: an arrow shows the moves out of the space it is
 printed in. Each is read at its head -- two barbs meeting at an apex, pointing
 the way they bisect -- because an arrow that curves round a hairpin finishes
-well round from where it started. Three things about the board pin the reading
+well round from where it started. Four things about the board pin the reading
 down: a move only ever goes to the next space along in this lane or the lane
-either side, every space leads on down its own lane whatever is printed on it,
-and a one-headed arrow means exactly that move, so only a second or third head
-crosses a lane. Those links are written `fixed`.
+either side, and never to one squarely alongside or not touching; every space
+leads on down its own lane whatever is printed on it; and a one-headed arrow
+means exactly that move, so only a second or third head crosses a lane. Those links are written `fixed`.
 
 Elsewhere links are worked out from positions and facings
 (`fd.core.trackgraph`), the same rules the in-game editor uses; a space whose
