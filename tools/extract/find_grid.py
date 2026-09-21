@@ -6,8 +6,8 @@ numbered so they sort in order:
   <id>_1_track_only.png      the road, everything else white
   <id>_2_no_arrows.png       the direction arrows painted out
   <id>_3_grey_corners.png    the red corner lines redrawn as thin grey lines
-  <id>_4_junctions.png       every T (and cross) where grid lines meet
-  <id>_5_pairs.png           T's paired across a lane: the cell divisions
+  <id>_4_lines.png           the grid lines sorted: along the road or across it
+  <id>_5_rungs.png           the divisions, one per lane; guessed ones magenta
   <id>_6_spaces.png          the printed cells: one space each, by lane
 
 and finally writes the spaces to tracks/<id>.json -- unless that file has been
@@ -15,15 +15,16 @@ edited by hand in TTS, in which case it is left alone.
 
 Close-up crops of the tricky corners go to out/_work/.
 
-A cell division runs square across a lane and leaves a T at each end, so
-junctions come in pairs. A T also carries the local direction of travel -- its
-two straight-through branches run with the track -- which is steadier than a
-traced racing line through tight corners.
+Which way is across the road is taken from the road's own edges, and each
+rung's place in the running order from where it sits along its edge, so the
+hairpins -- where the racing line's nearest point is as likely to be on the
+other leg -- come out as cleanly as the straights. A rung whose spacing is
+well off its neighbours' is treated as a missed or stray division and marked
+in the step images: what the detector guessed is always visible.
 
 Run:  python tools/extract/find_grid.py FDMonaco
 """
 import sys
-from collections import deque
 
 import cv2
 import numpy as np
@@ -31,7 +32,7 @@ from scipy.spatial import cKDTree
 from skimage.morphology import skeletonize
 
 from detect_track import (OUT, LANES, board_image, corner_lines, inner_side, keep_long,
-                          normals, racing_line, surface_mask)
+                          normals, racing_line, smooth_closed, surface_mask)
 
 WORK = OUT / "_work"
 
@@ -55,7 +56,13 @@ def track_only(im):
     for i in range(1, n):
         if st[i, 4] < 3000:
             m[lab == i] = 1
-    return np.where(m[..., None] > 0, im, 255).astype(np.uint8), m
+    # The road's own edge line is black, so the asphalt mask stops a few
+    # pixels short of the printed limit, and with it every division that
+    # reaches the limit. The mask itself is left alone -- grown, it closes
+    # the gap between the legs of a hairpin -- but the image keeps a few
+    # pixels of dark ink beyond it, so the divisions reach the limit.
+    keep = cv2.dilate(m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))) & (S < 60) & (V < 205)
+    return np.where((m | keep)[..., None] > 0, im, 255).astype(np.uint8), m
 
 
 # 2. Arrows ----------------------------------------------------------------------
@@ -80,6 +87,22 @@ def paint_out_arrows(track, road):
     return cv2.inpaint(track, halo, 5, cv2.INPAINT_TELEA), len(keep)
 
 
+def paint_out_flag(track, road):
+    """The start/finish flag: a band of white squares on the asphalt (nothing
+    else painted on the road is that bright) with black ones between them.
+    Its edges would otherwise pass for divisions."""
+    gray = cv2.cvtColor(track, cv2.COLOR_BGR2GRAY)
+    bg = cv2.medianBlur(gray, 21).astype(np.float32)
+    bright = ((gray.astype(np.float32) - bg > 35) & (road > 0)).astype(np.uint8)
+    n, lab, st, _ = cv2.connectedComponentsWithStats(bright, 8)
+    squares = np.isin(lab, [i for i in range(1, n) if 12 <= st[i, 4] <= 400]).astype(np.uint8)
+    band = cv2.morphologyEx(squares, cv2.MORPH_CLOSE, np.ones((15, 15), np.uint8))
+    n, lab, st, _ = cv2.connectedComponentsWithStats(band, 8)
+    band = np.isin(lab, [i for i in range(1, n) if st[i, 4] >= 600]).astype(np.uint8)
+    band = cv2.dilate(band, np.ones((7, 7), np.uint8)) & road
+    return cv2.inpaint(track, band, 5, cv2.INPAINT_TELEA), band
+
+
 def track_proper(road, line, width):
     """The road near the racing line: leaves out the pit road and scraps of
     pavement that came along with the road."""
@@ -97,7 +120,7 @@ def divider_colour(img, road):
     return np.median(img[(dark > 12) & (road > 0) & (S < 40) & (gray > 60)], axis=0).astype(np.uint8)
 
 
-def grey_corners(img, road, main):
+def grey_corners(img, road, main, across_dir):
     """Redraw the red corner lines as thin divider-grey lines.
 
     They mark cell boundaries, but painted twice as thick as the grid and in
@@ -111,325 +134,386 @@ def grey_corners(img, road, main):
     red = ((H <= 12) | (H >= 165)) & (S > 60) & (V > 60)
     fringe = (cv2.dilate(red.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0)
     fringe &= ((H <= 15) | (H >= 160)) & (S > 25)
-    paint = ((red | fringe) & (main > 0)).astype(np.uint8)
+    # The red blocks of a kerb poke into the road mask too: only red well
+    # inside a smoothed road edge is a corner line.
+    disc = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (37, 37))
+    smooth = cv2.morphologyEx(cv2.morphologyEx(main, cv2.MORPH_OPEN, disc), cv2.MORPH_CLOSE, disc)
+    inside = cv2.distanceTransform(smooth, cv2.DIST_L2, 5) >= 5
+    paint = ((red | fringe) & (main > 0) & inside).astype(np.uint8)
     colour = divider_colour(img, road)
     solid = cv2.morphologyEx(paint, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
     core = cv2.distanceTransform(solid, cv2.DIST_L2, 3) >= 1.5
+    # The line for one lane is joined to the next lane's by a piece running
+    # along the lane line: that is no division, so only what runs across
+    # the road is redrawn.
+    cx, cy = line_orientation(core.astype(np.uint8), r=4)
+    core &= np.abs(cx * across_dir[..., 0] + cy * across_dir[..., 1]) > 0.6
     out = cv2.inpaint(img, cv2.dilate(paint, np.ones((3, 3), np.uint8)), 3, cv2.INPAINT_TELEA)
     out[core] = colour
     return out, int(paint.sum())
 
 
-# 4. Junctions -------------------------------------------------------------------
+# 4. Lines -----------------------------------------------------------------------
 
-def grid_skeleton(img, road):
+def grid_skeleton(img, road, blank):
+    """The grid lines thinned to a pixel. Nothing is read under `blank`
+    (the painted-out flag): the divisions crossing it are left to be put
+    in from their neighbours rather than read from what the painting left."""
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     dark = cv2.medianBlur(gray, 15).astype(np.float32) - gray.astype(np.float32)
-    ink = ((dark > 5) & (road > 0)).astype(np.uint8)
+    reach = cv2.dilate(road, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)))
+    ink = ((dark > 5) & (reach > 0) & (cv2.dilate(blank, np.ones((9, 9), np.uint8)) == 0)).astype(np.uint8)
     ink = cv2.morphologyEx(ink, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
     n, lab, st, _ = cv2.connectedComponentsWithStats(ink, 8)
     ink = np.isin(lab, [i for i in range(1, n) if st[i, 4] >= 20]).astype(np.uint8)
     return skeletonize(ink > 0).astype(np.uint8), ink
 
 
-def branch_points(skel, merge=6):
-    """Where three or more thinned lines meet, one point per meeting."""
-    H, W = skel.shape
-    pad = np.pad(skel, 1)
-    nb = np.stack([pad[1 + a:1 + a + H, 1 + b:1 + b + W] for a, b in RING8])
-    crossings = ((nb == 0) & (np.roll(nb, -1, axis=0) == 1)).sum(axis=0)
-    jy, jx = np.nonzero((skel == 1) & (crossings >= 3))
-    jp = np.c_[jx, jy].astype(float)
-    marks, used = [], np.zeros(len(jp), bool)
-    tree = cKDTree(jp)
-    for k in range(len(jp)):
-        if used[k]:
-            continue
-        grp = tree.query_ball_point(jp[k], merge)
-        used[grp] = True
-        marks.append(jp[grp].mean(0))
-    return np.array(marks)
+def road_sides(main, line):
+    """Distance from every road pixel to the inside edge of the loop and to the
+    outside edge, plus the inside mask.
 
-
-def branches(skel, p, inner=4, reach=14):
-    """Follow each line leaving p along the skeleton; direction and length.
-
-    Following the thinned line rather than a straight ray lets a curved
-    division count at its full length.
+    The board minus the road falls into the outside, the hole the loop
+    encloses, and pockets the road wraps right round (between the legs of a
+    hairpin); a pocket counts as inside or outside by which side of the
+    racing line it lies. The nearest edge pixel is always on the road's own
+    leg, which is what makes this hold up in the hairpins where the racing
+    line's nearest point does not.
     """
-    H, W = skel.shape
-    cx, cy = p
-    seeds = set()
-    for y in range(int(max(0, cy - inner - 2)), int(min(H, cy + inner + 3))):
-        for x in range(int(max(0, cx - inner - 2)), int(min(W, cx + inner + 3))):
-            if skel[y, x] and inner <= np.hypot(x - cx, y - cy) < inner + 1.5:
-                seeds.add((y, x))
-    groups, seen = [], set()
-    for s in seeds:
-        if s in seen:
+    n, lab, st, cen = cv2.connectedComponentsWithStats((main == 0).astype(np.uint8), 4)
+    order = np.argsort(-st[1:, 4]) + 1
+    inside = order[1]                     # order[0] is the outside
+    if st[inside, 4] < 0.03 * main.size:
+        print("   warning: the road does not close into a loop; lanes will be unreliable")
+    poly = line.astype(np.float32)
+    is_in = np.zeros(n, bool)
+    is_in[inside] = True
+    for i in order[2:]:
+        is_in[i] = cv2.pointPolygonTest(poly, (float(cen[i][0]), float(cen[i][1])), False) > 0
+    is_in[0] = False
+    inside_mask = is_in[lab]
+    d_in = cv2.distanceTransform((~inside_mask).astype(np.uint8), cv2.DIST_L2, 5)
+    d_out = cv2.distanceTransform((inside_mask | (main > 0)).astype(np.uint8), cv2.DIST_L2, 5)
+    return d_in, d_out, inside_mask.astype(np.uint8)
+
+
+def road_frame(main, line, outward, slack=6.0, window=50):
+    """For every road pixel: which way is across the road (a unit vector
+    towards the outside), how far it lies from the inside edge, and how wide
+    the road is there.
+
+    All three come from the road's own edges, which is what holds up in the
+    hairpins. The road's width drifts round the lap, so what counts as too
+    wide is judged against a running median along the racing line; where
+    the road is wider than that -- the pit exit's funnel hangs off the
+    inside of the start straight -- an edge has moved, and the position is
+    taken from the racing line instead, which runs down the middle of the
+    road proper there. The line is consulted nowhere else.
+    """
+    d_in, d_out, inside = road_sides(main, line)
+    gx = cv2.Sobel(d_in, cv2.CV_64F, 1, 0, ksize=5)
+    gy = cv2.Sobel(d_in, cv2.CV_64F, 0, 1, ksize=5)
+    g = np.hypot(gx, gy) + 1e-9
+    across = np.dstack([gx / g, gy / g])
+    pos = d_in.copy()
+    local_w = d_in + d_out
+    ys, xs = np.nonzero(main)
+    _, at = cKDTree(line).query(np.c_[xs, ys])
+    n = len(line)
+    per = np.full(n, np.nan)
+    order = np.argsort(at)
+    bounds = np.searchsorted(at[order], np.arange(n + 1))
+    w_here = local_w[ys, xs][order]
+    for i in range(n):
+        if bounds[i + 1] > bounds[i]:
+            per[i] = np.median(w_here[bounds[i]:bounds[i + 1]])
+    per = np.where(np.isnan(per), np.nanmedian(per), per)
+    expected = np.array([np.median(np.roll(per, -i)[np.r_[np.arange(0, window + 1), np.arange(n - window, n)]])
+                         for i in range(n)])
+    widened = local_w[ys, xs] > expected[at] + slack
+    # Only a sizeable stretch is a widening: a sharp apex measures a little
+    # wide on the diagonal, and there the edges are still the better guide.
+    wmask = np.zeros(main.shape, np.uint8)
+    wmask[ys[widened], xs[widened]] = 1
+    nc, lab, st, _ = cv2.connectedComponentsWithStats(wmask, 8)
+    big = np.isin(lab, [i for i in range(1, nc) if st[i, 4] >= 2500])
+    widened &= big[ys, xs]
+    if widened.any():
+        # Cut the widened stretch back to the road proper, a band the
+        # expected width about the racing line, and measure the edges again.
+        w = np.nonzero(widened)[0]
+        off = ((np.c_[xs[w], ys[w]] - line[at[w]]) * outward[at[w]]).sum(1)
+        beyond = np.abs(off) > expected[at[w]] / 2 + 4
+        trim = main.copy()
+        trim[ys[w][beyond], xs[w][beyond]] = 0
+        d_in, d_out, inside = road_sides(trim, line)
+        pos = d_in.copy()
+        local_w = d_in + d_out
+        gx = cv2.Sobel(d_in, cv2.CV_64F, 1, 0, ksize=5)
+        gy = cv2.Sobel(d_in, cv2.CV_64F, 0, 1, ksize=5)
+        g = np.hypot(gx, gy) + 1e-9
+        across = np.dstack([gx / g, gy / g])
+        # Which way is across along that stretch: square to the racing
+        # line's direction taken over a good length, which a wiggle into
+        # the funnel cannot turn. Applied to the whole stretch, a little
+        # either side, since the edges there are unreliable to the mouth.
+        tan = smooth_closed(np.gradient(line, axis=0), 2 * window + 1)
+        tan /= np.linalg.norm(tan, axis=1, keepdims=True) + 1e-9
+        nrm = np.c_[-tan[:, 1], tan[:, 0]]
+        stretch = np.zeros(n, bool)
+        stretch[at[w]] = True
+        for k in range(1, 11):
+            stretch |= np.roll(stretch, k) | np.roll(stretch, -k)
+        z = np.nonzero(stretch[at])[0]
+        sign = np.sign((nrm[at[z]] * outward[at[z]]).sum(1))[:, None]
+        across[ys[z], xs[z]] = nrm[at[z]] * sign
+    return across, pos, np.maximum(local_w, 1e-6), inside, int(widened.sum())
+
+
+def line_orientation(skel, r=4):
+    """The direction each thinned line runs in, from the spread of the
+    skeleton pixels around each one (a structure tensor)."""
+    S = skel.astype(np.float64)
+    H, W = S.shape
+    X, Y = np.meshgrid(np.arange(W, dtype=np.float64), np.arange(H, dtype=np.float64))
+    box = lambda a: cv2.boxFilter(a, -1, (2 * r + 1, 2 * r + 1), normalize=False)
+    w = box(S) + 1e-9
+    mx, my = box(S * X) / w, box(S * Y) / w
+    sxx = box(S * X * X) / w - mx * mx
+    syy = box(S * Y * Y) / w - my * my
+    sxy = box(S * X * Y) / w - mx * my
+    ang = 0.5 * np.arctan2(2 * sxy, sxx - syy)
+    return np.cos(ang), np.sin(ang)
+
+
+def split_lines(skel, across_dir):
+    """Skeleton pixels running across the road (the cell divisions) and those
+    running along it (the lane lines)."""
+    cx, cy = line_orientation(skel)
+    align = np.abs(cx * across_dir[..., 0] + cy * across_dir[..., 1])
+    across = (skel > 0) & (align > 0.6)
+    along = (skel > 0) & ~across
+    return across.astype(np.uint8), along.astype(np.uint8)
+
+
+# 5. Rungs -----------------------------------------------------------------------
+
+def find_rungs(across, pos, local_w, lane_w, blank):
+    """Every division as one rung per lane: its two ends (inner, outer), lane
+    and size. A line drawn across several lanes, as the radial ones in the
+    corners are, is cut where it crosses from one lane to the next. Ink too
+    short to reach across a lane (digits, scraps) is left out.
+
+    Lane 1 is the innermost lane of the loop.
+    """
+    strip = np.floor(LANES * pos / local_w).astype(np.int32).clip(0, LANES - 1)
+    n, lab, st, _ = cv2.connectedComponentsWithStats(across, connectivity=8)
+    pieces = []
+    for i in range(1, n):
+        x, y, w, h, a = st[i]
+        if a < 4:
             continue
-        g, q = [], [s]
-        seen.add(s)
-        while q:
-            a = q.pop()
-            g.append(a)
-            for dy, dx in RING8:
-                b = (a[0] + dy, a[1] + dx)
-                if b in seeds and b not in seen:
-                    seen.add(b)
-                    q.append(b)
-        groups.append(g)
-    out = []
-    for g in groups:
-        far, far_pt = 0.0, g[0]
-        q = deque((a, 0) for a in g)
-        seen2 = set(g)
-        while q:
-            (y, x), steps = q.popleft()
-            r = np.hypot(x - cx, y - cy)
-            if r > far:
-                far, far_pt = r, (y, x)
-            if steps >= reach * 2 or r >= reach:
+        sub = lab[y:y + h, x:x + w] == i
+        sst = strip[y:y + h, x:x + w]
+        for s in np.unique(sst[sub]):
+            m = sub & (sst == s)
+            if m.sum() < 0.35 * lane_w:
                 continue
-            for dy, dx in RING8:
-                b = (y + dy, x + dx)
-                if 0 <= b[0] < H and 0 <= b[1] < W and skel[b] and b not in seen2 \
-                        and np.hypot(b[1] - cx, b[0] - cy) >= inner:
-                    seen2.add(b)
-                    q.append((b, steps + 1))
-        out.append((np.arctan2(far_pt[0] - cy, far_pt[1] - cx), far))
+            ys, xs = np.nonzero(m)
+            pieces.append((int(s), np.c_[xs + x, ys + y].astype(float)))
+    pieces = merge_pieces(pieces, lane_w)
+    cut = cv2.dilate(blank, np.ones((13, 13), np.uint8)) > 0
+    out = []
+    for s, pts in pieces:
+        if cut[pts[:, 1].astype(int), pts[:, 0].astype(int)].any():
+            continue                                    # cut short by the painted-out flag
+        c = pts.mean(0)
+        _, v = np.linalg.eigh((pts - c).T @ (pts - c))
+        t = (pts - c) @ v[:, -1]
+        a_end, b_end = pts[t.argmin()], pts[t.argmax()]
+        length = t.max() - t.min()
+        if not (0.6 * lane_w <= length <= 1.7 * lane_w):
+            continue
+        din = lambda q: pos[int(q[1]), int(q[0])]
+        inner, outer = (a_end, b_end) if din(a_end) < din(b_end) else (b_end, a_end)
+        cy, cx = int(round(c[1])), int(round(c[0]))
+        centred = abs(LANES * pos[cy, cx] / local_w[cy, cx] - (s + 0.5))
+        if centred > 0.3:
+            continue                                    # half a rung, or a scrap at the kerb
+        out.append({"lane": s + 1, "inner": inner, "outer": outer, "mid": c,
+                    "size": int(len(pts)), "guessed": False, "centred": centred})
     return out
 
 
-def classify(br, flow_hint, tol=30, min_len=9):
-    """A T: two branches straight through (the boundary, running with the
-    track) and a stem square to them (the division). A cross: four at right
-    angles. Returns (kind, flow direction, stem directions)."""
-    br = [b for b in br if b[1] >= min_len]
-    ang = np.sort(np.mod([b[0] for b in br], 2 * np.pi))
-    if len(ang) not in (3, 4):
-        return None
-    gaps = np.degrees(np.diff(np.r_[ang, ang[0] + 2 * np.pi]))
-    unit = lambda a: np.array([np.cos(a), np.sin(a)])
-    if len(ang) == 3:
-        order = np.argsort(gaps)
-        g = gaps[order]
-        if not (abs(g[0] - 90) <= tol and abs(g[1] - 90) <= tol and abs(g[2] - 180) <= tol):
-            return None
-        # The wide gap lies between the two straight-through branches; the stem
-        # is the branch opposite it.
-        wide = order[2]
-        stem = ang[(wide + 2) % 3]
-        through = unit(ang[wide])
-        flow = through if through @ flow_hint >= 0 else -through
-        return "T", flow, [unit(stem)]
-    if all(abs(gaps - 90) <= tol):
-        dirs = [unit(a) for a in ang]
-        flow = max(dirs, key=lambda d: abs(d @ flow_hint))
-        flow = flow if flow @ flow_hint >= 0 else -flow
-        stems = [d for d in dirs if abs(d @ flow) < 0.5]
-        return "+", flow, stems
-    return None
+def merge_pieces(pieces, lane_w, reach=9.0):
+    """A division broken by a spur or a gap comes as two pieces in the same
+    lane, end to end: put them back together. Two different divisions of a
+    lane are never end to end, so touching ends are proof enough, as long
+    as the whole is no longer than a division."""
+    def ends(pts):
+        c = pts.mean(0)
+        _, v = np.linalg.eigh((pts - c).T @ (pts - c))
+        t = (pts - c) @ v[:, -1]
+        return pts[t.argmin()], pts[t.argmax()], t.max() - t.min()
+    info = [(s, pts, *ends(pts)) for s, pts in pieces]
+    merged = True
+    while merged:
+        merged = False
+        for i in range(len(info)):
+            si, pi, ai, bi, _ = info[i]
+            for j in range(i + 1, len(info)):
+                sj, pj, aj, bj, _ = info[j]
+                if sj != si or min(np.hypot(*(p - q)) for p in (ai, bi) for q in (aj, bj)) > reach:
+                    continue
+                pts = np.r_[pi, pj]
+                e = ends(pts)
+                if e[2] > 1.7 * lane_w:
+                    continue
+                info[i] = (si, pts, *e)
+                del info[j]
+                merged = True
+                break
+            if merged:
+                break
+    return [(s, pts) for s, pts, *_ in info]
 
 
-# 5. Pairs -----------------------------------------------------------------------
+def lap_sense(line, reverse):
+    """+1 or -1: which way round the lap runs, from the racing line's
+    orientation on the board, flipped by the track's `reverse` flag."""
+    cw = cv2.contourArea(line.astype(np.float32), oriented=True) > 0
+    return (1.0 if cw else -1.0) * (-1.0 if reverse else 1.0)
 
-def pair_across(points, flows, stems, outward, ink, lane_w):
-    """Join each junction to the one at the other end of its division.
 
-    Look along the stem, a lane's width across, square to the local flow,
-    with the printed line solid in between.
-    """
-    def inked(a, b, frac=0.8):
-        n = max(2, int(np.hypot(*(b - a))))
-        ts = np.linspace(0.15, 0.85, n)
-        q = (a[None] + (b - a)[None] * ts[:, None]).round().astype(int)
-        return ink[q[:, 1], q[:, 0]].mean() >= frac
+def order_rungs(rungs, line, tangent, reverse, sense, k=40):
+    """Each lane's rungs in running order, by where each sits along the
+    racing line. The nearest point of the line is not enough in a hairpin,
+    where it may be on the other leg: of the nearest points, the one taken is
+    the first whose tangent runs the way the rung itself faces (square to it,
+    in the sense the lap runs) -- the other leg runs the opposite way.
+    Returns the rungs by lane, each in order with `along` its arc position."""
+    arc = np.r_[0, np.cumsum(np.hypot(*np.diff(line, axis=0).T))]
+    L = arc[-1] + np.hypot(*(line[0] - line[-1]))
+    travel = tangent * (-1.0 if reverse else 1.0)
+    tree = cKDTree(line)
+    by_lane = {}
+    for r in rungs:
+        a = r["outer"] - r["inner"]
+        a = a / (np.linalg.norm(a) + 1e-9)
+        r["fwd"] = np.array([-a[1], a[0]]) * sense
+        ds, ks = tree.query(r["mid"], k=min(k, len(line)))
+        with_us = [j for j in ks if travel[j] @ r["fwd"] > 0.5]
+        j = with_us[0] if with_us else ks[0]
+        r["along"] = (L - arc[j]) if reverse else arc[j]
+        r["loop_len"] = L
+        by_lane.setdefault(r["lane"], []).append(r)
+    for l in by_lane:
+        by_lane[l].sort(key=lambda r: r["along"])
+    return by_lane
 
-    tree = cKDTree(points)
-    cands = []
-    for j in range(len(points)):
-        for k in tree.query_ball_point(points[j], 1.6 * lane_w):
-            if k == j:
-                continue
-            d = points[k] - points[j]
-            across = abs(d @ np.array([-flows[j][1], flows[j][0]]))
-            along = abs(d @ flows[j])
-            if not (0.55 * lane_w <= across <= 1.5 * lane_w) or along > 0.36 * across + 2:
-                continue
-            u = d / np.hypot(*d)
-            if max(abs(u @ s) for s in stems[j]) < 0.85:     # not along a stem of j
-                continue
-            if not inked(points[j], points[k]):
-                continue
-            cands.append((along + abs(across - lane_w), j, k))
-    # Orient every pair inner -> outer, and use each end once per side.
-    cands.sort()
-    as_inner, as_outer, pairs = set(), set(), []
-    for _, j, k in cands:
-        if (points[k] - points[j]) @ outward[j] < 0:
-            j, k = k, j
-        if j in as_inner or k in as_outer or (j, k) in pairs:
+
+def rung_between(a, b, t):
+    """A rung made up between rungs a and b, t of the way from a to b."""
+    g = {"lane": a["lane"], "size": 0, "guessed": True, "loop_len": a["loop_len"], "fwd": a["fwd"],
+         "along": (a["along"] + t * ((b["along"] - a["along"]) % a["loop_len"])) % a["loop_len"]}
+    for key in ("inner", "outer", "mid"):
+        g[key] = a[key] + t * (b[key] - a[key])
+    return g
+
+
+def patch_gaps(by_lane, lane_w, max_fill=3):
+    """Check the spacing of the rungs along each lane. A cell far shorter
+    than its neighbours is a stray line, and the odder of its two rungs is
+    dropped; one far longer hides up to `max_fill` undetected divisions,
+    which are put in between its rungs and marked as guesses. Returns what
+    changed, for the step image."""
+    dropped, added = [], []
+    # The cell's length along the road: its longer side, measured the way
+    # the road runs (a wedge in a hairpin has one long side; a stray lying
+    # beside a rung has none).
+    def step(a, b):
+        return max(abs((b[end] - a[end]) @ r["fwd"]) for end in ("inner", "outer") for r in (a, b))
+    length = lambda r: np.hypot(*(r["outer"] - r["inner"]))
+    for l, rs in list(by_lane.items()):
+        if len(rs) < 4:
             continue
-        as_inner.add(j)
-        as_outer.add(k)
-        pairs.append((j, k))
-    return pairs
-
-
-def complete(points, stems, pairs, ink, skel, lane_w):
-    """Add the missing far end of a division that runs off a lone junction.
-
-    Follow the stem across the lane until it meets a line running the other
-    way: that meeting is the partner that went undetected.
-    """
-    paired = {i for pr in pairs for i in pr}
-    H, W = ink.shape
-    added, links = [], []
-    for i in range(len(points)):
-        if i in paired:
-            continue
-        for s in stems[i]:
-            side = np.array([-s[1], s[0]])
-            end = None
-            for t in np.arange(0.55 * lane_w, 1.5 * lane_w, 1.0):
-                q = points[i] + s * t
-                x, y = int(round(q[0])), int(round(q[1]))
-                if not (0 <= x < W and 0 <= y < H) or not ink[y, x]:
-                    break
-                # A line crossing here: ink either side, square to the stem.
-                l = q + side * 5
-                r = q - side * 5
-                if all(0 <= int(round(v[0])) < W and 0 <= int(round(v[1])) < H and
-                       ink[int(round(v[1])), int(round(v[0]))] for v in (l, r)):
-                    end = q
-                    break
-            if end is not None:
-                # Solid line from the junction to the end?
-                n = int(np.hypot(*(end - points[i])))
-                ts = np.linspace(0.15, 0.85, max(2, n))
-                pts = (points[i][None] + (end - points[i])[None] * ts[:, None]).round().astype(int)
-                if ink[pts[:, 1], pts[:, 0]].mean() >= 0.8:
-                    added.append(end)
-                    links.append((i, len(points) + len(added) - 1))
-                    break
-    return np.array(added).reshape(-1, 2), links
+        local = lambda rs, i: np.median([step(rs[(i + k) % len(rs)], rs[(i + k + 1) % len(rs)])
+                                         for k in range(-4, 5) if k != 0])
+        keep = list(rs)
+        i = 0
+        while i < len(keep) and len(keep) > 3:
+            a, b = keep[i], keep[(i + 1) % len(keep)]
+            if step(a, b) < 0.45 * local(keep, i):
+                # Of the two, the one that looks least like its neighbours
+                # goes: off in length, or off centre in its lane.
+                usual = np.median([length(keep[(i + k) % len(keep)]) for k in (-3, -2, 2, 3)])
+                odd = lambda r: abs(length(r) - usual) + 20 * r.get("centred", 0)
+                weak = b if odd(b) >= odd(a) else a
+                dropped.append(weak)
+                keep = [q for q in keep if q is not weak]
+            else:
+                i += 1
+        out = []
+        for i, r in enumerate(keep):
+            out.append(r)
+            nxt = keep[(i + 1) % len(keep)]
+            mean = step(r, nxt)
+            n = int(round(mean / local(keep, i)))
+            if mean > 1.6 * local(keep, i) and 2 <= n <= max_fill + 1:
+                for k in range(1, n):
+                    g = rung_between(r, nxt, k / n)
+                    out.append(g)
+                    added.append(g)
+        by_lane[l] = out
+    return dropped, added
 
 
 # 6. Spaces ------------------------------------------------------------------------
 
-def segment_cells(main, skel, min_frac=0.35):
-    """The road cut up along its printed lines: one blob per cell.
-
-    Where a line has a small break, two cells run together through a narrow
-    waist; a watershed on the distance to the lines cuts them apart there.
-    """
-    lines = cv2.dilate(skel, np.ones((2, 2), np.uint8))
-    cells = (main & (lines == 0)).astype(np.uint8)
-    n, lab, st, _ = cv2.connectedComponentsWithStats(cells, 4)
-    areas = st[1:, 4]
-    typical = float(np.median(areas[areas > 200]))
-    dist = cv2.distanceTransform(cells, cv2.DIST_L2, 5)
-    out = np.zeros(lab.shape, np.int32)
-    nxt = 1
-    for i in range(1, n):
-        a = st[i, 4]
-        if a < min_frac * typical:
-            continue
-        x, y, w, h, _ = st[i]
-        sub = lab[y:y + h, x:x + w] == i
-        k = int(round(a / typical))
-        if k <= 1:
-            out[y:y + h, x:x + w][sub] = nxt
-            nxt += 1
-            continue
-        # Seeds: the k strongest peaks of the distance map, well apart.
-        d = dist[y:y + h, x:x + w] * sub
-        peaks = []
-        order = np.dstack(np.unravel_index(np.argsort(-d.ravel()), d.shape))[0]
-        for py, px in order:
-            if d[py, px] <= 0 or len(peaks) >= k:
-                break
-            if all(np.hypot(py - qy, px - qx) > 14 for qy, qx in peaks):
-                peaks.append((py, px))
-        markers = np.zeros(sub.shape, np.int32)
-        for m, (py, px) in enumerate(peaks, 1):
-            markers[py, px] = m
-        markers[~sub] = len(peaks) + 1                         # background
-        ws = cv2.watershed(cv2.merge([(d * 10).clip(0, 255).astype(np.uint8)] * 3), markers)
-        for m in range(1, len(peaks) + 1):
-            part = (ws == m) & sub
-            if part.sum() >= min_frac * typical:
-                out[y:y + h, x:x + w][part] = nxt
-                nxt += 1
-    return out, typical
-
-
-def cell_lane(main, centre, across, reach=120, gap=4):
-    """Lane from where the cell sits on its own chord across the road."""
-    H, W = main.shape
-    ends = []
-    for sgn in (-1, 1):
-        last, off = 0.0, 0
-        for t in np.arange(1.0, reach, 1.0):
-            q = centre + sgn * across * t
-            x, y = int(round(q[0])), int(round(q[1]))
-            if not (0 <= x < W and 0 <= y < H):
-                break
-            if main[y, x]:
-                last, off = t, 0
-            else:
-                off += 1
-                if off > gap:
-                    break
-        ends.append(last)
-    frac = ends[0] / max(sum(ends), 1e-6)
-    return int(np.clip(np.floor(frac * LANES) + 1, 1, LANES))
-
-
-def cells_to_spaces(labels, main, line, tangent, outward, reverse):
-    """A space per cell: its centre, lane, facing, and the cells ahead of it."""
-    tree = cKDTree(line)
-    spaces = {}
-    for i in range(1, labels.max() + 1):
-        ys, xs = np.nonzero(labels == i)
-        if not len(xs):
-            continue
-        c = np.array([xs.mean(), ys.mean()])
-        _, at = tree.query(c)
-        flow = tangent[at] * (-1 if reverse else 1)
-        # The cell's own long axis gives the local flow better than the line.
-        pts = np.c_[xs, ys] - c
-        w, v = np.linalg.eigh(pts.T @ pts)
-        axis = v[:, 1]
-        if w[1] > 1.3 * w[0]:
-            flow = axis if axis @ flow >= 0 else -axis
-        # Chords are measured from the inside out.
-        across = outward[at] - (outward[at] @ flow) * flow
-        across = across / (np.linalg.norm(across) + 1e-9)   # outward; the walk back along it finds the inside edge
-        spaces[i] = {"pos": c, "flow": flow, "lane": cell_lane(main, c, across),
-                     "rot": float(np.degrees(np.arctan2(flow[1], flow[0])))}
-    # Which cells touch, across the line drawn between them.
+def spaces_from_rungs(by_lane, shape, origin):
+    """A space per pair of neighbouring rungs in a lane: its centre from the
+    four corners, its facing from one rung to the next, and the spaces it
+    touches ahead. Each lane's order starts at the space nearest `origin`."""
+    spaces, quads = {}, []
+    for l, rs in by_lane.items():
+        L = rs[0]["loop_len"]
+        cells = []
+        for a, b in zip(rs, rs[1:] + rs[:1]):
+            corners = np.array([a["inner"], a["outer"], b["outer"], b["inner"]])
+            flow = b["mid"] - a["mid"]
+            flow = flow / (np.linalg.norm(flow) + 1e-9)
+            i = len(spaces) + 1
+            spaces[i] = {"pos": corners.mean(0), "flow": flow, "lane": l,
+                         "rot": float(np.degrees(np.arctan2(flow[1], flow[0]))),
+                         "along": (a["along"] + (b["along"] - a["along"]) % L / 2) % L,
+                         "guessed": a["guessed"] or b["guessed"], "next": []}
+            quads.append((i, corners))
+            cells.append(i)
+        start = min(cells, key=lambda i: np.hypot(*(spaces[i]["pos"] - origin)))
+        s0 = spaces[start]["along"]
+        for i in cells:
+            spaces[i]["order"] = (spaces[i]["along"] - s0) % L
+        for i, j in zip(cells, cells[1:] + cells[:1]):
+            spaces[i]["next"].append(j)
+    labels = np.zeros(shape, np.int32)
+    for i, corners in quads:
+        cv2.fillPoly(labels, [corners.round().astype(np.int32).reshape(-1, 1, 2)], int(i))
+    # Which cells touch across the line between them.
     touch = {}
-    lab = labels
-    for dy, dx in ((0, 3), (3, 0), (2, 2), (2, -2)):
-        a = lab[3:-3, 3:-3]
-        b = lab[3 + dy:lab.shape[0] - 3 + dy, 3 + dx:lab.shape[1] - 3 + dx]
+    for dy, dx in ((0, 3), (3, 0), (2, 2), (2, -2), (0, 6), (6, 0), (4, 4), (4, -4)):
+        a = labels[6:-6, 6:-6]
+        b = labels[6 + dy:labels.shape[0] - 6 + dy, 6 + dx:labels.shape[1] - 6 + dx]
         m = (a > 0) & (b > 0) & (a != b)
         for u, v in set(zip(a[m].tolist(), b[m].tolist())):
             touch.setdefault(u, set()).add(v)
             touch.setdefault(v, set()).add(u)
     for i, s in spaces.items():
-        ahead = []
         for j in touch.get(i, ()):
-            if j not in spaces:
-                continue
             d = spaces[j]["pos"] - s["pos"]
-            if d @ s["flow"] > 0.35 * np.hypot(*d) and abs(spaces[j]["lane"] - s["lane"]) <= 1:
-                ahead.append(j)
-        s["next"] = ahead
-    return spaces
-
+            if abs(spaces[j]["lane"] - s["lane"]) == 1 and d @ s["flow"] > 0.35 * np.hypot(*d):
+                s["next"].append(j)
+        s["next"] = sorted(set(s["next"]))
+    return spaces, labels
 
 
 # 7. The track file ------------------------------------------------------------------
@@ -443,12 +527,10 @@ def write_track(info, im, spaces, line, reverse, path):
     import json
     if path.exists() and json.loads(path.read_text(encoding="utf-8")).get("edited"):
         return False
-    _, at = cKDTree(line).query(np.array([s["pos"] for s in spaces.values()]))
-    along = dict(zip(spaces, at))
     ids = {}
     for l in range(1, LANES + 1):
         lane_cells = sorted((i for i, s in spaces.items() if s["lane"] == l),
-                            key=lambda i: along[i], reverse=reverse)
+                            key=lambda i: spaces[i]["order"])
         for i in lane_cells:
             ids[i] = len(ids) + 1
     out = []
@@ -504,8 +586,10 @@ def main():
     cv2.imwrite(str(name("1_track_only")), track)
 
     clean, n_arrows = paint_out_arrows(track, road)
+    clean, flag = paint_out_flag(clean, road)
     cv2.imwrite(str(name("2_no_arrows")), clean)
-    print("1-2. road %.1f%% of the board; %d arrows painted out" % (100 * road.mean(), n_arrows))
+    print("1-2. road %.1f%% of the board; %d arrows painted out; flag %d px"
+          % (100 * road.mean(), n_arrows, int(flag.sum())))
 
     # The track proper: near the racing line. Leaves out the pit road and
     # scraps of pavement that came along with the road.
@@ -517,77 +601,63 @@ def main():
     lane_w = width / LANES
     main = track_proper(road, line, width)
 
-    grey, n_red = grey_corners(clean, road, main)
+    across_dir, pos, local_w, inside, widened = road_frame(main, line, outward_line)
+    grey, n_red = grey_corners(clean, road, main, across_dir)
     cv2.imwrite(str(name("3_grey_corners")), grey)
-    print("3. %d red corner-line pixels redrawn as thin grey lines" % n_red)
+    print("3. %d red corner-line pixels redrawn as thin grey lines; road wider than usual on %d px"
+          % (n_red, widened))
 
-    skel, ink = grid_skeleton(grey, main)
-    marks = branch_points(skel)
-    _, at = cKDTree(line).query(marks)
-    points, kinds, flows, stems = [], [], [], []
-    for p, a in zip(marks, at):
-        c = classify(branches(skel, p), tangent[a])
-        if c:
-            points.append(p)
-            kinds.append(c[0])
-            flows.append(c[1])
-            stems.append(c[2])
-    points = np.array(points)
-    print("4. branch points %d; T's %d; crosses %d"
-          % (len(marks), kinds.count("T"), kinds.count("+")))
-
+    skel, ink = grid_skeleton(grey, main, flag)
+    across, along = split_lines(skel, across_dir)
+    print("4. skeleton %d px: %d across the road, %d along it"
+          % (int(skel.sum()), int(across.sum()), int(along.sum())))
     vis = grey.copy()
-    for p in points:
-        c = tuple(p.round().astype(int))
-        cv2.circle(vis, c, 4, (0, 255, 255), -1)
-        cv2.circle(vis, c, 4, (0, 0, 0), 1)
-    cv2.imwrite(str(name("4_junctions")), vis)
+    vis[cv2.dilate(along, np.ones((2, 2), np.uint8)) > 0] = (255, 160, 0)
+    vis[cv2.dilate(across, np.ones((2, 2), np.uint8)) > 0] = (0, 220, 0)
+    cv2.imwrite(str(name("4_lines")), vis)
 
-    _, at = cKDTree(line).query(points)
-    outward = outward_line[at]
-    inkd = cv2.dilate(ink, np.ones((3, 3), np.uint8))
-    pairs = pair_across(points, flows, stems, outward, inkd, lane_w)
-    extra, links = complete(points, stems, pairs, inkd, skel, lane_w)
-    paired = {i for pr in pairs for i in pr} | {a for a, _ in links}
-    lone = [i for i in range(len(points)) if i not in paired]
-    lengths = [np.hypot(*(points[k] - points[j])) for j, k in pairs]
-    print("5. pairs %d (median %.1f px; lane %.1f); completed by following the line %d; still alone %d"
-          % (len(pairs), np.median(lengths), lane_w, len(links), len(lone)))
-
-    allp = np.r_[points, extra] if len(extra) else points
-    np.savez(OUT / f"{map_id}_grid.npz", points=points, kinds=np.array(kinds),
-             flows=np.array(flows), pairs=np.array(pairs), extra=extra, links=np.array(links))
-
-    vis = grey.copy()
-    for j, k in pairs + links:
-        cv2.line(vis, tuple(allp[j].round().astype(int)), tuple(allp[k].round().astype(int)), (0, 190, 0), 2)
-    for i, p in enumerate(points):
-        c = tuple(p.round().astype(int))
-        cv2.circle(vis, c, 4, (0, 255, 255) if i in paired else (0, 0, 255), -1)
-        cv2.circle(vis, c, 4, (0, 0, 0), 1)
-    for p in extra:
-        c = tuple(p.round().astype(int))
-        cv2.circle(vis, c, 4, (0, 150, 255), -1)
-        cv2.circle(vis, c, 4, (0, 0, 0), 1)
-    cv2.imwrite(str(name("5_pairs")), vis)
-    for label, box in {"loews": (1850, 80, 2330, 520), "grid": (100, 480, 420, 1020),
-                       "chicane": (780, 480, 1250, 800), "rascasse": (250, 950, 650, 1350)}.items():
-        cv2.imwrite(str(WORK / f"{map_id}_5_pairs_{label}.png"), crop(vis, box))
-
-    # 6. Spaces
     from detect_track import ROOT
     import json
     existing = ROOT / "tracks" / f"{map_id}.json"
     reverse = False
     if existing.exists():
         reverse = json.loads(existing.read_text(encoding="utf-8")).get("detect", {}).get("reverse", False)
-    labels, typical = segment_cells(main, skel)
-    spaces = cells_to_spaces(labels, main, line, tangent, outward_line, reverse)
+
+    rungs = find_rungs(across, pos, local_w, lane_w, flag)
+    by_lane = order_rungs(rungs, line, tangent, reverse, lap_sense(line, reverse))
+    found = {l: len(rs) for l, rs in by_lane.items()}
+    dropped, added = patch_gaps(by_lane, lane_w)
+    print("5. rungs per lane %s; %d stray dropped; %d missing put in by interpolation"
+          % ([found.get(l, 0) for l in range(1, LANES + 1)], len(dropped), len(added)))
+    np.savez(OUT / f"{map_id}_grid.npz",
+             ends=np.array([[r["inner"], r["outer"]] for rs in by_lane.values() for r in rs]),
+             lane=np.array([r["lane"] for rs in by_lane.values() for r in rs]),
+             guessed=np.array([r["guessed"] for rs in by_lane.values() for r in rs]),
+             along=np.array([r["along"] for rs in by_lane.values() for r in rs]),
+             centred=np.array([r.get("centred", 0) for rs in by_lane.values() for r in rs]),
+             dropped=np.array([[r["inner"], r["outer"]] for r in dropped]).reshape(-1, 2, 2),
+             dropped_info=np.array([[r["along"], r.get("centred", 0), r["size"]] for r in dropped]).reshape(-1, 3))
+    vis = grey.copy()
+    lane_col = [(0, 200, 255), (0, 220, 90), (255, 140, 0)]
+    for l, rs in by_lane.items():
+        for r in rs:
+            col = (255, 0, 255) if r["guessed"] else lane_col[(l - 1) % 3]
+            cv2.line(vis, tuple(r["inner"].round().astype(int)), tuple(r["outer"].round().astype(int)), col, 2)
+    for r in dropped:
+        c = tuple(r["mid"].round().astype(int))
+        cv2.line(vis, (c[0] - 5, c[1] - 5), (c[0] + 5, c[1] + 5), (0, 0, 255), 2)
+        cv2.line(vis, (c[0] - 5, c[1] + 5), (c[0] + 5, c[1] - 5), (0, 0, 255), 2)
+    cv2.imwrite(str(name("5_rungs")), vis)
+    for label, box in {"loews": (1850, 80, 2330, 520), "grid": (100, 480, 420, 1020),
+                       "chicane": (780, 480, 1250, 800), "rascasse": (250, 950, 650, 1350)}.items():
+        cv2.imwrite(str(WORK / f"{map_id}_5_rungs_{label}.png"), crop(vis, box))
+
+    # 6. Spaces
+    spaces, labels = spaces_from_rungs(by_lane, main.shape, line[0])
     per = [sum(1 for s in spaces.values() if s["lane"] == l) for l in range(1, LANES + 1)]
-    straight = sum(1 for s in spaces.values()
-                   if any(spaces[j]["lane"] == s["lane"] for j in s["next"]))
-    print("6. cells %d (typical %.0f px) -- per lane %s; %d have a cell straight ahead in their lane"
-          % (len(spaces), typical, per, straight))
+    guessed = sum(1 for s in spaces.values() if s["guessed"])
+    print("6. cells %d -- per lane %s; %d rest on a guessed division"
+          % (len(spaces), per, guessed))
     np.savez(OUT / f"{map_id}_spaces.npz",
              ids=np.array(list(spaces)), pos=np.array([s["pos"] for s in spaces.values()]),
              rot=np.array([s["rot"] for s in spaces.values()]),
@@ -604,7 +674,7 @@ def main():
             cv2.line(vis, c, tuple(spaces[j]["pos"].round().astype(int)), (60, 60, 60), 1)
     for i, s in spaces.items():
         c = tuple(s["pos"].round().astype(int))
-        cv2.circle(vis, c, 3, (255, 255, 255), -1)
+        cv2.circle(vis, c, 3, (255, 0, 255) if s["guessed"] else (255, 255, 255), -1)
         a = np.radians(s["rot"])
         cv2.line(vis, c, (int(c[0] + 10 * np.cos(a)), int(c[1] + 10 * np.sin(a))), (255, 255, 255), 1)
     cv2.imwrite(str(name("6_spaces")), vis)

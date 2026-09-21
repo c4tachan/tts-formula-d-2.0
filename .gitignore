@@ -13,3 +13,6 @@ Thumbs.db
 
 # Dice extraction contact sheets
 tools/extract/out/
+
+# Python environment for the extraction tools
+.venv/
