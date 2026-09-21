@@ -13,6 +13,11 @@ two barbs meeting at an apex just ahead of them, and it points the way they
 bisect; a blob with two heads is a fork and gives two links. No arrow points
 backwards, which tells a head from the tail.
 
+The links a whole corner makes obey rules of their own, which settle the
+cases a single arrow leaves in doubt: a space forks to one side or the other
+and never both, and within one lane's run through a corner the links across a
+lane neither double up nor cross each other.
+
 Two things about the board keep this honest. A move only ever goes to one of
 three spaces: the next one along in this lane, or the next one along in the
 lane either side. Every space leads on down its own lane whatever is printed
@@ -28,9 +33,11 @@ Writes out/<id>_8_arrows.png: every arrow with the link it was read as.
 Run:  python tools/extract/find_arrows.py FDMonaco          what it finds
       python tools/extract/find_arrows.py FDMonaco --write   put it in the track file
 """
+import functools
 import json
 import pathlib
 import sys
+from collections import Counter
 
 import cv2
 import numpy as np
@@ -50,18 +57,20 @@ MIN_AREA = 25
 # meet, as a share of a cell.
 HEAD_REACH = 0.3
 # Heads pointing within this many degrees of each other are one head read
-# twice, not a fork.
+# twice, not a fork; so are heads closer together than this share of a cell.
 ONE_HEAD = 25
+APART = 0.16
 # How far from a space's centre an arrow may sit, in cells.
 NEAR = 0.8
 # How far ahead to look for the next space along, in cells: about one, but
 # the lanes either side sit further off round a corner.
 STEP = 1.6
 # How far in front of a space another has to sit to be a move at all: one
-# squarely alongside is not one, whichever way an arrow leans.
-MIN_AHEAD = 0.3
+# squarely alongside is not one, whichever way an arrow leans. Lanes are not
+# in step, so the space across from one can be only just in front of it.
+MIN_AHEAD = 0.12
 # And how far away it may be and still be touching.
-TOUCHING = 1.5
+TOUCHING = 1.6
 
 
 def arrow_ink(im):
@@ -121,16 +130,20 @@ def walk(skel, start, nodes, limit):
     return path, None
 
 
-def one_head(heads, spread=ONE_HEAD):
-    """Heads pointing much the same way taken as one: an arrowhead read once
-    per barb rather than a fork."""
+def one_head(heads, cell, spread=ONE_HEAD):
+    """Heads taken as one where they are really the same arrowhead read twice:
+    pointing much the same way, or sitting on top of each other. The two heads
+    of a fork are drawn at opposite corners of a space, half a cell or more
+    apart, while a barb mistaken for a head of its own is right beside the
+    apex it belongs to."""
     out = []
     for p, d in heads:
         a = np.degrees(np.arctan2(d[1], d[0]))
         for g in out:
             m = np.mean([x[1] for x in g], axis=0)
             b = np.degrees(np.arctan2(m[1], m[0]))
-            if abs((a - b + 180) % 360 - 180) <= spread:
+            close = min(float(np.hypot(*(q - p))) for q, _ in g) <= APART * cell
+            if close or abs((a - b + 180) % 360 - 180) <= spread:
                 g.append((p, d))
                 break
         else:
@@ -170,7 +183,7 @@ def heads_of(mask, ahead, cell):
         if tuple(e) not in spoken and np.dot(e - mid, ahead) > 0:
             heads.append((e, tangent[tuple(e)]))
     return one_head([(p, d) for p, d in heads
-                     if np.hypot(*d) > 1e-6 and np.dot(d, ahead) > 0])
+                     if np.hypot(*d) > 1e-6 and np.dot(d, ahead) > 0], cell)
 
 
 def facing(space):
@@ -181,7 +194,7 @@ def facing(space):
 def read_arrows(lab, keep, spaces, cell):
     """Every blob as (source space, [(tip, direction)])."""
     pos = np.array([s["pos"] for s in spaces])
-    out, misses = [], []
+    out, misses = {}, []
     for i in keep:
         ys, xs = np.nonzero(lab == i)
         here = np.array([xs.mean(), ys.mean()])
@@ -196,8 +209,10 @@ def read_arrows(lab, keep, spaces, cell):
         if not heads:
             misses.append(("arrow too small to read", here, src["id"]))
             continue
-        out.append((src, [(p + corner, d) for p, d in heads]))
-    return out, misses
+        # A forked arrow is often printed as two separate strokes, so heads
+        # are gathered per space rather than per blob.
+        out.setdefault(src["id"], (src, []))[1].extend((p + corner, d) for p, d in heads)
+    return [(src, one_head(heads, cell)) for src, heads in out.values()], misses
 
 
 def ahead_of(src, spaces, pos, cell):
@@ -213,17 +228,21 @@ def ahead_of(src, spaces, pos, cell):
     front = np.array(src["pos"], float) + ahead * cell
     out = {}
     for lane in (src["lane"] - 1, src["lane"], src["lane"] + 1):
-        best, best_d = None, STEP * cell
+        best, best_d = None, None
         for j, s in enumerate(spaces):
             if s is src or s["lane"] != lane:
                 continue
             v = pos[j] - src["pos"]
             if np.dot(v, ahead) < MIN_AHEAD * cell:
                 continue                    # alongside or behind: not a move
-            if np.hypot(*v) > TOUCHING * cell:
-                continue                    # too far off to be the next along
-            d = float(np.hypot(*(pos[j] - front)))
-            if d < best_d:
+            far = float(np.hypot(*v))
+            if far > TOUCHING * cell:
+                continue                    # not touching: not a move either
+            # Straight on is whatever sits a cell in front; across a lane it is
+            # simply the closest, since the lanes are not in step -- the space
+            # after that one is a cell further off again.
+            d = float(np.hypot(*(pos[j] - front))) if lane == src["lane"] else far
+            if best_d is None or d < best_d:
                 best, best_d = s, d
         if best is not None:
             out[lane] = best
@@ -254,7 +273,7 @@ def links(track, arrows, cell):
         if on is None:
             misses.append(("nothing ahead in this lane", np.array(src["pos"], float), src["id"]))
             continue
-        out.append((src["id"], on["id"]))       # always: straight on down the lane
+        out.append((src["id"], on["id"], 0.0))  # always: straight on down the lane
         straight = np.array(on["pos"], float) - src["pos"]
         straight = straight / np.hypot(*straight)
 
@@ -278,8 +297,166 @@ def links(track, arrows, cell):
                 # is a barb read as a head of its own, not a move.
                 misses.append(("a head leans off the track", tip, src["id"]))
             else:
-                out.append((src["id"], taken["id"]))
-    return sorted(set(out)), misses
+                v = np.array(taken["pos"], float) - src["pos"]
+                u = v / np.hypot(*v)
+                off = abs(np.degrees(np.arctan2(side_of(u, d), float(np.dot(u, d)))))
+                out.append((src["id"], taken["id"], off))
+    return out, misses
+
+
+def lane_order(track):
+    """How far along its own lane each space sits, by walking the lane round.
+
+    Counting starts halfway down the longest straight: begun anywhere near a
+    corner it would wrap round from last to first partway through one.
+    """
+    sp = {s["id"]: s for s in track["spaces"]}
+    on = {}
+    for s in track["spaces"]:
+        for n in s["next"]:
+            if sp[n]["lane"] == s["lane"]:
+                on[s["id"]] = n
+    order = {}
+    for lane in sorted({s["lane"] for s in track["spaces"]}):
+        at = min(s["id"] for s in track["spaces"] if s["lane"] == lane)
+        loop = []
+        while at is not None and at not in loop:
+            loop.append(at)
+            at = on.get(at)
+        best, run, start = (0, 0), 0, 0
+        for k, i in enumerate(loop + loop):
+            run = run + 1 if not sp[i]["corner"] else 0
+            if run > best[0]:
+                best = (run, k)
+        if best[0]:
+            start = (best[1] - best[0] // 2) % len(loop)
+        for k, i in enumerate(loop[start:] + loop[:start]):
+            order[i] = k
+    return order
+
+
+def matching(sources, targets, order, cost):
+    """Pair each source with a target so that no two share one and the pairs
+    never cross: a car moving across a lane keeps its place in the queue.
+
+    Pairs as many as it can, then keeps them as short as possible.
+    """
+    src = sorted(sources, key=lambda i: order.get(i, 0))
+    dst = sorted(targets, key=lambda i: order.get(i, 0))
+
+    @functools.lru_cache(None)
+    def best(i, j):
+        if i == len(src):
+            return 0.0, ()
+        out = best(i + 1, j)                     # this one goes unpaired
+        for k in range(j, len(dst)):
+            c = cost.get((src[i], dst[k]))
+            if c is None:
+                continue
+            score, pairs = best(i + 1, k + 1)
+            here = (score - 1000 + c, ((src[i], dst[k]),) + pairs)
+            if here[0] < out[0]:
+                out = here
+        return out
+
+    pairs = dict(best(0, 0)[1])
+    best.cache_clear()
+    return pairs
+
+
+def tidy(track, found, cell):
+    """Make the links obey the rules a board's arrows always follow.
+
+    A space forks to one side or the other, never both -- where two heads
+    disagree, the one squarest to what it points at wins, the other being a
+    barb misread as a head. And within one lane's run the links across a lane
+    neither double up nor cross, which settles which space each lands on when
+    the head alone leaves it in doubt.
+    """
+    sp = {s["id"]: s for s in track["spaces"]}
+    order = lane_order(track)
+    same = {(a, b) for a, b, _ in found if sp[a]["lane"] == sp[b]["lane"]}
+    cross = [(a, b, off) for a, b, off in found if sp[a]["lane"] != sp[b]["lane"]]
+
+    # One way or the other: where a space has heads both ways, the one that
+    # sits squarest to the space it points at is the arrow, and the other is a
+    # barb read as a head.
+    best = {}
+    dropped = []
+    for a, b, off in sorted(cross, key=lambda x: x[2]):
+        if a in best:
+            dropped.append((a, b, "forks the other way as well"))
+        else:
+            best[a] = (b, off)
+    runs = {}
+    for a, (b, _) in best.items():
+        runs.setdefault((sp[a]["corner"], sp[a]["lane"], int(np.sign(sp[b]["lane"] - sp[a]["lane"]))),
+                        []).append(a)
+    fixed = []
+    for (corner, lane, want), sources in runs.items():
+        sources = sorted(set(sources), key=lambda i: order.get(i, 0))
+        targets, cost = set(), {}
+        for a in sources:
+            for s in track["spaces"]:
+                if s["lane"] != lane + want:
+                    continue
+                v = np.array(s["pos"], float) - sp[a]["pos"]
+                far = float(np.hypot(*v))
+                if np.dot(v, facing(sp[a])) < MIN_AHEAD * cell or far > TOUCHING * cell:
+                    continue
+                targets.add(s["id"])
+                cost[(a, s["id"])] = far / cell
+        pairs = matching(sources, targets, order, cost)
+        for a in sources:
+            if a in pairs:
+                fixed.append((a, pairs[a]))
+            else:
+                dropped.append((a, None, "no space left for it across the lane"))
+    return sorted(same | set(fixed)), dropped
+
+
+def from_reading(track, reading, cell):
+    """Links from a reading of the board by eye (tracks/<id>.arrows.json).
+
+    The reading says only which spaces fork and which way; the rules say
+    where to. Every space goes on down its own lane, and the forks out of one
+    lane's run through a corner are paired with the lane beside it so that
+    none double up or cross -- which is exactly how the board is printed.
+    """
+    spaces = track["spaces"]
+    sp = {s["id"]: s for s in spaces}
+    pos = np.array([s["pos"] for s in spaces])
+    order = lane_order(track)
+    out, dropped = set(), []
+    runs = {}
+    arrowed = {int(k): v for k, v in reading["forks"].items()}
+    arrowed.update({i: 0 for i in reading.get("approach", [])})
+    for i, side in arrowed.items():
+        src = sp[i]
+        on = ahead_of(src, spaces, pos, cell).get(src["lane"])
+        if on is not None:
+            out.add((i, on["id"]))
+        if side:
+            runs.setdefault((src["corner"], src["lane"], side), []).append(i)
+    for (corner, lane, side), sources in runs.items():
+        targets, cost = set(), {}
+        for a in sources:
+            for s in spaces:
+                if s["lane"] != lane + side:
+                    continue
+                v = np.array(s["pos"], float) - sp[a]["pos"]
+                far = float(np.hypot(*v))
+                if np.dot(v, facing(sp[a])) < MIN_AHEAD * cell or far > TOUCHING * cell:
+                    continue
+                targets.add(s["id"])
+                cost[(a, s["id"])] = far / cell
+        pairs = matching(sources, targets, order, cost)
+        for a in sources:
+            if a in pairs:
+                out.add((a, pairs[a]))
+            else:
+                dropped.append((a, None, "read as a fork, but no space is free for it"))
+    return sorted(out), dropped
 
 
 def cell_length(track):
@@ -322,6 +499,28 @@ def main():
 
     found, more = links(track, arrows, cell)
     misses += more
+    found, dropped = tidy(track, found, cell)
+
+    # A reading by eye, where there is one, says which spaces fork: the
+    # detector's count of heads is the weak part. The detector's links are
+    # kept only to compare against.
+    reading_path = ROOT / "tracks" / f"{map_id}.arrows.json"
+    if reading_path.exists():
+        reading = json.loads(reading_path.read_text(encoding="utf-8"))
+        detected = found
+        found, dropped = from_reading(track, reading, cell)
+        misses = []
+        seen = {}
+        for a_, b_ in detected:
+            seen.setdefault(a_, set()).add(b_)
+        mine = {}
+        for a_, b_ in found:
+            mine.setdefault(a_, set()).add(b_)
+        agree = sum(1 for i in mine if seen.get(i) == mine[i])
+        print("   using the reading in %s: the detector agrees on %d of its %d spaces"
+              % (reading_path.relative_to(ROOT), agree, len(mine)))
+    for a_, b_, why in dropped:
+        print("   space %d: %s%s" % (a_, why, "" if b_ is None else " (was %d)" % b_))
     by_space = {}
     for src, dst in found:
         by_space.setdefault(src, set()).add(dst)
@@ -344,6 +543,14 @@ def main():
         for sid, dst in by_space.items():
             spaces[sid]["next"] = sorted(dst)
             spaces[sid]["fixed"] = True
+        # Spaces the reading found no arrow on go back to the plain rule --
+        # on, or a lane either side -- in case an earlier run fixed them.
+        if reading_path.exists():
+            pos = np.array([s["pos"] for s in track["spaces"]])
+            for sid in reading.get("blank", []):
+                s = spaces[sid]
+                s.pop("fixed", None)
+                s["next"] = sorted(o["id"] for o in ahead_of(s, track["spaces"], pos, cell).values())
         path.write_text(json.dumps(track, indent=1), encoding="utf-8")
         print("4. written to", path.relative_to(ROOT))
         sys.path.insert(0, str(ROOT / "tools" / "extract"))

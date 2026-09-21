@@ -212,6 +212,35 @@ function Graph.problems(spaces, cell)
                 end
             end)
         end
+        -- In a corner a space leads across a lane one way or the other, never
+        -- both: the arrows printed there fork towards one side only. (On a
+        -- straight both ways is the rule.)
+        local sides = {}
+        for _, n in ipairs(s.next or {}) do
+            local o = byId[n]
+            if o and o.lane ~= s.lane then sides[o.lane < s.lane and "in" or "out"] = n end
+        end
+        if s.corner and sides["in"] and sides["out"] then
+            out[#out + 1] = { id = s.id,
+                text = "leads both ways across the lanes, to " .. sides["in"] .. " and " .. sides["out"] }
+        end
+    end
+    -- In a corner two spaces in one lane never lead to the same space in
+    -- another: the arrows across a lane are printed in step with it.
+    local from = {}
+    for _, s in ipairs(spaces) do
+        for _, n in ipairs(s.corner and s.next or {}) do
+            local o = byId[n]
+            if o and o.lane ~= s.lane then
+                local key = s.lane .. ":" .. n
+                if from[key] then
+                    out[#out + 1] = { id = s.id,
+                        text = "leads to space " .. n .. ", and so does space " .. from[key] }
+                else
+                    from[key] = s.id
+                end
+            end
+        end
     end
     return out
 end

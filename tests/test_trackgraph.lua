@@ -123,6 +123,35 @@ function T.a_space_turned_round_is_reported()
     eq(table.concat(found, ","), "8", "only the turned space")
 end
 
+local function flagged(spaces, pattern)
+    local ids = {}
+    for _, p in ipairs(Graph.problems(spaces)) do
+        if p.text:find(pattern) then ids[#ids + 1] = p.id end
+    end
+    table.sort(ids)
+    return table.concat(ids, ",")
+end
+
+function T.a_corner_space_forks_one_way_only()
+    local s = straight(4)
+    Graph.relink(s)
+    -- On a straight the middle lane leads both ways across, as it should.
+    eq(flagged(s, "both ways"), "", "not a problem on a straight")
+    byId(s, 6).corner = 1
+    byId(s, 7).corner = 1
+    byId(s, 7).next, byId(s, 7).fixed = { 8 }, true
+    eq(flagged(s, "both ways"), "6", "inside a corner it is")
+end
+
+function T.corner_links_across_a_lane_do_not_double_up()
+    local s = straight(4)
+    Graph.relink(s)
+    for _, id in ipairs({ 1, 2, 3 }) do byId(s, id).corner = 1 end
+    byId(s, 1).next, byId(s, 1).fixed = { 2, 6 }, true
+    byId(s, 2).next, byId(s, 2).fixed = { 3, 6 }, true
+    eq(flagged(s, "and so does"), "2", "the second space to claim 6 is flagged")
+end
+
 function T.nearest_finds_the_closest_space()
     local s = straight(4)
     local n, d = Graph.nearest(s, 81, 51)

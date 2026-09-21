@@ -112,6 +112,26 @@ either side, and never to one squarely alongside or not touching; every space
 leads on down its own lane whatever is printed on it; and a one-headed arrow
 means exactly that move, so only a second or third head crosses a lane. Those links are written `fixed`.
 
+Reading how many heads an arrow has is where the detector is weak -- a fork
+printed as two strokes, or a barb that looks like a head -- and a head is what
+says whether a space forks at all. So which spaces fork is read by eye instead,
+from close-ups `tools/extract/arrow_sheets.py` makes, into
+`tracks/<id>.arrows.json`. When that file is there, `find_arrows.py` takes the
+forks from it and uses the detector only to compare against.
+
+Where each fork lands is then settled by rules that held on every corner of
+Monaco, and that the editor checks too:
+
+- a space in a corner forks one way across the lanes or the other, never both;
+- two spaces in one lane never lead to the same space in the next lane;
+- and those links never cross each other: a car moving over a lane keeps its
+  place along the track.
+
+Within one lane's run through a corner, then, the forks pair off with the lane
+beside them in order. Where the lanes have different numbers of spaces some
+space has to go without a fork, and the board prints a single arrow on exactly
+that one -- which is how a misread fork shows itself.
+
 Elsewhere links are worked out from positions and facings
 (`fd.core.trackgraph`), the same rules the in-game editor uses; a space whose
 links were set by hand, or read off an arrow, keeps them (`fixed`).

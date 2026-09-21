@@ -70,7 +70,9 @@ def lua_track(track):
 
 
 def main():
-    files = sorted(TRACKS.glob("*.json"))
+    # tracks/<id>.json only: <id>.arrows.json beside it is a reading of the
+    # board's arrows, which find_arrows.py turns into the track's links.
+    files = sorted(f for f in TRACKS.glob("*.json") if f.stem.count(".") == 0)
     if not files:
         sys.exit("no track files in tracks/")
     OUT.mkdir(parents=True, exist_ok=True)

@@ -70,7 +70,9 @@ pit lane. The buttons stand in for them until track data exists.
 A track's spaces start from `python tools/extract/find_grid.py <mapId>`, which
 reads the grid printed on the board image and writes `tracks/<mapId>.json`;
 `find_corners.py <mapId>` then marks which spaces lie inside each corner, and
-`find_arrows.py <mapId> --write` reads the printed arrows into the links.
+`find_arrows.py <mapId> --write` turns the printed arrows into the links -- from
+`tracks/<mapId>.arrows.json`, a reading of which spaces fork, where there is one
+(`arrow_sheets.py` makes the close-ups to read it from).
 Each numbered image it leaves in `tools/extract/out/` is one step, for
 checking by eye. Detection is a starting point; the cleanup happens in TTS:
 
