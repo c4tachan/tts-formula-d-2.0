@@ -23,6 +23,8 @@ CATEGORY = {
     "maps_custom": "custom",
 }
 ORDER = ["formula_d", "formula_de", "custom"]
+# Only these categories reach maps.json; the mod does not support the rest yet.
+SUPPORTED = {"formula_d"}
 
 # maps_custom["Name"] = "https://..."
 RE_ENTRY = re.compile(
@@ -110,6 +112,7 @@ def main():
         if ck not in known:
             problems.append(f"{ck[0]}[{ck[1]!r}]: URL never used by any handler")
 
+    maps = [m for m in maps if m["category"] in SUPPORTED]
     maps.sort(key=lambda m: (ORDER.index(m["category"]), m["id"]))
     OUT.write_text(json.dumps(maps, indent=2), encoding="utf-8")
 
