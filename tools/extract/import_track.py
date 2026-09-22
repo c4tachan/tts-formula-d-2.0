@@ -80,22 +80,25 @@ def main():
         track = json.loads(path.read_text(encoding="utf-8"))
         before = len(track["spaces"])
         old = {s["id"]: s for s in track["spaces"]}
+        # Ids are space codes; a save from before them has numbers, which
+        # come back from TTS's JSON as floats.
+        sid = lambda v: int(v) if isinstance(v, float) and v.is_integer() else v
         spaces = []
         for s in as_list(e.get("spaces")):
-            prev = old.get(s["id"], {})
+            prev = old.get(sid(s["id"]), {})
             space = {
-                "id": int(s["id"]),
+                "id": sid(s["id"]),
                 "pos": [round(float(v), 1) for v in as_list(s["pos"])],
                 "rot": round(float(s["rot"]) % 360, 1),
                 "lane": int(s["lane"]),
-                "next": sorted(int(n) for n in as_list(s.get("next"))),
+                "next": sorted((sid(n) for n in as_list(s.get("next"))), key=str),
                 "corner": prev.get("corner"),
                 "sector": prev.get("sector", 0),
             }
             if s.get("fixed"):
                 space["fixed"] = True        # links set by hand: never recomputed
             spaces.append(space)
-        spaces.sort(key=lambda s: s["id"])
+        spaces.sort(key=lambda s: str(s["id"]))
         track["spaces"] = spaces
         track["edited"] = True
         track["edited_from"] = f"{save_path.name} ({when:%Y-%m-%d %H:%M})"

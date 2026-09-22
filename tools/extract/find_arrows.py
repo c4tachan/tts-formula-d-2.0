@@ -429,7 +429,7 @@ def from_reading(track, reading, cell):
     order = lane_order(track)
     out, dropped = set(), []
     runs = {}
-    arrowed = {int(k): v for k, v in reading["forks"].items()}
+    arrowed = {(int(k) if k.isdigit() else k): v for k, v in reading["forks"].items()}
     arrowed.update({i: 0 for i in reading.get("approach", [])})
     for i, side in arrowed.items():
         src = sp[i]
@@ -520,7 +520,7 @@ def main():
         print("   using the reading in %s: the detector agrees on %d of its %d spaces"
               % (reading_path.relative_to(ROOT), agree, len(mine)))
     for a_, b_, why in dropped:
-        print("   space %d: %s%s" % (a_, why, "" if b_ is None else " (was %d)" % b_))
+        print("   space %s: %s%s" % (a_, why, "" if b_ is None else " (was %s)" % b_))
     by_space = {}
     for src, dst in found:
         by_space.setdefault(src, set()).add(dst)
@@ -528,7 +528,7 @@ def main():
           ("; %d arrows unread" % len(misses)) if misses else ""))
     for why, at, sid in misses[:10]:
         print("   %s at (%d, %d)%s" % (why, at[0], at[1],
-              "" if sid is None else " near space %d" % sid))
+              "" if sid is None else " near space %s" % sid))
 
     spaces = {s["id"]: s for s in track["spaces"]}
     corner = {s["id"] for s in track["spaces"] if s["corner"]}

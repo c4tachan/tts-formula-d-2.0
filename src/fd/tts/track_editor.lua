@@ -56,15 +56,14 @@ end
 local function working(track)
     base[track.id] = track
     if not edits[track.id] then
-        local spaces, top = {}, 0
+        local spaces = {}
         for i, s in ipairs(track.spaces) do
             spaces[i] = copySpace(s)
-            if s.id > top then top = s.id end
         end
         -- Start from links worked out the editor's way: the detector's are
         -- cruder, and would paint a hundred sound spaces red on Monaco.
         local cell = Graph.relink(spaces)
-        edits[track.id] = { spaces = spaces, nextId = top + 1, cell = cell }
+        edits[track.id] = { spaces = spaces, nextId = 1, cell = cell }
         changed()
     end
     return edits[track.id]
@@ -203,6 +202,9 @@ function Editor.grab(pointer)
 end
 
 --- A new space at a point, in the lane and facing of the nearest one.
+--
+-- Its id is the nearest space's code with "+n" on the end, which says where
+-- it was put: the next run of find_corners.py gives it a code of its own.
 function Editor.add(pointer)
     if not open then return nil end
     local tile, track = Track.tile(), base[open]
@@ -210,11 +212,15 @@ function Editor.add(pointer)
     local e = edits[open]
     local px, py = Track.pixelOf(tile, track, pointer)
     local near = Graph.nearest(e.spaces, px, py)
+    local id = nil
+    repeat
+        id = tostring(near and near.id or "new") .. "+" .. e.nextId
+        e.nextId = e.nextId + 1
+    until not find(e, id)
     local s = {
-        id = e.nextId, pos = { px, py }, next = {},
+        id = id, pos = { px, py }, next = {},
         lane = near and near.lane or 1, rot = near and near.rot or 0,
     }
-    e.nextId = e.nextId + 1
     e.dirty = true
     table.insert(e.spaces, s)
     changed()
@@ -227,20 +233,37 @@ local function spaceOf(obj)
     return id and find(edits[open], id) or nil
 end
 
+--- The space a player means: the marker they are pointing at, or else the
+-- space nearest the pointer, if the pointer is on its cell.
+function Editor.spaceAt(obj, pointer)
+    local s = spaceOf(obj)
+    if s or not open or not pointer then return s end
+    local tile = Track.tile()
+    if not tile then return nil end
+    local e = edits[open]
+    local px, py = Track.pixelOf(tile, base[open], pointer)
+    local near, d = Graph.nearest(e.spaces, px, py)
+    local cell = (e.cell and e.cell > 0) and e.cell or 30
+    if near and d <= 0.6 * cell then return near end
+    return nil
+end
+
+local function beginLink(s)
+    linkFrom = s.id
+    return "Linking from space " .. s.id .. ": now right-click the space a car can move on to, Link to here."
+end
+
 --- Begin a hand-made link from a marker's space.
 function Editor.startLink(obj)
     local s = spaceOf(obj)
     if not s then return "That is not a space marker." end
-    linkFrom = s.id
-    return "Linking from space " .. s.id .. ": now right-click the space a car can move on to, Link to here."
+    return beginLink(s)
 end
 
 --- Finish a hand-made link: the start space leads to this one (or no longer
 -- does, if it already did). The start space's links are then kept exactly
 -- as set, and relinking leaves them alone.
-function Editor.linkTo(obj)
-    local to = spaceOf(obj)
-    if not to then return "That is not a space marker." end
+local function toggleLink(to)
     local from = linkFrom and find(edits[open], linkFrom)
     if not from then return "Right-click a space and choose Start a link here first." end
     if from.id == to.id then return "A space cannot lead to itself." end
@@ -258,6 +281,31 @@ function Editor.linkTo(obj)
     local list = #nxt > 0 and table.concat(nxt, ", ") or "none"
     return "Space " .. from.id .. " " .. verb .. " space " .. to.id
         .. "; its links are now set by hand (" .. list .. ")."
+end
+
+function Editor.linkTo(obj)
+    local to = spaceOf(obj)
+    if not to then return "That is not a space marker." end
+    return toggleLink(to)
+end
+
+--- One key for a link, pressed twice: on the space a car moves from, then
+-- on the space it moves to. The link is added, or taken away if it was
+-- there. Pressing it twice on the same space calls it off.
+function Editor.linkKey(obj, pointer)
+    local s = Editor.spaceAt(obj, pointer)
+    if not s then return "Point at a space first." end
+    if not linkFrom or not find(edits[open], linkFrom) then
+        linkFrom = s.id
+        return "Linking from space " .. s.id .. ": point at the space a car can move on to and press the key again."
+    end
+    if linkFrom == s.id then
+        linkFrom = nil
+        return "Link called off."
+    end
+    local msg = toggleLink(s)
+    linkFrom = nil
+    return msg
 end
 
 --- Hand a space's links back to the automatic rules.
@@ -397,7 +445,15 @@ function Editor.load(saved, strayMarkers)
     edits, base, markers, open, linkFrom = {}, {}, {}, nil, nil
     changed()
     for id, e in pairs(saved or {}) do
-        edits[id] = { spaces = e.spaces, nextId = e.nextId, dirty = true }
+        -- Edits saved before spaces had codes for ids name them by numbers
+        -- the track file no longer uses; kept, they would hide it entirely.
+        local first = e.spaces and e.spaces[1]
+        if first and type(first.id) == "number" then
+            printToAll("Track edits for " .. id .. " in this save predate space codes and were dropped.",
+                { 1, 0.8, 0.3 })
+        else
+            edits[id] = { spaces = e.spaces, nextId = e.nextId or 1, dirty = true }
+        end
     end
     for _, guid in ipairs(strayMarkers or {}) do
         local obj = getObjectFromGUID(guid)

@@ -434,7 +434,7 @@ end
 local function markersOut(S)
     local n = 0
     for _, o in ipairs(S.objects) do
-        if o.name:find("^Space %d+") then n = n + 1 end
+        if o.name:find("^Space [iom]%.") then n = n + 1 end
     end
     return n
 end
@@ -528,6 +528,73 @@ function T.a_marker_can_change_lane()
     end
 end
 
+local function nextOf(Editor, FDMonaco, id)
+    for _, s in ipairs(Editor.trackFor(FDMonaco).spaces) do
+        if s.id == id then return s.next, s.fixed end
+    end
+end
+
+local function has(list, x)
+    for _, v in ipairs(list) do
+        if v == x then return true end
+    end
+    return false
+end
+
+function T.the_link_key_adds_then_removes_a_link()
+    local S = world()
+    local Editor, Track, FDMonaco = editor(S)
+    local a, b = FDMonaco.spaces[100], FDMonaco.spaces[140]
+    local at = function(sp) return Track.worldOf(S.board, FDMonaco, sp.pos[1] + 1, sp.pos[2] - 1) end
+    local key = "Track editor: link or unlink two spaces"
+    assert(not has(nextOf(Editor, FDMonaco, a.id), b.id), "not linked to start with")
+
+    -- No markers out: the key goes by the space under the pointer.
+    S.press(key, "Red", nil, at(a))
+    assert(S.logged("Linking from space " .. a.id))
+    S.press(key, "Red", nil, at(b))
+    local nxt, fixed = nextOf(Editor, FDMonaco, a.id)
+    assert(has(nxt, b.id), "linked")
+    assert(fixed, "set by hand, so relinking keeps it")
+
+    -- The same two presses take it away again.
+    S.press(key, "Red", nil, at(a))
+    S.press(key, "Red", nil, at(b))
+    assert(not has(nextOf(Editor, FDMonaco, a.id), b.id), "unlinked")
+end
+
+function T.editing_draws_every_link_as_an_arrow()
+    local S = world()
+    local Editor, Track, FDMonaco = editor(S)
+    local track = Editor.trackFor(FDMonaco)
+    local nLinks, nCorners = 0, 0
+    for _, s in ipairs(track.spaces) do
+        nLinks = nLinks + #(s.next or {})
+        if s.corner then nCorners = nCorners + 1 end
+    end
+    local lines = S.board.getVectorLines()
+    eq(#lines, #(FDMonaco.outer or {}) + #track.spaces + nCorners + nLinks)
+    -- A link's arrow is shaft plus head: five points, the tip twice.
+    local last = lines[#lines].points
+    eq(#last, 5)
+    eq(last[2].x, last[4].x)
+    eq(last[2].z, last[4].z)
+end
+
+function T.the_link_key_is_called_off_on_the_same_space_or_off_the_track()
+    local S = world()
+    local Editor, Track, FDMonaco = editor(S)
+    local a = FDMonaco.spaces[100]
+    local key = "Track editor: link or unlink two spaces"
+    local before = #nextOf(Editor, FDMonaco, a.id)
+    S.press(key, "Red", nil, Track.worldOf(S.board, FDMonaco, a.pos[1], a.pos[2]))
+    S.press(key, "Red", nil, Track.worldOf(S.board, FDMonaco, a.pos[1], a.pos[2]))
+    assert(S.logged("Link called off"))
+    eq(#nextOf(Editor, FDMonaco, a.id), before)
+    S.press(key, "Red", nil, Track.worldOf(S.board, FDMonaco, 5, 5))
+    assert(S.logged("Point at a space first"))
+end
+
 function T.edits_are_saved_with_the_game_and_come_back()
     local S = world()
     local Editor, Track, FDMonaco = editor(S)
@@ -560,7 +627,7 @@ function T.the_editor_works_from_right_click_menus()
     eq(m.name, "Space " .. sp.id .. " (lane " .. to .. ")")
     local other = nil
     for _, o in ipairs(S.objects) do
-        if o ~= m and o.name:find("^Space %d+") then other = o break end
+        if o ~= m and o.name:find("^Space [iom]%.") then other = o break end
     end
     other.rightClick("Delete space", "Red")
     S.board.rightClick("Add a space here", "Red", w)
@@ -579,7 +646,7 @@ function T.deleting_every_marker_before_apply_is_still_saved()
     local gone = 0
     for i = #S.objects, 1, -1 do
         local o = S.objects[i]
-        if o.name:find("^Space %d+") then o.destruct() gone = gone + 1 end
+        if o.name:find("^Space [iom]%.") then o.destruct() gone = gone + 1 end
     end
     assert(gone > 0)
     -- No markers left and no Apply: the deletions must still reach the save.

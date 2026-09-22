@@ -175,21 +175,41 @@ local PROBLEM_COLOUR = { 1, 0.15, 0.15 }
 -- Spaces inside a corner get a second, smaller outline in this colour.
 local CORNER_COLOUR = { 1, 0.3, 0.85 }
 local CORNER_INSET = 0.55
+-- Arrowheads, in image pixels (a printed cell is about 45 long, 25 wide).
+local HEAD_LONG, HEAD_WIDE = 6, 3.5
+-- A link's arrow runs over this stretch of the way between the two spaces'
+-- centres, so its tail and head sit clear of either space's outline.
+local LINK_FROM, LINK_TO = 0.3, 0.72
 
 --- A footprint on every space, with a tick out to the space straight ahead.
 --
--- One line per space: the outline, then on from its front edge towards the
--- next space in its lane. Spaces listed in `flagged` (id -> true) are drawn
--- red. The track's outside edge is drawn too, where the file has one.
--- `links` draws every hand-set link out in full, which is worth seeing while
--- editing and far too busy otherwise: most of a corner is hand-set once its
--- arrows have been read.
+-- One line per space: the outline, then an arrow on from its front edge
+-- towards the next space in its lane. Spaces listed in `flagged` (id -> true)
+-- are drawn red. The track's outside edge is drawn too, where the file has one.
+-- `links` draws every link as an arrow of its own instead, hand-set ones in
+-- white: worth seeing while editing, far too busy otherwise.
 function Track.overlay(tile, track, flagged, links)
     local thickness = THICKNESS / math.max(tile.getScale().x, 0.001)
     local f = Track.frame(tile, track)
     local lines = {}
     local byId = {}
     for _, s in ipairs(track.spaces) do byId[s.id] = s end
+
+    -- An arrow from (x0, y0) to (x1, y1), image pixels, as one polyline:
+    -- the shaft, then the head drawn back from the tip on either side.
+    local function arrow(x0, y0, x1, y1)
+        local dx, dy = x1 - x0, y1 - y0
+        local len = math.sqrt(dx * dx + dy * dy)
+        if len < 1e-6 then return nil end
+        dx, dy = dx / len, dy / len
+        local bx, by = x1 - dx * HEAD_LONG, y1 - dy * HEAD_LONG
+        return {
+            Track.localIn(f, x0, y0), Track.localIn(f, x1, y1),
+            Track.localIn(f, bx - dy * HEAD_WIDE, by + dx * HEAD_WIDE),
+            Track.localIn(f, x1, y1),
+            Track.localIn(f, bx + dy * HEAD_WIDE, by - dx * HEAD_WIDE),
+        }
+    end
 
     for _, piece in ipairs(track.outer or {}) do
         if #piece > 1 then
@@ -212,13 +232,16 @@ function Track.overlay(tile, track, flagged, links)
             at(MARK_LONG, MARK_WIDE), at(MARK_LONG, -MARK_WIDE), at(-MARK_LONG, -MARK_WIDE),
             at(-MARK_LONG, MARK_WIDE), at(MARK_LONG, MARK_WIDE), at(MARK_LONG, 0),
         }
-        for _, n in ipairs(s.next or {}) do
+        -- Out of the front, an arrow towards the next space in the lane.
+        -- Editing, every link is drawn as its own arrow below instead.
+        for _, n in ipairs(links and {} or s.next or {}) do
             local o = byId[n]
             if o and o.lane == s.lane then
                 -- Stop short of the next space's own outline.
                 local mx = s.pos[1] + (o.pos[1] - s.pos[1]) * 0.62
                 local my = s.pos[2] + (o.pos[2] - s.pos[2]) * 0.62
-                pts[#pts + 1] = Track.localIn(f, mx, my)
+                local head = arrow(s.pos[1] + fx * MARK_LONG, s.pos[2] + fy * MARK_LONG, mx, my)
+                for i = 2, #(head or {}) do pts[#pts + 1] = head[i] end
                 break
             end
         end
@@ -234,14 +257,19 @@ function Track.overlay(tile, track, flagged, links)
                 color = CORNER_COLOUR, thickness = thickness,
             }
         end
-        -- Links set by hand are drawn out in full, in white.
-        if links and s.fixed then
+        -- Editing, every link is an arrow between the two spaces: white if
+        -- set by hand, else in the lane colour of the space it leaves.
+        if links then
             for _, n in ipairs(s.next or {}) do
                 local o = byId[n]
-                if o then
+                local dx, dy = o and o.pos[1] - s.pos[1], o and o.pos[2] - s.pos[2]
+                local pts2 = o and arrow(s.pos[1] + dx * LINK_FROM, s.pos[2] + dy * LINK_FROM,
+                                         s.pos[1] + dx * LINK_TO, s.pos[2] + dy * LINK_TO)
+                if pts2 then
                     lines[#lines + 1] = {
-                        points = { Track.localIn(f, s.pos[1], s.pos[2]), Track.localIn(f, o.pos[1], o.pos[2]) },
-                        color = { 1, 1, 1 }, thickness = thickness,
+                        points = pts2,
+                        color = s.fixed and { 1, 1, 1 } or LANE_COLOUR[s.lane] or { 1, 1, 1 },
+                        thickness = thickness,
                     }
                 end
             end

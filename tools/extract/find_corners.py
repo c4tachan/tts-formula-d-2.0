@@ -7,9 +7,21 @@ turn; the piece holding the start/finish band is a straight, which settles
 which of the two alternating sets are the corners. Each space then takes the
 corner of the piece its centre lies in.
 
-This only adds corner data -- positions, lanes and links are left as they are
--- so it runs on hand-edited track files too. Stop counts are kept from the
-file where it already has them.
+This adds corner data and gives every space its code -- positions, lanes and
+links are left as they are -- so it runs on hand-edited track files too. Stop
+counts are kept from the file where it already has them.
+
+A space's code, which is its id, is <lane>.<sector>.<n>:
+  lane    i, m or o: the inside, middle and outside lane of the lap
+  sector  c1, c2, ... for the corners in running order from the finish line;
+          s1, s2, ... for the straights, sK being the one that leads into cK,
+          and the last (from the last corner round to the finish) one more
+  n       0 for the first cell of the lane that touches the sector's leading
+          edge, counting up in running order. At the finish line that is the
+          cell the checkered band crosses in that lane, or, where the band
+          lies on a cell boundary (a staggered lane), the cell just past it.
+Links, and the reading in tracks/<id>.arrows.json, are carried over to the new
+codes, so the file stays whole however often this is run.
 
 Stop counts are printed on the board in the corner flags, which is a job for
 eyes rather than code: every corner is cropped to out/_work/<id>_flag_<n>.png
@@ -34,7 +46,7 @@ import cv2
 import numpy as np
 
 from detect_track import OUT, board_image, corner_lines, racing_line
-from find_grid import track_only, track_proper
+from find_grid import paint_out_flag, track_only, track_proper
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 WORK = OUT / "_work"
@@ -115,6 +127,146 @@ def running_order(spaces, where):
     return {a: c.most_common(1)[0][0] for a, c in ahead.items()}
 
 
+LANE_LETTER = {1: "i", 2: "m", 3: "o"}
+
+
+def lane_chains(spaces):
+    """Each lane's spaces in running order, following the link that stays in
+    the lane (the nearest, where there is more than one). Exits if a lane does
+    not make one closed loop: the codes would not mean anything."""
+    sp = {s["id"]: s for s in spaces}
+    near = lambda a, b: np.hypot(a["pos"][0] - b["pos"][0], a["pos"][1] - b["pos"][1])
+    chains = {}
+    for lane in sorted({s["lane"] for s in spaces}):
+        members = [s for s in spaces if s["lane"] == lane]
+        on = {}
+        for s in members:
+            same = [n for n in s["next"] if n in sp and sp[n]["lane"] == lane]
+            if same:
+                on[s["id"]] = min(same, key=lambda n: near(s, sp[n]))
+        start = members[0]["id"]
+        loop, seen, at = [], set(), start
+        while at is not None and at not in seen:
+            loop.append(at)
+            seen.add(at)
+            at = on.get(at)
+        if at != start or len(loop) != len(members):
+            stuck = loop[-1]
+            sys.exit("lane %d is not one loop: following it from space %s stops at space %s after %d of %d "
+                     "spaces -- a space with no link on down its lane" % (lane, start, stuck, len(loop), len(members)))
+        chains[lane] = loop
+    return chains
+
+
+def finish_zeros(spaces, chains, where, start_piece, band):
+    """Per lane, the space the finish line starts: the first, in running
+    order, at or past the checkered band. Where the band lies across a cell
+    that is the cell itself; where it lies on the boundary between two, as
+    in a lane staggered against the others, it is the one after.
+
+    Band pixels go to the space nearest them, which is the cell they are in;
+    the band's middle in each lane is the mean of that lane's share."""
+    from scipy.spatial import cKDTree
+    # Only the band itself: other bright paint (a crossing, say) can come
+    # through as smaller patches.
+    n_b, lab_b, st_b, _ = cv2.connectedComponentsWithStats(band.astype(np.uint8), connectivity=8)
+    if n_b < 2:
+        sys.exit("no checkered band found on the board")
+    ys, xs = np.nonzero(lab_b == 1 + int(np.argmax(st_b[1:, cv2.CC_STAT_AREA])))
+    pix = np.c_[xs, ys].astype(float)
+    ids = [s["id"] for s in spaces]
+    pos = {s["id"]: np.array(s["pos"], float) for s in spaces}
+    lane_of = {s["id"]: s["lane"] for s in spaces}
+    _, k = cKDTree(np.array([s["pos"] for s in spaces])).query(pix)
+    owner = [ids[i] for i in k]
+    zeros = {}
+    for lane, loop in chains.items():
+        mine = np.array([lane_of[o] == lane for o in owner])
+        if not mine.any():
+            sys.exit("the checkered band touches no space of lane %d -- check out/<id>_7_corners.png" % lane)
+        mid = pix[mine].mean(0)
+        n = len(loop)
+        first = next(j for j in range(n) if where[loop[j]] == start_piece and where[loop[j - 1]] != start_piece)
+        run, j = [], first
+        while where[loop[j % n]] == start_piece and len(run) < n:
+            run.append(loop[j % n])
+            j += 1
+        # How far past the band's middle each space sits, along the lane.
+        cell = np.median([np.hypot(*(pos[b] - pos[a])) for a, b in zip(run, run[1:])])
+        def past(i):
+            a, b = run[max(i - 1, 0)], run[min(i + 1, len(run) - 1)]
+            d = pos[b] - pos[a]
+            return (pos[run[i]] - mid) @ (d / (np.linalg.norm(d) + 1e-9))
+        zeros[lane] = next((run[i] for i in range(len(run)) if past(i) >= -0.3 * cell), run[0])
+    return zeros
+
+
+def assign_codes(spaces, where, ring, band):
+    """Give every space its code (see the top of this file). Returns the map
+    from each old id to its code."""
+    chains = lane_chains(spaces)
+    zeros = finish_zeros(spaces, chains, where, ring[0], band)
+    n_corners = len(ring) // 2
+    name = {ring[0]: "s%d" % (n_corners + 1)}          # the finish straight, before the line
+    for i, piece in enumerate(ring[1:], 1):
+        name[piece] = "c%d" % (i // 2 + 1) if i % 2 else "s%d" % (i // 2 + 1)
+    codes = {}
+    for lane, loop in chains.items():
+        k = loop.index(zeros[lane])
+        loop = loop[k:] + loop[:k]
+        # From the line the finish straight is s1; once the lane has left it,
+        # coming back into it is the last straight. A space on no piece
+        # keeps the sector of the one before it.
+        count, sector, left = Counter(), "s1", False
+        for sid in loop:
+            piece = where[sid]
+            if piece == ring[0]:
+                sector = name[ring[0]] if left else "s1"
+            elif piece:
+                left, sector = True, name[piece]
+            codes[sid] = "%s.%s.%d" % (LANE_LETTER.get(lane, str(lane)), sector, count[sector])
+            count[sector] += 1
+    for s in spaces:
+        s["sector"] = codes[s["id"]].split(".")[1]
+    if len(set(codes.values())) != len(codes):
+        sys.exit("two spaces were given the same code")
+    return codes
+
+
+def recode(track, codes, arrows_path):
+    """Rename every space to its code, and every link and arrow reading with it."""
+    spaces = track["spaces"]
+    for s in spaces:
+        s["next"] = [codes.get(n, n) for n in s["next"]]
+        s["id"] = codes[s["id"]]
+    lane_of = {"i": 0, "m": 1, "o": 2}
+    def key(s):
+        lane, sector, n = s["id"].split(".")
+        return (lane_of.get(lane, 9), int(sector[1:]) * 2 - (sector[0] == "s"), int(n))
+    spaces.sort(key=key)
+    if arrows_path.exists():
+        reading = json.loads(arrows_path.read_text(encoding="utf-8"))
+        known = lambda i: codes.get(i, codes.get(int(i)) if str(i).isdigit() else None) or \
+            (i if i in codes.values() else None)
+        lost = []
+        forks = {}
+        for k, v in reading.get("forks", {}).items():
+            c = known(k)
+            if c:
+                forks[c] = v
+            else:
+                lost.append(k)
+        reading["forks"] = forks
+        for field in ("approach", "blank"):
+            if field in reading:
+                keep = [known(i) for i in reading[field]]
+                lost += [i for i, c in zip(reading[field], keep) if not c]
+                reading[field] = [c for c in keep if c]
+        arrows_path.write_text(json.dumps(reading, indent=1), encoding="utf-8")
+        print("   %s: carried over to the new codes%s" % (arrows_path.name,
+              "" if not lost else "; no space for %s" % lost))
+
+
 def flag_crop(im, spaces, members, pad=170):
     """A corner and the ground around it, where its flag is printed."""
     pts = np.array([s["pos"] for s in spaces if s["id"] in members])
@@ -136,7 +288,8 @@ def main():
     path = ROOT / "tracks" / f"{map_id}.json"
     track = json.loads(path.read_text(encoding="utf-8"))
     info, im = board_image(map_id)
-    _, road = track_only(im)
+    track_img, road = track_only(im)
+    _, band = paint_out_flag(track_img, road)
     line, _, width = racing_line(im)
     main_road = track_proper(road, line, width)
 
@@ -212,6 +365,11 @@ def main():
     print("   ->", out.relative_to(ROOT))
 
     track["corners"] = corners
+    codes = assign_codes(spaces, where, ring, band)
+    recode(track, codes, ROOT / "tracks" / f"{map_id}.arrows.json")
+    per = Counter(c.rsplit(".", 1)[0] for c in codes.values())
+    print("4. codes given: %d spaces, %d lane-sectors, e.g. %s" % (len(codes), len(per), ", ".join(
+        s["id"] for s in track["spaces"][:3])))
     path.write_text(json.dumps(track, indent=1), encoding="utf-8")
     print("3. corners written to", path.relative_to(ROOT))
     import gen_tracks

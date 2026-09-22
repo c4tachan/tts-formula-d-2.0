@@ -849,6 +849,10 @@ local function registerEditorKeys()
     addHotkey("Track editor: apply", editorKey(function(color)
         fdApply({ color = color })
     end))
+    -- Pressed on one space, then on another: adds the link, or removes it.
+    addHotkey("Track editor: link or unlink two spaces", editorKey(function(color, hovered, pointer)
+        broadcastToColor(Editor.linkKey(hovered, pointer), color, LEVEL_RGB.info)
+    end))
 end
 
 function onObjectDestroy(obj)

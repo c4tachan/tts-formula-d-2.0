@@ -41,14 +41,14 @@ the only thing needing measurement in game is the tile itself — not each track
 
   "spaces": [
     {
-      "id": 1,
+      "id": "m.c1.0",            // the space's code, <lane>.<sector>.<n> (below)
       "pos": [1204, 880],        // pixel centre of the space
       "rot": 47.5,               // degrees; car's facing when parked here
-      "lane": 1,                 // 1 = innermost
-      "next": [2, 14],           // legal successors (lane changes included)
+      "lane": 2,                 // 1 = innermost
+      "next": ["m.c1.1", "i.c1.1"], // legal successors (lane changes included)
       "fixed": true,             // optional: `next` was set by hand; never recomputed
-      "corner": null,            // corner id when this space is inside one
-      "sector": 0                // ordinal along the lap, for lap counting
+      "corner": 1,               // corner id when this space is inside one
+      "sector": "c1"             // the corner or straight it lies in
     }
   ],
 
@@ -72,6 +72,27 @@ the only thing needing measurement in game is the tile itself — not each track
   }
 }
 ```
+
+## Space codes
+
+A space's id is its code, `<lane>.<sector>.<n>`, given by
+`tools/extract/find_corners.py`:
+
+- **lane**: `i`, `m` or `o`, the inside, middle and outside lane of the lap
+  (lanes 1, 2 and 3). This is fixed round the lap, not per bend.
+- **sector**: `c1`, `c2`, ... for the corners, in running order from the finish
+  line; `s1`, `s2`, ... for the straights, `sK` being the one that leads into
+  `cK`. The straight from the last corner round to the finish line is one more
+  (`s11` on Monaco).
+- **n**: `0` for the first cell of the lane that touches the sector's leading
+  edge, counting up in running order. At the finish line that is the cell the
+  checkered band crosses; where the band lies on a cell boundary, as in a lane
+  staggered against the others, it is the cell just past it.
+
+A fresh scan from `find_grid.py` has plain numbers for ids until
+`find_corners.py` runs; that step renames every link and the arrow reading in
+`tracks/<id>.arrows.json` to match. A space added in the editor is named
+after the space nearest it, with `+n` on the end, until the next run.
 
 ## Why pixels and not a hand-built graph
 
