@@ -5,6 +5,8 @@
 --
 -- `state` is plain data so it can go straight through JSON for onSave and undo.
 
+local Moves = require("fd.core.moves")
+
 local Race = {}
 Race.__index = Race
 
@@ -63,7 +65,8 @@ local function freshWear(rules)
 end
 
 -- `space` is not reset: a reset or a fresh start does not move the cars on
--- the board. `moveFrom` is, as it belongs to the race being thrown away.
+-- the board. The move and corner stops are, as they belong to the race
+-- being thrown away.
 local function resetCar(rules, car)
     car.gear = 0         -- selected on the dashboard
     car.rolledGear = 0   -- gear of the last die actually rolled; 0 = on the grid
@@ -73,7 +76,9 @@ local function resetCar(rules, car)
     car.maxGear = nil
     car.movedRound = nil
     car.stalledRound = nil
-    car.moveFrom = nil
+    car.move = nil       -- the move since the last roll; see startMove
+    car.stops = nil      -- stops made in the corner `space` is in
+    car.crashed = nil    -- corner the car went out in, missing its stops
 end
 
 function Race:join(color, name)
@@ -111,18 +116,104 @@ function Race:cars()
     return out
 end
 
---- The car is now on the space `spaceId`, or off the track if nil. Silent:
--- cars are put down all the time, and the board shows where they are.
-function Race:placed(color, spaceId)
+--- The car is now on the space `spaceId`, or off the track if nil.
+--
+-- With `track`, a car put down during its move has the move judged: see
+-- Race:judgeMove. Without it -- a car claimed where it stands, or the board
+-- re-read after an undo -- it is only noted, silently: cars are picked up
+-- and put down all the time, and the board shows where they are.
+function Race:placed(color, spaceId, track)
     local car = self:car(color)
-    if car then
-        car.space = spaceId
+    if not car then return end
+    if spaceId ~= car.space then
+        car.stops = nil
+    end
+    car.space = spaceId
+    if track and spaceId and car.move then
+        self:judgeMove(car, track)
     end
 end
 
---- Where a car starts the move it is about to make.
-local function startMove(car)
-    car.moveFrom = car.space
+--- A car is about to move `roll` spaces: note where from, the stops it has
+-- made in the corner there, and where the other cars are -- they are what
+-- it has to get round, wherever they go afterwards.
+function Race:startMove(car, roll)
+    if not car.space then
+        car.move = nil
+        return
+    end
+    local occupied = {}
+    for _, o in ipairs(self:cars()) do
+        if o ~= car and o.space and not o.eliminated then
+            occupied[#occupied + 1] = o.space
+        end
+    end
+    car.move = {
+        from = car.space, roll = roll, stops = car.stops, occupied = occupied,
+        charged = { brake = 0, overshoot = 0 }, -- spaces charged for so far
+    }
+end
+
+--- How bad ending a move this way is, to choose between two ways there.
+function Race:moveCost(o)
+    local rules, total = self.rules, 0
+    for _, wear in ipairs({ rules.brakeWear(o.brake), rules.overshootWear(o.overshoot) }) do
+        for _, pts in pairs(wear) do total = total + pts end
+    end
+    if rules.overshootOut(o.missed) then
+        total = total + 1000
+    end
+    return total
+end
+
+--- Charge (or give back) the difference between what the move has cost so
+-- far and `spaces` of `kind` ("brake" or "overshoot").
+function Race:chargeMove(car, kind, spaces, reason)
+    local m = car.move
+    local delta = spaces - m.charged[kind]
+    m.charged[kind] = spaces
+    local wearOf = kind == "brake" and self.rules.brakeWear or self.rules.overshootWear
+    if delta > 0 then
+        self:applyWear(car, wearOf(delta), reason)
+    elseif delta < 0 then
+        self:refund(car, wearOf(-delta), "move changed")
+    end
+end
+
+--- Judge where the car was put down against the roll: brake for spaces
+-- short, overshoot for a corner left too early, out for missing too many
+-- stops. Put down again, it is judged again and only the difference is
+-- charged. A space the roll cannot reach is warned about and charged
+-- nothing -- the track data may be wrong, or the table may have ruled.
+function Race:judgeMove(car, track)
+    local m = car.move
+    local occupied = {}
+    for _, id in ipairs(m.occupied) do occupied[id] = true end
+    local reach = Moves.reach(track, m.from, m.roll, {
+        occupied = occupied, stops = m.stops,
+        cost = function(o) return self:moveCost(o) end,
+    })
+    local o = reach and reach[car.space]
+    local who = self:label(car)
+    if not o then
+        self:emit("warn", string.format("%s: that space is not a legal %d from %s -- nothing charged for the move",
+            who, m.roll, m.from), car.color)
+        self:chargeMove(car, "brake", 0)
+        self:chargeMove(car, "overshoot", 0)
+        car.crashed = nil
+        self:checkElimination(car)
+        return
+    end
+    car.stops = o.stops
+    self:chargeMove(car, "brake", o.brake, string.format("braked %d short", o.brake))
+    self:chargeMove(car, "overshoot", o.overshoot,
+        string.format("overshot corner %s by %d", tostring(o.corner), o.overshoot))
+    local crash = nil
+    if self.rules.overshootOut(o.missed) then
+        crash = o.corner
+    end
+    car.crashed = crash
+    self:checkElimination(car)
 end
 
 function Race:zone(id)
@@ -135,18 +226,21 @@ end
 -- Wear ----------------------------------------------------------------------
 
 function Race:checkElimination(car)
-    local out = nil
+    local why = nil
     for _, z in ipairs(self.rules.zones) do
         if z.eliminateAt and car.wear[z.id] <= z.eliminateAt then
-            out = z
+            why = "no " .. z.name .. " left"
             break
         end
     end
-    if out and not car.eliminated then
+    if not why and car.crashed then
+        why = "went through corner " .. car.crashed .. " without its stops"
+    end
+    if why and not car.eliminated then
         car.eliminated = true
         self:dropChecks(car.color)
-        self:emit("out", self:label(car) .. " is out of the race (no " .. out.name .. " left)", car.color)
-    elseif not out and car.eliminated then
+        self:emit("out", self:label(car) .. " is out of the race (" .. why .. ")", car.color)
+    elseif not why and car.eliminated then
         car.eliminated = false
         self:emit("info", self:label(car) .. " is back in the race", car.color)
     end
@@ -160,6 +254,20 @@ function Race:applyWear(car, wear, reason)
             car.wear[z.id] = car.wear[z.id] - pts
             self:emit("wear", string.format("%s loses %d %s (%s) -- %d left",
                 self:label(car), pts, z.name, reason, math.max(0, car.wear[z.id])), car.color)
+        end
+    end
+    self:checkElimination(car)
+end
+
+--- Give back a zone -> points map of wear, capped at each zone's start.
+function Race:refund(car, wear, reason)
+    for _, z in ipairs(self.rules.zones) do
+        local pts = wear[z.id]
+        if pts and pts ~= 0 then
+            local before = car.wear[z.id]
+            car.wear[z.id] = math.min(z.start, before + pts)
+            self:emit("info", string.format("%s gets back %d %s (%s) -- %d left",
+                self:label(car), car.wear[z.id] - before, z.name, reason, car.wear[z.id]), car.color)
         end
     end
     self:checkElimination(car)
@@ -317,7 +425,7 @@ function Race:rolled(color, gear, value)
     car.lastRoll = value
     car.maxGear = nil
     car.movedRound = self.state.round
-    startMove(car)
+    self:startMove(car, value)
     self:emit("info", string.format("%s rolls %s in %s gear", who, tostring(value), gearName(gear)), color)
 
     if self.rules.engineStrain[gear] == value then
@@ -392,7 +500,7 @@ function Race:blackDie(value, roller)
             car.gear = 1
             car.rolledGear = 1
             car.movedRound = self.state.round
-            startMove(car)
+            self:startMove(car, outcome.bonus)
         end
     elseif check.kind == "grid" then
         car.gridRolls = car.gridRolls or {}

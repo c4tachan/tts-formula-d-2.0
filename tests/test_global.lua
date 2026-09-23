@@ -435,11 +435,11 @@ function T.the_race_knows_which_space_a_car_is_on()
     eq(state().cars.Red.space, space.id)
 
     roll(S, 1, 2)
-    eq(state().cars.Red.moveFrom, space.id, "the move starts where the car was")
+    eq(state().cars.Red.move.from, space.id, "the move starts where the car was")
     local nxt = FDMonaco.byId[space.next[1]]
     putNear(S, mine, nxt)
     eq(state().cars.Red.space, nxt.id)
-    eq(state().cars.Red.moveFrom, space.id)
+    eq(state().cars.Red.move.from, space.id)
 
     mine.pos = S.vec(60, 1, 0)
     onObjectDrop("Red", mine)
@@ -469,18 +469,46 @@ function T.a_car_claimed_on_the_track_is_on_its_space()
     eq(state().cars.Red, nil)
 end
 
-function T.undo_keeps_the_cars_where_they_are()
-    local S = redRacing()
+--- Red's car, claimed and put down on the Monaco space `id`.
+local function redOn(S, id)
     local FDMonaco = require("fd.data.tracks.FDMonaco")
     S.beginner.click("fdDashCar", "Red")
     local mine = getObjectFromGUID(state().cars.Red.tts.car)
-    local space = FDMonaco.spaces[100]
-    putNear(S, mine, space)
+    putNear(S, mine, FDMonaco.byId[id])
+    eq(state().cars.Red.space, id)
+    return mine
+end
+
+function T.a_car_put_down_after_its_roll_is_charged_for_the_move()
+    local S = redRacing()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local mine = redOn(S, "m.s2.5")
     roll(S, 1, 2)
-    putNear(S, mine, FDMonaco.byId[space.next[1]])
+    putNear(S, mine, FDMonaco.byId["m.s2.6"])
+    eq(state().cars.Red.wear.wp, 17)
+    assert(S.logged("braked 1 short"))
+    -- Put down again, it is judged again: the full roll costs nothing.
+    putNear(S, mine, FDMonaco.byId["m.s2.7"])
+    eq(state().cars.Red.wear.wp, 18)
+    assert(S.logged("gets back 1 WP"))
+    -- Too far is warned about, not charged or refused.
+    putNear(S, mine, FDMonaco.byId["m.s2.10"])
+    eq(state().cars.Red.wear.wp, 18)
+    eq(state().cars.Red.space, "m.s2.10")
+    assert(S.logged("not a legal 2"))
+end
+
+function T.undo_keeps_the_cars_where_they_are()
+    local S = redRacing()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local mine = redOn(S, "m.s2.5")
+    roll(S, 1, 2)
+    putNear(S, mine, FDMonaco.byId["m.s2.6"])
+    eq(state().cars.Red.wear.wp, 17)
     fdUndo({ color = "Red", steam_name = "RedPlayer" })
-    eq(state().cars.Red.moveFrom, nil, "the roll is undone")
-    eq(state().cars.Red.space, space.next[1], "but the car is still where it was put")
+    eq(state().cars.Red.wear.wp, 18, "the charge is undone")
+    eq(state().cars.Red.move.from, "m.s2.5", "the roll is not")
+    eq(state().cars.Red.space, "m.s2.6", "and the car is still where it was put")
 end
 
 function T.no_snapping_on_a_map_without_track_data()

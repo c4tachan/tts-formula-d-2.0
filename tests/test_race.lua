@@ -255,14 +255,14 @@ function T.a_move_starts_from_the_space_the_car_was_on()
     eq(r:car("Red").space, "m.s1.3", "starting the race does not move the car")
     r:blackDie(10, "Red")
     r:rolled("Red", 1, 2)
-    eq(r:car("Red").moveFrom, "m.s1.3")
+    eq(r:car("Red").move.from, "m.s1.3")
     r:drain()
     r:placed("Red", "m.s1.5")
     eq(#r:drain(), 0, "placing a car says nothing")
     eq(r:car("Red").space, "m.s1.5")
-    eq(r:car("Red").moveFrom, "m.s1.3", "moving the car does not start a new move")
+    eq(r:car("Red").move.from, "m.s1.3", "moving the car does not start a new move")
     r:rolled("Red", 2, 3)
-    eq(r:car("Red").moveFrom, "m.s1.5")
+    eq(r:car("Red").move.from, "m.s1.5")
     local copy = Race.new(Rules, r:serialize())
     eq(copy:car("Red").space, "m.s1.5")
 end
@@ -272,7 +272,7 @@ function T.a_great_start_is_a_move_from_the_grid()
     r:placed("Red", "i.s11.4")
     r:startRace()
     r:blackDie(18, "Red")
-    eq(r:car("Red").moveFrom, "i.s11.4")
+    eq(r:car("Red").move.from, "i.s11.4")
 end
 
 function T.off_the_track_is_no_space()
@@ -281,7 +281,101 @@ function T.off_the_track_is_no_space()
     r:placed("Red", nil)
     eq(r:car("Red").space, nil)
     r:rolled("Red", 1, 2)
-    eq(r:car("Red").moveFrom, nil)
+    eq(r:car("Red").move, nil)
+end
+
+-- Judging moves ---------------------------------------------------------------
+
+--- One lane, cells 0 .. cells-1 named "c0", "c1", ...; `corner` is
+-- { first, last, stops } for corner 1.
+local function lane(cells, corner)
+    local spaces = {}
+    for k = 0, cells - 1 do
+        local inCorner = corner and k >= corner[1] and k <= corner[2]
+        spaces[#spaces + 1] = { id = "c" .. k, lane = 1, corner = inCorner and 1 or nil,
+            next = k < cells - 1 and { "c" .. (k + 1) } or {} }
+    end
+    return { spaces = spaces, corners = corner and { { id = 1, stops = corner[3] } } or {} }
+end
+
+--- Red rolls `roll` in `gear` from where the car is, and is put down on `to`.
+local function move(r, track, gear, roll, to)
+    r:rolled("Red", gear, roll)
+    r:placed("Red", to, track)
+end
+
+function T.braking_is_charged_and_rejudged()
+    local track = lane(20)
+    local r = started("Red")
+    r:placed("Red", "c0")
+    move(r, track, 1, 2, "c1")
+    eq(r:car("Red").wear.wp, 17)
+    assert(hasEvent(r, "wear", "braked 1 short"))
+    r:placed("Red", "c2", track)
+    eq(r:car("Red").wear.wp, 18)
+    r:placed("Red", "c0", track)
+    eq(r:car("Red").wear.wp, 16, "not moving at all brakes the whole roll")
+end
+
+function T.an_unreachable_space_warns_and_charges_nothing()
+    local track = lane(20)
+    local r = started("Red")
+    r:placed("Red", "c0")
+    move(r, track, 1, 2, "c1")
+    r:drain()
+    r:placed("Red", "c9", track)
+    assert(hasEvent(r, "warn", "not a legal 2 from c0"))
+    eq(r:car("Red").wear.wp, 18, "the brake charged before is given back")
+end
+
+function T.overshooting_is_charged()
+    local track = lane(20, { 2, 4, 1 })
+    local r = started("Red")
+    r:placed("Red", "c0")
+    move(r, track, 3, 7, "c7")
+    eq(r:car("Red").wear.wp, 15)
+    assert(hasEvent(r, "wear", "overshot corner 1 by 3"))
+end
+
+function T.stops_carry_from_move_to_move()
+    local track = lane(20, { 2, 6, 2 })
+    local r = started("Red")
+    r:placed("Red", "c0")
+    move(r, track, 1, 2, "c2")
+    eq(r:car("Red").stops, 1)
+    move(r, track, 1, 2, "c4")
+    eq(r:car("Red").stops, 2)
+    move(r, track, 2, 4, "c8")
+    eq(r:car("Red").wear.wp, 18, "two stops made: free to leave")
+    eq(r:car("Red").stops, 0)
+end
+
+function T.missing_two_stops_is_out_and_a_correction_brings_it_back()
+    local track = lane(20, { 2, 6, 2 })
+    local r = started("Red")
+    r:placed("Red", "c0")
+    move(r, track, 3, 8, "c8")
+    assert(r:car("Red").eliminated)
+    assert(hasEvent(r, "out", "corner 1 without its stops"))
+    r:placed("Red", "c6", track)
+    assert(not r:car("Red").eliminated)
+    eq(r:car("Red").wear.wp, 16, "braked 2, stopped in the corner")
+end
+
+function T.cars_in_the_way_are_where_they_were_at_the_roll()
+    -- Two lanes wide, Blue sitting in Red's lane.
+    local track = { corners = {}, spaces = {} }
+    for k = 0, 9 do
+        track.spaces[#track.spaces + 1] = { id = "i" .. k, lane = 1, next = { "i" .. (k + 1), "o" .. (k + 1) } }
+        track.spaces[#track.spaces + 1] = { id = "o" .. k, lane = 2, next = { "o" .. (k + 1), "i" .. (k + 1) } }
+    end
+    local r = started("Red", "Blue")
+    r:placed("Red", "i0")
+    r:placed("Blue", "i2")
+    r:rolled("Red", 1, 2)
+    r:placed("Blue", "o7") -- Blue moves on after Red rolled
+    r:placed("Red", "i2", track)
+    assert(hasEvent(r, "warn", "not a legal"), "Blue was there")
 end
 
 return T

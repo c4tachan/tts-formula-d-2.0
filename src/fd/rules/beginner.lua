@@ -49,6 +49,12 @@ function Rules.overshootWear(spaces)
     return { wp = spaces }
 end
 
+--- Whether leaving a corner `missed` stops short puts a car out: a
+-- 2-stop corner with none made, a 3-stop corner with one or none.
+function Rules.overshootOut(missed)
+    return missed >= 2
+end
+
 --- Zones a pit stop restores to their starting value.
 Rules.pitRestores = { "wp" }
 

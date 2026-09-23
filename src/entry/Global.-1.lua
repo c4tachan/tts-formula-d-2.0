@@ -453,9 +453,11 @@ function onObjectDrop(color, obj)
     end
     local owner = carOwning(obj.getGUID())
     if owner or CAR_NAMES[obj.getName()] then
-        local space = snapCar(obj)
+        local space, track = snapCar(obj)
         if owner then
-            race:placed(owner.color, space and space.id)
+            -- Put down during its move, the move is judged and charged:
+            -- undoable, and the dashboards show the result.
+            act(function() race:placed(owner.color, space and space.id, track) end)
         end
         return
     end
@@ -742,7 +744,7 @@ local ON_SPACE = 0.5
 --- A car put down on the track: settle it onto the nearest free space, facing
 -- the way the track runs. Advisory like the rest -- it only helps a car land
 -- neatly on a space the player chose, and does nothing off the track.
--- Returns the space it went to, or nil.
+-- Returns the space it went to and the track it is on, or nil.
 snapCar = function(obj)
     local tile = Track.tile()
     local track = tile and trackOnBoard()
@@ -764,7 +766,7 @@ snapCar = function(obj)
     obj.setPositionSmooth({ x = pos.x, y = pos.y + SNAP_LIFT, z = pos.z }, false, true)
     -- The car models' noses point along their local +Z.
     obj.setRotationSmooth({ x = 0, y = yaw, z = 0 }, false, true)
-    return space
+    return space, track
 end
 
 --- The id of the space a car is sitting on, without moving it; nil if it is
