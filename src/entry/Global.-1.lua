@@ -708,8 +708,8 @@ local function editorStatus()
     end
     local track = Editor.trackFor(TRACKS[Editor.openId()])
     local _, problems = Editor.problems()
-    Hud.setEditor(string.format("Editing %s: %d spaces, %d problem(s) shown red, %d marker(s) out",
-        track.name, #track.spaces, #problems, Editor.markerCount()))
+    Hud.setEditor(string.format("Editing %s: %d spaces, %d problem(s) shown red, %d marker(s) out, %d on the grid",
+        track.name, #track.spaces, #problems, Editor.markerCount(), Editor.gridCount()))
 end
 
 --- Draw the spaces over the board, to check them against the print.
@@ -857,6 +857,10 @@ local function boardMenu(on)
     tile.addContextMenuItem("Pick up spaces here", function(color, pos) pickUpAt(color, pos) end)
     tile.addContextMenuItem("Add a space here", function(color, pos) addAt(color, pos) end)
     tile.addContextMenuItem("Apply track edits", function(color) fdApply({ color = color }) end)
+    tile.addContextMenuItem("Clear the grid", function(color)
+        broadcastToColor(Editor.clearGrid(), color, LEVEL_RGB.info)
+        editorStatus()
+    end)
 end
 
 --- Open or close the track editor for the map on the board.
@@ -947,6 +951,10 @@ local function registerEditorKeys()
     -- Pressed on one space, then on another: adds the link, or removes it.
     addHotkey("Track editor: link or unlink two spaces", editorKey(function(color, hovered, pointer)
         broadcastToColor(Editor.linkKey(hovered, pointer), color, LEVEL_RGB.info)
+    end))
+    -- Pressed on each grid space in turn, pole first; again on one takes it off.
+    addHotkey("Track editor: mark grid space", editorKey(function(color, hovered, pointer)
+        broadcastToColor(Editor.gridKey(hovered, pointer), color, LEVEL_RGB.info)
     end))
 end
 

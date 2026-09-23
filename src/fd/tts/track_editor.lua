@@ -52,7 +52,7 @@ function Editor.trackFor(track)
     return {
         id = track.id, name = track.name, ruleset = track.ruleset, lanes = track.lanes,
         laps = track.laps, image = track.image, outer = track.outer, spaces = e.spaces,
-        corners = track.corners,
+        corners = track.corners, start = e.start or track.start,
     }
 end
 
@@ -69,12 +69,47 @@ local function working(track)
         edits[track.id] = { spaces = spaces, nextId = 1, cell = cell }
         changed()
     end
-    return edits[track.id]
+    local e = edits[track.id]
+    -- The grid, pole first; edits saved before the grid could be marked
+    -- have none of their own.
+    if not e.start then
+        local start = {}
+        for i, id in ipairs(track.start or {}) do start[i] = id end
+        e.start = start
+    end
+    return e
 end
 
 local function find(e, id)
     for i, s in ipairs(e.spaces) do
         if s.id == id then return s, i end
+    end
+end
+
+--- Where a space stands on the grid, 1 being pole, or nil.
+local function gridPlace(e, id)
+    for i, g in ipairs(e.start or {}) do
+        if g == id then return i end
+    end
+    return nil
+end
+
+--- A marker's name: the ghost's, and its grid place if it has one.
+local function markerName(e, s)
+    local place = gridPlace(e, s.id)
+    return Ghosts.name(s) .. (place and (" - grid " .. place) or "")
+end
+
+--- Rename the markers of the grid places from `from` on, after the grid
+-- changed there; `gone` is a space that has just left it.
+local function renameGrid(e, from, gone)
+    local want = {}
+    for i = from, #e.start do want[e.start[i]] = true end
+    if gone then want[gone] = true end
+    for guid, id in pairs(markers) do
+        local s = want[id] and find(e, id)
+        local obj = s and getObjectFromGUID(guid)
+        if obj then obj.setName(markerName(e, s)) end
     end
 end
 
@@ -116,6 +151,10 @@ function Editor.draw()
             tinted[guid] = red
         end
     end
+    local tile = Track.tile()
+    if tile then
+        Track.setLayer("grid", Track.grid(tile, Editor.trackFor(base[open]), e.start))
+    end
 end
 
 function Editor.open(track)
@@ -143,6 +182,7 @@ function Editor.close()
     applying = false
     markers, tinted = {}, {}
     open = nil
+    Track.setLayer("grid", nil)
 end
 
 local boardTop = Ghosts.boardTop
@@ -151,6 +191,8 @@ local boardTop = Ghosts.boardTop
 -- by the caller for however many markers it is putting out.
 local function spawnMarker(tile, f, top, s, red)
     local obj = Ghosts.spawn(tile, f, top, s, red, DESCRIPTION)
+    local e = edits[open]
+    if gridPlace(e, s.id) then obj.setName(markerName(e, s)) end
     markers[obj.getGUID()] = s.id
     tinted[obj.getGUID()] = red or false
     -- Right-click menu, so nothing needs a key bound to it.
@@ -353,8 +395,47 @@ function Editor.setLane(obj, lane)
     edits[open].dirty = true
     changed()
     obj.setColorTint(Ghosts.tint(s, tinted[obj.getGUID()]))
-    obj.setName(Ghosts.name(s))
+    obj.setName(markerName(edits[open], s))
     return true
+end
+
+--- The grid key: the space pointed at goes on the end of the grid, or off it
+-- if it is already there. Pressed on each grid space in turn, pole first.
+function Editor.gridKey(obj, pointer)
+    local s = Editor.spaceAt(obj, pointer)
+    if not s then return "Point at a space first." end
+    local e = edits[open]
+    local place = gridPlace(e, s.id)
+    if place then
+        table.remove(e.start, place)
+    else
+        e.start[#e.start + 1] = s.id
+    end
+    e.dirty = true
+    renameGrid(e, place or #e.start, place and s.id or nil)
+    Editor.draw()
+    if place then
+        return "Space " .. s.id .. " is off the grid; " .. #e.start .. " grid space(s) left."
+    end
+    return "Space " .. s.id .. " is grid place " .. #e.start
+        .. (#e.start == 1 and " (pole)." or ".")
+end
+
+--- Take every space off the grid, to mark it again from pole.
+function Editor.clearGrid()
+    if not open then return "The editor is not open." end
+    local e = edits[open]
+    local was = e.start
+    e.start = {}
+    e.dirty = true
+    for _, id in ipairs(was) do renameGrid(e, 1, id) end
+    Editor.draw()
+    return "Grid cleared (" .. #was .. " space(s)). Mark it again from pole."
+end
+
+--- How many spaces are on the open track's grid.
+function Editor.gridCount()
+    return open and #edits[open].start or 0
 end
 
 local function underPointer(guid)
@@ -448,6 +529,12 @@ function Editor.onDestroyed(obj)
         e.dirty = true
         changed()
     end
+    local place = gridPlace(e, id)
+    if place then
+        table.remove(e.start, place)
+        renameGrid(e, place)
+        Editor.draw()
+    end
     return true
 end
 
@@ -489,7 +576,7 @@ function Editor.save()
                 end
                 spaces[i] = c
             end
-            out[id] = { spaces = spaces, nextId = e.nextId }
+            out[id] = { spaces = spaces, nextId = e.nextId, start = e.start }
         end
     end
     return out
@@ -519,7 +606,7 @@ function Editor.load(saved, strayMarkers)
             printToAll("Track edits for " .. id .. " in this save predate space codes and were dropped.",
                 { 1, 0.8, 0.3 })
         else
-            edits[id] = { spaces = e.spaces, nextId = e.nextId or 1, dirty = true }
+            edits[id] = { spaces = e.spaces, nextId = e.nextId or 1, dirty = true, start = e.start }
         end
     end
     for _, guid in ipairs(strayMarkers or {}) do

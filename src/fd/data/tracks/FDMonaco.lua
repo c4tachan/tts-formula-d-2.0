@@ -537,6 +537,9 @@ T.corners = {
     { id = 10, stops = 1, long = 6, short = 2 },
 }
 
+-- The starting grid, pole first.
+T.start = {}
+
 T.byId = {}
 for _, s in ipairs(T.spaces) do
     T.byId[s.id] = s

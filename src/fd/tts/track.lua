@@ -271,9 +271,44 @@ function Track.marks(tile, track, marks)
     return lines
 end
 
+local GRID_COLOUR = { 1, 1, 1 }
+local GRID_RADIUS = 16
+
+--- The starting grid, `ids` pole first: a ring on each space (two on pole)
+-- and a line joining them in order, so the order can be checked by eye.
+function Track.grid(tile, track, ids)
+    if not ids or #ids == 0 then return nil end
+    local thickness = THICKNESS / math.max(tile.getScale().x, 0.001)
+    local f = Track.frame(tile, track)
+    local byId = {}
+    for _, s in ipairs(track.spaces) do byId[s.id] = s end
+    local lines, path = {}, {}
+    local function ring(s, r)
+        local pts = {}
+        for i = 0, 8 do
+            local a = i * math.pi / 4
+            pts[#pts + 1] = Track.localIn(f, s.pos[1] + r * math.cos(a), s.pos[2] + r * math.sin(a))
+        end
+        lines[#lines + 1] = { points = pts, color = GRID_COLOUR, thickness = thickness }
+    end
+    for i, id in ipairs(ids) do
+        local s = byId[id]
+        if s then
+            ring(s, GRID_RADIUS)
+            if i == 1 then ring(s, GRID_RADIUS * 0.6) end
+            path[#path + 1] = Track.localIn(f, s.pos[1], s.pos[2])
+        end
+    end
+    if #path > 1 then
+        lines[#lines + 1] = { points = path, color = GRID_COLOUR, thickness = thickness }
+    end
+    return lines
+end
+
 -- The tile has one set of vector lines, shared by layers drawn in this
--- order: the space overlay, then the reach highlight on top.
-local LAYERS = { "overlay", "reach" }
+-- order: the space overlay, the grid being marked, then the reach
+-- highlight on top.
+local LAYERS = { "overlay", "grid", "reach" }
 local layers = {}
 
 --- Replace one layer's lines (nil or empty clears it) and redraw the tile.

@@ -68,7 +68,8 @@ def main():
         print("  no track edits in this save")
         return 1
     for track_id, e in edits.items():
-        print(f"  {track_id}: {len(as_list(e.get('spaces')))} spaces")
+        print(f"  {track_id}: {len(as_list(e.get('spaces')))} spaces, "
+              f"{len(as_list(e.get('start')))} on the grid")
     if "--list" in sys.argv:
         return 0
 
@@ -100,6 +101,11 @@ def main():
             spaces.append(space)
         spaces.sort(key=lambda s: str(s["id"]))
         track["spaces"] = spaces
+        # The grid, pole first, as marked with the editor's grid key. A save
+        # from before the key has none, and leaves the file's alone.
+        if "start" in e:
+            ids = {s["id"] for s in spaces}
+            track["start"] = [sid(v) for v in as_list(e["start"]) if sid(v) in ids]
         track["edited"] = True
         track["edited_from"] = f"{save_path.name} ({when:%Y-%m-%d %H:%M})"
         path.write_text(json.dumps(track, indent=1), encoding="utf-8")

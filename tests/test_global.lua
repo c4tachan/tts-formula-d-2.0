@@ -751,9 +751,11 @@ function T.editing_draws_every_link_as_an_arrow()
         nLinks = nLinks + #(s.next or {})
     end
     local lines = S.board.getVectorLines()
-    eq(#lines, #(FDMonaco.outer or {}) + nLinks)
+    -- The grid is drawn over the links while editing.
+    local nGrid = #(Track.grid(S.board, track, track.start) or {})
+    eq(#lines, #(FDMonaco.outer or {}) + nLinks + nGrid)
     -- A link's arrow is shaft plus head: five points, the tip twice.
-    local last = lines[#lines].points
+    local last = lines[#lines - nGrid].points
     eq(#last, 5)
     eq(last[2].x, last[4].x)
     eq(last[2].z, last[4].z)
@@ -892,6 +894,74 @@ function T.links_can_be_set_by_hand_and_handed_back()
     assert(not leadsTo(space(a.id), b.id), "toggled off")
     ma.rightClick("Automatic links", "Red")
     eq(space(a.id).fixed, nil)
+end
+
+function T.the_grid_key_marks_the_grid_in_order()
+    local S = world()
+    local Editor, Track, FDMonaco = editor(S)
+    local key = "Track editor: mark grid space"
+    -- From an empty grid, not the one Monaco's file has.
+    S.board.rightClick("Clear the grid", "Red")
+    local a, b, c = FDMonaco.spaces[100], FDMonaco.spaces[101], FDMonaco.spaces[102]
+    local at = function(sp) return Track.worldOf(S.board, FDMonaco, sp.pos[1] + 1, sp.pos[2] - 1) end
+    local before = #S.board.getVectorLines()
+
+    S.press(key, "Red", nil, at(a))
+    assert(S.logged("Space " .. a.id .. " is grid place 1 %(pole%)"))
+    S.press(key, "Red", nil, at(b))
+    S.press(key, "Red", nil, at(c))
+    local start = Editor.trackFor(FDMonaco).start
+    eq(#start, 3)
+    eq(start[1], a.id)
+    eq(start[3], c.id)
+    -- Three rings, a second on pole, and the line through them.
+    eq(#S.board.getVectorLines(), before + 5)
+    assert(S.find("Space " .. b.id .. " (lane " .. b.lane .. ") - grid 2"), "its marker says its place")
+    assert(S.ui.fdr_editor.value:find("3 on the grid"), S.ui.fdr_editor.value)
+
+    -- Pressed again on one: it comes off, and those behind move up.
+    S.press(key, "Red", nil, at(a))
+    assert(S.logged("is off the grid"))
+    start = Editor.trackFor(FDMonaco).start
+    eq(#start, 2)
+    eq(start[1], b.id)
+    assert(S.find("Space " .. b.id .. " (lane " .. b.lane .. ") - grid 1"))
+    assert(S.find("Space " .. a.id .. " (lane " .. a.lane .. ")"), "renamed back")
+
+    -- Deleting a grid space's marker takes it off the grid too.
+    S.find("Space " .. b.id .. " (lane " .. b.lane .. ") - grid 1").destruct()
+    start = Editor.trackFor(FDMonaco).start
+    eq(#start, 1)
+    eq(start[1], c.id)
+
+    S.press(key, "Red", nil, Track.worldOf(S.board, FDMonaco, 5, 5))
+    assert(S.logged("Point at a space first"))
+end
+
+function T.the_grid_is_saved_and_can_be_cleared()
+    local S = world()
+    local Editor, Track, FDMonaco = editor(S)
+    local key = "Track editor: mark grid space"
+    -- From an empty grid, not the one Monaco's file has.
+    S.board.rightClick("Clear the grid", "Red")
+    local a, b = FDMonaco.spaces[100], FDMonaco.spaces[101]
+    S.press(key, "Red", nil, Track.worldOf(S.board, FDMonaco, a.pos[1], a.pos[2]))
+    S.press(key, "Red", nil, Track.worldOf(S.board, FDMonaco, b.pos[1], b.pos[2]))
+    local saved = onSave()
+    local start = saved.json.edits.FDMonaco.start
+    eq(#start, 2)
+    eq(start[1], a.id)
+
+    local S2 = world()
+    onLoad(saved)
+    local Editor2 = require("fd.tts.track_editor")
+    eq(Editor2.trackFor(require("fd.data.tracks.FDMonaco")).start[2], b.id)
+
+    fdEdit({ color = "Red", steam_name = "RedPlayer" })
+    S2.board.rightClick("Clear the grid", "Red")
+    assert(S2.logged("Grid cleared %(2"))
+    eq(#Editor2.trackFor(require("fd.data.tracks.FDMonaco")).start, 0)
+    assert(S2.find("Space " .. a.id .. " (lane " .. a.lane .. ")"), "markers lose their place")
 end
 
 function T.problems_are_counted_on_the_panel()

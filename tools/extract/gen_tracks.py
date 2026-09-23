@@ -67,6 +67,9 @@ def lua_track(track):
         ways = ", long = {}, short = {}".format(c["long"], c["short"]) if c.get("long") else ""
         L.append("    {{ id = {}, stops = {}{}{} }},".format(c["id"], stops, ways, name))
     L += ["}", "",
+          "-- The starting grid, pole first.",
+          "T.start = {" + "".join(" " + lit(v) + "," for v in track.get("start", [])).rstrip(",") + (" }" if track.get("start") else "}"),
+          "",
           "T.byId = {}",
           "for _, s in ipairs(T.spaces) do",
           "    T.byId[s.id] = s",

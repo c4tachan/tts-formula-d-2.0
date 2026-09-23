@@ -62,7 +62,7 @@ the only thing needing measurement in game is the tile itself — not each track
     }
   ],
 
-  "start": [101, 102, 103],      // grid positions, pole first
+  "start": ["m.s11.4", "i.s11.3"], // grid positions, pole first (below)
   "finish": { "line": [1, 2, 3] },
 
   "pit": {                       // omitted on tracks without a pit lane
@@ -88,6 +88,16 @@ A space's id is its code, `<lane>.<sector>.<n>`, given by
   edge, counting up in running order. At the finish line that is the cell the
   checkered band crosses; where the band lies on a cell boundary, as in a lane
   staggered against the others, it is the cell just past it.
+
+## The starting grid
+
+`start` is marked by hand in the editor: bind **Track editor: mark grid
+space** (Options > Game Keys), then point at each grid space in turn, pole
+first. Each one is ringed on the board -- pole twice -- with a line through
+them in order, and its marker's name gains its place (`- grid 3`). Pressing
+the key on a space already on the grid takes it off; **Clear the grid** on
+the board's right-click menu starts again. `import_track.py` brings the list
+out with the rest of the edits.
 
 A fresh scan from `find_grid.py` has plain numbers for ids until
 `find_corners.py` runs; that step renames every link and the arrow reading in
