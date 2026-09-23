@@ -5,9 +5,10 @@
 -- model, tint, name and lock all in the data -- and a whole track is spawned
 -- a batch at a time over a few frames, so the game does not stall on it.
 --
--- Ghosts are locked: no physics, so hundreds packed nose to tail cannot knock
--- each other about, but a player can still pick one up, turn it and put it
--- down. The ones only there to be looked at have no collision at all.
+-- Ghosts sit on the board face, locked: no physics, so hundreds packed nose
+-- to tail cannot knock each other about. TTS will not pick up a locked
+-- object, so the editor unlocks a marker while a pointer is on it (see
+-- Editor.onHover). The ones only there to be looked at have no collision at all.
 
 local Track = require("fd.tts.track")
 
@@ -19,8 +20,9 @@ local DIFFUSE = "https://steamusercontent-a.akamaihd.net/ugc/1014943869376507421
 -- Smaller than the cars players race with (1.5), so neighbouring ghosts
 -- stand clear of each other and the print shows round them.
 local SCALE = 1.0
--- How far above the board face a ghost floats, in world units.
-local LIFT = 0.3
+-- How far the car model reaches below its origin, at scale 1 (from the OBJ).
+-- Lifting it by that much sets its wheels on the board.
+local UNDERSIDE = 0.095
 -- How see-through a ghost is: 0 invisible, 1 solid.
 local ALPHA = 0.45
 -- Ghosts spawned per frame.
@@ -67,7 +69,7 @@ function Ghosts.spawn(tile, f, top, s, problem, description, solid)
         data = {
             Name = "Custom_Model",
             Transform = {
-                posX = w.x, posY = top + LIFT, posZ = w.z,
+                posX = w.x, posY = top + UNDERSIDE * SCALE, posZ = w.z,
                 rotX = 0, rotY = Track.yawIn(tile, f, s.pos[1], s.pos[2], s.rot), rotZ = 0,
                 scaleX = SCALE, scaleY = SCALE, scaleZ = SCALE,
             },

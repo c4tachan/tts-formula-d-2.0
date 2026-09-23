@@ -488,6 +488,31 @@ function T.opening_the_editor_puts_a_ghost_car_on_every_space()
     eq(markersOut(S), #FDMonaco.spaces)
 end
 
+function T.a_marker_is_loose_only_under_a_pointer_or_in_a_hand()
+    local S = world()
+    local _, _, FDMonaco = editor(S)
+    local sp = FDMonaco.spaces[100]
+    local m = S.find("Space " .. sp.id .. " (lane " .. sp.lane .. ")")
+    onObjectHover("Red", m)
+    eq(m.locked, false, "under the pointer: loose, so it can be picked up")
+    m.held_by_color = "Red"
+    onObjectHover("Red", nil)
+    eq(m.locked, false, "not locked while in a hand")
+    onObjectHover("Red", m)
+    m.held_by_color = nil
+    onObjectDrop("Red", m)
+    eq(m.locked, false, "put down but still under the pointer: loose")
+    onObjectHover("Red", nil)
+    eq(m.locked, true, "pointer gone and at rest: locked again")
+    -- Let go of while the pointer moves on: locked once it settles.
+    onObjectHover("Red", m)
+    m.held_by_color = "Red"
+    onObjectHover("Red", nil)
+    m.held_by_color = nil
+    onObjectDrop("Red", m)
+    eq(m.locked, true, "dropped and settled: locked again")
+end
+
 function T.moving_a_marker_moves_its_space()
     local S = world()
     local Editor, Track, FDMonaco = editor(S)

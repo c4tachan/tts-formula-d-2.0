@@ -17,6 +17,8 @@ local Editor = {}
 
 -- How far round the pointer to pick up spaces, in world units.
 local RADIUS = 5
+-- How long a marker put down gets to come to rest before it is locked anyway.
+local SETTLE = 5
 local DESCRIPTION = "Track editor marker. Drag to move, Q/E to turn; right-click for its lane."
 
 local edits = {}        -- track id -> { spaces = {...}, nextId = n, name = ... }
@@ -24,6 +26,7 @@ local base = {}         -- track id -> the track module it started from
 local open = nil        -- id of the track being edited
 local markers = {}      -- marker guid -> space id
 local tinted = {}       -- marker guid -> true if it is shown red
+local hovered = {}      -- player colour -> guid of the marker under their pointer
 local applying = false
 local linkFrom = nil     -- space id a hand-made link starts from
 -- The problem list for the open track, kept until something changes: the
@@ -353,6 +356,54 @@ function Editor.setLane(obj, lane)
     return true
 end
 
+local function underPointer(guid)
+    for _, g in pairs(hovered) do
+        if g == guid then return true end
+    end
+    return false
+end
+
+--- Lock a marker again, unless someone has it in hand or under the pointer.
+local function relock(obj)
+    if obj ~= nil and not obj.held_by_color and not underPointer(obj.getGUID()) then
+        obj.setLock(true)
+    end
+end
+
+--- Lock a marker once it has settled on the board, so its neighbours cannot
+-- shove it about. Locking one still moving would leave it hanging wherever it
+-- was let go.
+local function relockWhenSettled(obj)
+    local function lock() relock(obj) end
+    local function settled()
+        return obj == nil or obj.held_by_color or obj.resting
+    end
+    -- Give it a moment to leave the resting state it was let go in, and if
+    -- it is still moving after SETTLE seconds, lock it where it is.
+    Wait.time(function()
+        Wait.condition(lock, settled, SETTLE, lock)
+    end, 0.3)
+end
+
+--- A marker comes loose while a pointer is on it, so it can be picked up (TTS
+-- will not pick up a locked object), and locks again when the pointer leaves.
+function Editor.onHover(color, obj)
+    local guid = obj ~= nil and markers[obj.getGUID()] and obj.getGUID() or nil
+    local was = hovered[color]
+    if was == guid then return end
+    hovered[color] = guid
+    if guid then obj.setLock(false) end
+    local old = was and getObjectFromGUID(was)
+    if old then relockWhenSettled(old) end
+end
+
+--- A marker put down locks again once it settles.
+function Editor.onDropped(obj)
+    if not markers[obj.getGUID()] then return false end
+    relockWhenSettled(obj)
+    return true
+end
+
 --- Read every marker back into the working copy, clear them, and relink.
 function Editor.apply()
     if not open then return 0 end
@@ -457,6 +508,7 @@ function Editor.load(saved, strayMarkers)
     -- runs in one that has been editing, the strays below must not still be
     -- counted as live markers -- removing those would delete their spaces.
     edits, base, markers, tinted, open, linkFrom = {}, {}, {}, {}, nil, nil
+    hovered = {}
     changed()
     for id, e in pairs(saved or {}) do
         -- Edits saved before spaces had codes for ids name them by numbers

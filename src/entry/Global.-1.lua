@@ -420,7 +420,14 @@ local function dashboardMoved(dash)
     end, 0.8)
 end
 
+function onObjectHover(color, obj)
+    Editor.onHover(color, obj)
+end
+
 function onObjectDrop(color, obj)
+    if Editor.onDropped(obj) then
+        return
+    end
     if Dashboard.is(obj) then
         dashboardMoved(obj)
         return
