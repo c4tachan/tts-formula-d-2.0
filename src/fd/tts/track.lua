@@ -149,6 +149,17 @@ function Track.spaceNear(tile, f, track, world, reach, taken)
     return best
 end
 
+--- Where a car on the space `id` sits: the world position and the yaw that
+-- faces the way the track runs. Nil if the track has no such space.
+function Track.seat(tile, f, track, id)
+    for _, s in ipairs(track.spaces) do
+        if s.id == id then
+            return Track.worldIn(tile, f, s.pos[1], s.pos[2]), Track.yawIn(tile, f, s.pos[1], s.pos[2], s.rot)
+        end
+    end
+    return nil
+end
+
 --- Where a car put down at `world` belongs: the nearest free space within
 -- `reach` cells, as a world position and the yaw that faces the way the
 -- track runs. `others` are world positions of cars already on the track;

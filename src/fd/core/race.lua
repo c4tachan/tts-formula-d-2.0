@@ -573,6 +573,8 @@ function Race:settleGrid()
         names[i] = i .. ". " .. self:label(car)
     end
     self.state.phase = "setup"
+    -- Not state: lets the Global script put the cars on the grid.
+    self.gridSettled = true
     self:emit("info", "Starting grid: " .. table.concat(names, "  "))
 end
 

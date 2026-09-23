@@ -66,8 +66,10 @@ button.
 1. Take a car and a dashboard from the Beginner Dashboard bag.
 2. Click **Join race** under the dashboard. It gets a gear stick and WP
    marker in your colour.
-3. Optionally **Grid roll** on the race panel (top left), then **Start**; each
-   player rolls the black die for their start.
+3. Optionally **Grid roll** on the race panel (top left): everyone rolls the
+   black die, and once the order is settled each claimed car is set down on
+   its grid space, pole first. Then **Start**; each player rolls the black die
+   for their start.
 4. On your turn move the gear stick, roll the die that arrives, move your car.
 
 ### Track data: detect, then edit in game

@@ -563,6 +563,63 @@ function T.undo_keeps_the_cars_where_they_are()
     eq(state().cars.Red.space, "m.s2.6", "and the car is still where it was put")
 end
 
+--- Everyone rolls the black die for the grid: `rolls` is color -> value.
+local function gridRoll(S, rolls)
+    fdGrid({ steam_name = "host", color = "Red" })
+    local black = S.find("Damage Dice")
+    for color, value in pairs(rolls) do
+        black.value = value
+        onObjectRandomize(black, color)
+    end
+end
+
+--- Red and Blue in the race, each with a car parked off the board.
+local function twoCars()
+    local S = world()
+    S.beginner.click("fdDashJoin", "Red")
+    S.advanced.click("fdDashJoin", "Blue")
+    S.beginner.click("fdDashCar", "Red")
+    S.advanced.click("fdDashCar", "Blue")
+    return S, getObjectFromGUID(state().cars.Red.tts.car), getObjectFromGUID(state().cars.Blue.tts.car)
+end
+
+function T.the_grid_roll_puts_the_cars_on_the_grid()
+    local S, red, blue = twoCars()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    gridRoll(S, { Red = 4, Blue = 15 })
+    local pole, second = FDMonaco.byId[FDMonaco.start[1]], FDMonaco.byId[FDMonaco.start[2]]
+    assert(onSpace(S, blue, pole), "the higher roll takes pole, facing along the track")
+    assert(onSpace(S, red, second), "and the other car lines up behind")
+    eq(state().cars.Blue.space, pole.id)
+    eq(state().cars.Red.space, second.id)
+end
+
+function T.the_grid_waits_for_ties_to_be_broken()
+    local S, red = twoCars()
+    local at = red.pos
+    gridRoll(S, { Red = 9, Blue = 9 })
+    eq(red.pos, at, "nobody moves on a tie")
+    gridRoll(S, { Red = 12, Blue = 3 })
+    eq(state().cars.Red.space, require("fd.data.tracks.FDMonaco").start[1])
+end
+
+function T.a_driver_without_a_car_is_told_at_the_grid()
+    local S = world()
+    S.beginner.click("fdDashJoin", "Red")
+    gridRoll(S, { Red = 7 })
+    assert(S.logged("no car to put on the grid"))
+    eq(state().cars.Red.space, nil)
+end
+
+function T.no_grid_placing_on_a_map_without_track_data()
+    local S, red = twoCars()
+    local at = red.pos
+    S.board.custom = { image = "http://example.invalid/other-map.png" }
+    gridRoll(S, { Red = 4, Blue = 15 })
+    assert(S.logged("No starting grid known"))
+    eq(red.pos, at)
+end
+
 function T.no_snapping_on_a_map_without_track_data()
     local S = world()
     local FDMonaco = require("fd.data.tracks.FDMonaco")

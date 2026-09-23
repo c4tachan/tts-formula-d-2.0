@@ -29,6 +29,7 @@ setup_packed = false
 local race
 local syncCars -- defined with the rest of the car handling, below
 local snapCar -- defined with the track, below
+local placeOnGrid -- likewise
 local spaceUnder -- likewise
 local showReach -- likewise
 local clearReach -- likewise
@@ -236,6 +237,10 @@ local function act(fn)
         table.remove(undo, 1)
     end
     fn()
+    if race.gridSettled then
+        race.gridSettled = nil
+        placeOnGrid()
+    end
     local opened = race.opened
     race.opened = nil
     relay(race:drain())
@@ -765,6 +770,13 @@ local function boardTrack()
     return tile, Editor.trackFor(track)
 end
 
+--- Set a car down at `pos` (on the board face), level and turned to `yaw`.
+local function setDown(obj, pos, yaw)
+    obj.setPositionSmooth({ x = pos.x, y = pos.y + SNAP_LIFT, z = pos.z }, false, true)
+    -- The car models' noses point along their local +Z.
+    obj.setRotationSmooth({ x = 0, y = yaw, z = 0 }, false, true)
+end
+
 snapCar = function(obj)
     local tile, track = boardTrack()
     if not track then
@@ -781,10 +793,38 @@ snapCar = function(obj)
     if not space then
         return nil
     end
-    obj.setPositionSmooth({ x = pos.x, y = pos.y + SNAP_LIFT, z = pos.z }, false, true)
-    -- The car models' noses point along their local +Z.
-    obj.setRotationSmooth({ x = 0, y = yaw, z = 0 }, false, true)
+    setDown(obj, pos, yaw)
     return space, track
+end
+
+--- Once the grid roll has settled the order, set each claimed car down on
+-- its grid space, pole first. Called inside act, so the race notes where
+-- they went. A car with no grid space, or no car to move, is left to the
+-- players, with a word as to why.
+placeOnGrid = function()
+    local tile, track = boardTrack()
+    local start = track and track.start or {}
+    if #start == 0 then
+        race:emit("warn", "No starting grid known for the map on the board -- put the cars on the grid by hand")
+        return
+    end
+    local f = Track.frame(tile, track)
+    for i, car in ipairs(race:cars()) do
+        local obj = car.tts and car.tts.car and getObjectFromGUID(car.tts.car)
+        local pos, yaw = nil, nil
+        if start[i] then
+            pos, yaw = Track.seat(tile, f, track, start[i])
+        end
+        if not obj then
+            race:emit("warn", race:label(car) .. " has no car to put on the grid -- press Car", car.color)
+        elseif not pos then
+            race:emit("warn", string.format("%s starts in place %d, but the grid has only %d -- put the car down by hand",
+                race:label(car), i, #start), car.color)
+        else
+            setDown(obj, pos, yaw)
+            race:placed(car.color, start[i])
+        end
+    end
 end
 
 --- The id of the space a car is sitting on, without moving it; nil if it is
