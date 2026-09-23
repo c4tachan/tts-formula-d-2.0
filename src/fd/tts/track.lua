@@ -168,26 +168,22 @@ function Track.snap(tile, track, world, reach, others)
     return s, Track.worldIn(tile, f, s.pos[1], s.pos[2]), Track.yawIn(tile, f, s.pos[1], s.pos[2], s.rot)
 end
 
--- Footprint drawn at each space, in image pixels: roughly a car's outline, so
--- the marker shows which way a car parked there would face.
-local MARK_LONG, MARK_WIDE = 13, 7
 local PROBLEM_COLOUR = { 1, 0.15, 0.15 }
--- Spaces inside a corner get a second, smaller outline in this colour.
-local CORNER_COLOUR = { 1, 0.3, 0.85 }
-local CORNER_INSET = 0.55
 -- Arrowheads, in image pixels (a printed cell is about 45 long, 25 wide).
 local HEAD_LONG, HEAD_WIDE = 6, 3.5
 -- A link's arrow runs over this stretch of the way between the two spaces'
--- centres, so its tail and head sit clear of either space's outline.
+-- centres, so its tail and head sit clear of the ghost cars on them.
 local LINK_FROM, LINK_TO = 0.3, 0.72
 
---- A footprint on every space, with a tick out to the space straight ahead.
+--- The links between spaces, as arrows; the spaces themselves are shown by
+-- ghost cars (fd.tts.ghosts).
 --
--- One line per space: the outline, then an arrow on from its front edge
--- towards the next space in its lane. Spaces listed in `flagged` (id -> true)
--- are drawn red. The track's outside edge is drawn too, where the file has one.
--- `links` draws every link as an arrow of its own instead, hand-set ones in
--- white: worth seeing while editing, far too busy otherwise.
+-- One arrow per link, in the lane colour of the space it leaves, or red if
+-- that space is listed in `flagged` (id -> true). Without `links` only the
+-- link on down each lane is drawn, which is enough to follow the track;
+-- with it, every link, those set by hand in white -- worth seeing while
+-- editing, far too busy otherwise. The track's outside edge is drawn too,
+-- where the file has one.
 function Track.overlay(tile, track, flagged, links)
     local thickness = THICKNESS / math.max(tile.getScale().x, 0.001)
     local f = Track.frame(tile, track)
@@ -222,56 +218,21 @@ function Track.overlay(tile, track, flagged, links)
     end
 
     for _, s in ipairs(track.spaces) do
-        local a = math.rad(s.rot)
-        local fx, fy = math.cos(a), math.sin(a)      -- along the car
-        local rx, ry = -fy, fx                       -- across it
-        local function at(along, across)
-            return Track.localIn(f, s.pos[1] + fx * along + rx * across, s.pos[2] + fy * along + ry * across)
-        end
-        local pts = {
-            at(MARK_LONG, MARK_WIDE), at(MARK_LONG, -MARK_WIDE), at(-MARK_LONG, -MARK_WIDE),
-            at(-MARK_LONG, MARK_WIDE), at(MARK_LONG, MARK_WIDE), at(MARK_LONG, 0),
-        }
-        -- Out of the front, an arrow towards the next space in the lane.
-        -- Editing, every link is drawn as its own arrow below instead.
-        for _, n in ipairs(links and {} or s.next or {}) do
+        local colour = (flagged and flagged[s.id]) and PROBLEM_COLOUR or LANE_COLOUR[s.lane] or { 1, 1, 1 }
+        for _, n in ipairs(s.next or {}) do
             local o = byId[n]
-            if o and o.lane == s.lane then
-                -- Stop short of the next space's own outline.
-                local mx = s.pos[1] + (o.pos[1] - s.pos[1]) * 0.62
-                local my = s.pos[2] + (o.pos[2] - s.pos[2]) * 0.62
-                local head = arrow(s.pos[1] + fx * MARK_LONG, s.pos[2] + fy * MARK_LONG, mx, my)
-                for i = 2, #(head or {}) do pts[#pts + 1] = head[i] end
-                break
-            end
-        end
-        lines[#lines + 1] = {
-            points = pts,
-            color = (flagged and flagged[s.id]) and PROBLEM_COLOUR or LANE_COLOUR[s.lane] or { 1, 1, 1 },
-            thickness = thickness,
-        }
-        if s.corner then
-            local l, w = MARK_LONG * CORNER_INSET, MARK_WIDE * CORNER_INSET
-            lines[#lines + 1] = {
-                points = { at(l, w), at(l, -w), at(-l, -w), at(-l, w), at(l, w) },
-                color = CORNER_COLOUR, thickness = thickness,
-            }
-        end
-        -- Editing, every link is an arrow between the two spaces: white if
-        -- set by hand, else in the lane colour of the space it leaves.
-        if links then
-            for _, n in ipairs(s.next or {}) do
-                local o = byId[n]
-                local dx, dy = o and o.pos[1] - s.pos[1], o and o.pos[2] - s.pos[2]
-                local pts2 = o and arrow(s.pos[1] + dx * LINK_FROM, s.pos[2] + dy * LINK_FROM,
-                                         s.pos[1] + dx * LINK_TO, s.pos[2] + dy * LINK_TO)
-                if pts2 then
+            if o and (links or o.lane == s.lane) then
+                local dx, dy = o.pos[1] - s.pos[1], o.pos[2] - s.pos[2]
+                local pts = arrow(s.pos[1] + dx * LINK_FROM, s.pos[2] + dy * LINK_FROM,
+                                  s.pos[1] + dx * LINK_TO, s.pos[2] + dy * LINK_TO)
+                if pts then
                     lines[#lines + 1] = {
-                        points = pts2,
-                        color = s.fixed and { 1, 1, 1 } or LANE_COLOUR[s.lane] or { 1, 1, 1 },
+                        points = pts,
+                        color = (links and s.fixed and not (flagged and flagged[s.id])) and { 1, 1, 1 } or colour,
                         thickness = thickness,
                     }
                 end
+                if not links then break end
             end
         end
     end

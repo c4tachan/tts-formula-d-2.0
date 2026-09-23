@@ -18,6 +18,7 @@ local Controls = require("fd.tts.controls")
 local Mini = require("fd.tts.minidash")
 local Track = require("fd.tts.track")
 local Editor = require("fd.tts.track_editor")
+local Ghosts = require("fd.tts.ghosts")
 local TRACKS = { FDMonaco = require("fd.data.tracks.FDMonaco") }
 
 mod_packed = false
@@ -105,7 +106,11 @@ function onSave()
         -- Hand edits to track spaces; tools/extract/import_track.py reads them.
         edits = Editor.save(),
         -- Editor markers out on the board; removed on load (see Editor.load).
-        markers = Editor.markerGuids(),
+        markers = (function()
+            local out = Editor.markerGuids()
+            for _, g in ipairs(Ghosts.guids()) do out[#out + 1] = g end
+            return out
+        end)(),
     })
 end
 
@@ -685,6 +690,7 @@ function fdTrack(player)
     end
     if trackShown then
         Track.hide()
+        Ghosts.clear()
         trackShown = nil
         printToAll("Track overlay off", LEVEL_RGB.info)
         return
@@ -696,6 +702,7 @@ function fdTrack(player)
     end
     local ok, why = Track.show(Editor.trackFor(track))
     if ok then
+        Ghosts.show(Editor.trackFor(track))
         trackShown = track.id
         printToAll(string.format("%s: %d spaces", track.name, #Editor.trackFor(track).spaces), LEVEL_RGB.info)
     else
@@ -783,8 +790,9 @@ function fdEdit(player)
         broadcastToColor("No track data for the map on the board yet.", player.color, LEVEL_RGB.warn)
         return
     end
-    Editor.open(track)
+    Ghosts.clear()               -- the overlay's ghosts; the editor puts out its own
     Editor.onChange = editorStatus
+    Editor.open(track)
     boardMenu(true)
     trackShown = track.id
     editorStatus()

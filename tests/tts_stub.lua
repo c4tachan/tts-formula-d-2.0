@@ -184,6 +184,25 @@ function spawnObject(params)
     })
 end
 
+function spawnObjectData(params)
+    Stub.counts.object = Stub.counts.object + 1
+    local d = params.data
+    local t = d.Transform or {}
+    local o = Stub.object(d.Nickname or d.Name, {
+        pos = vec(t.posX or 0, t.posY or 0, t.posZ or 0),
+        rot = vec(t.rotX or 0, t.rotY or 0, t.rotZ or 0),
+        scale = vec(t.scaleX or 1, t.scaleY or 1, t.scaleZ or 1),
+        tint = d.ColorDiffuse, locked = d.Locked, description = d.Description,
+        data = d,
+    })
+    -- A collider that can be switched off, as a custom model's MeshCollider.
+    o.collider = { name = "MeshCollider", enabled = true }
+    o.collider.set = function(k, v) o.collider[k] = v end
+    o.getComponents = function() return { o.collider } end
+    if params.callback_function then params.callback_function(o) end
+    return o
+end
+
 function getObjects()
     Stub.counts.getObjects = Stub.counts.getObjects + 1
     return Stub.objects

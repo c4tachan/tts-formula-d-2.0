@@ -66,7 +66,7 @@ measure("shift gear (drop the gear stick)", S, function()
     stick.pos = S.vec(p.x, p.y, p.z)
     onObjectDrop("Red", stick)
 end)
-measure("show the track overlay", S, function() fdTrack({ color = "Red", steam_name = "host" }) end)
+measure("show the track (ghost cars)", S, function() fdTrack({ color = "Red", steam_name = "host" }) end)
 fdTrack({ color = "Red", steam_name = "host" })
 measure("open the track editor", S, function() fdEdit({ color = "Red", steam_name = "host" }) end)
 local Track = require("fd.tts.track")
@@ -75,7 +75,7 @@ local sp = FDMonaco.spaces[100]
 local here = Track.worldOf(S.board, FDMonaco, sp.pos[1], sp.pos[2])
 measure("editor: pick up spaces", S, function() S.board.rightClick("Pick up spaces here", "Red", here) end)
 local marker = nil
-for _, o in ipairs(S.objects) do if o.name:find("^Space %d+") then marker = o break end end
+for _, o in ipairs(S.objects) do if o.name:find("^Space [iom]%.") then marker = o break end end
 measure("editor: change a lane", S, function() marker.rightClick("Lane 2", "Red") end)
 measure("editor: apply", S, function() S.board.rightClick("Apply track edits", "Red") end)
 measure("save the game", S, function() onSave() end)

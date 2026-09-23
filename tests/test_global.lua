@@ -332,19 +332,30 @@ function T.track_overlay_maps_pixels_onto_the_board()
 
     fdTrack({ color = "Red", steam_name = "RedPlayer" })
     local lines = S.board.getVectorLines()
-    local inCorners = 0
+    local byId, onDown = {}, 0
+    for _, s in ipairs(FDMonaco.spaces) do byId[s.id] = s end
     for _, s in ipairs(FDMonaco.spaces) do
-        if s.corner then inCorners = inCorners + 1 end
+        for _, n in ipairs(s.next) do
+            if byId[n] and byId[n].lane == s.lane then onDown = onDown + 1 break end
+        end
     end
-    assert(inCorners > 0, "Monaco has corners")
-    eq(#lines, #FDMonaco.outer + #FDMonaco.spaces + inCorners,
-        "a line per piece of edge, one per space, and a second on each space inside a corner")
-    assert(#lines < #FDMonaco.spaces * 2.5, "hand-set links are left off outside the editor")
+    eq(#lines, #FDMonaco.outer + onDown, "a line per piece of edge and an arrow on down each lane")
     assert(lines[1].thickness < 0.01, "thickness is in the tile's local space")
+    eq(S.count("Space " .. FDMonaco.spaces[1].id .. " (lane " .. FDMonaco.spaces[1].lane .. ")"), 1,
+        "a ghost car on the space")
+    local ghosts = 0
+    for _, o in ipairs(S.objects) do
+        if o.name:find("^Space [iom]%.") then ghosts = ghosts + 1 end
+    end
+    eq(ghosts, #FDMonaco.spaces, "one on every space")
+    local g = S.find("Space " .. FDMonaco.spaces[1].id .. " (lane " .. FDMonaco.spaces[1].lane .. ")")
+    eq(g.collider.enabled, false, "no collision: a car put down goes through to the board")
     assert(S.logged(FDMonaco.name))
 
     fdTrack({ color = "Red", steam_name = "RedPlayer" })
     eq(#S.board.getVectorLines(), 0, "toggles back off")
+    eq(S.count("Space " .. FDMonaco.spaces[1].id .. " (lane " .. FDMonaco.spaces[1].lane .. ")"), 0,
+        "and the ghosts go with it")
 end
 
 -- Cars on the track ---------------------------------------------------------------
@@ -461,15 +472,20 @@ function T.editor_keys_need_the_editor_open()
     eq(markersOut(S), 0)
 end
 
-function T.picking_up_spaces_only_takes_those_near_the_pointer()
+function T.opening_the_editor_puts_a_ghost_car_on_every_space()
     local S = world()
     local Editor, Track, FDMonaco = editor(S)
+    eq(markersOut(S), #FDMonaco.spaces)
     local sp = FDMonaco.spaces[100]
-    local w = Track.worldOf(S.board, FDMonaco, sp.pos[1], sp.pos[2])
-    S.press("Track editor: pick up spaces here", "Red", nil, w)
-    local n = markersOut(S)
-    assert(n > 0 and n < #FDMonaco.spaces / 4, "picked up " .. n)
-    assert(S.find("Space " .. sp.id .. " (lane " .. sp.lane .. ")"), "the space under the pointer")
+    local m = S.find("Space " .. sp.id .. " (lane " .. sp.lane .. ")")
+    eq(m.data.Name, "Custom_Model")
+    assert(m.data.CustomMesh.MeshURL:find("steamusercontent"), "the car's own model")
+    eq(m.locked, true, "locked: no physics")
+    eq(m.collider.enabled, true, "keeps its collision, so it can be picked up")
+    assert(m.tint.a < 1, "see-through")
+    -- Picking up is still there, and finds nothing left to put out.
+    S.press("Track editor: pick up spaces here", "Red", nil, Track.worldOf(S.board, FDMonaco, sp.pos[1], sp.pos[2]))
+    eq(markersOut(S), #FDMonaco.spaces)
 end
 
 function T.moving_a_marker_moves_its_space()
@@ -482,7 +498,7 @@ function T.moving_a_marker_moves_its_space()
     local target = Track.worldOf(S.board, FDMonaco, sp.pos[1] + 5, sp.pos[2] - 3)
     m.pos = S.vec(target.x, m.pos.y, target.z)
     S.press("Track editor: apply", "Red")
-    eq(markersOut(S), 0, "markers cleared")
+    eq(markersOut(S), #FDMonaco.spaces, "the ghosts stay out after apply")
     local edited = Editor.trackFor(FDMonaco)
     local moved
     for _, s in ipairs(edited.spaces) do
@@ -567,13 +583,12 @@ function T.editing_draws_every_link_as_an_arrow()
     local S = world()
     local Editor, Track, FDMonaco = editor(S)
     local track = Editor.trackFor(FDMonaco)
-    local nLinks, nCorners = 0, 0
+    local nLinks = 0
     for _, s in ipairs(track.spaces) do
         nLinks = nLinks + #(s.next or {})
-        if s.corner then nCorners = nCorners + 1 end
     end
     local lines = S.board.getVectorLines()
-    eq(#lines, #(FDMonaco.outer or {}) + #track.spaces + nCorners + nLinks)
+    eq(#lines, #(FDMonaco.outer or {}) + nLinks)
     -- A link's arrow is shaft plus head: five points, the tip twice.
     local last = lines[#lines].points
     eq(#last, 5)

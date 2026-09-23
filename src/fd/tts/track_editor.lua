@@ -1,10 +1,9 @@
 -- Editing a track's spaces in the game.
 --
--- The whole track stays drawn as vector lines, which costs next to nothing.
--- Only the spaces around the pointer are turned into markers -- small blocks
--- a player can drag, turn with Q/E, delete, or recolour into another lane --
--- because a few hundred physical objects at once would bog the game down.
--- Applying reads the markers back into the working copy and relinks it.
+-- Every space gets a marker: a ghost car (fd.tts.ghosts) a player can drag,
+-- turn with Q/E, delete, or move into another lane; links are drawn over the
+-- board as arrows. Applying reads the markers back into the working copy and
+-- relinks it, and the markers stay out until the editor closes.
 --
 -- Edits live in the Global save. TTS scripts cannot write files, so getting
 -- an edited track into the repo is a job for tools/extract/import_track.py,
@@ -12,19 +11,19 @@
 
 local Track = require("fd.tts.track")
 local Graph = require("fd.core.trackgraph")
+local Ghosts = require("fd.tts.ghosts")
 
 local Editor = {}
 
 -- How far round the pointer to pick up spaces, in world units.
 local RADIUS = 5
--- A marker is about the size of a printed cell.
-local MARKER_SCALE = { x = 0.34, y = 0.06, z = 0.62 }
-local MARKER_LIFT = 0.25
+local DESCRIPTION = "Track editor marker. Drag to move, Q/E to turn; right-click for its lane."
 
 local edits = {}        -- track id -> { spaces = {...}, nextId = n, name = ... }
 local base = {}         -- track id -> the track module it started from
 local open = nil        -- id of the track being edited
 local markers = {}      -- marker guid -> space id
+local tinted = {}       -- marker guid -> true if it is shown red
 local applying = false
 local linkFrom = nil     -- space id a hand-made link starts from
 -- The problem list for the open track, kept until something changes: the
@@ -100,6 +99,19 @@ function Editor.draw()
     if not open then return end
     local flagged = Editor.problems()
     Track.show(Editor.trackFor(base[open]), flagged, true)
+    -- Problem spaces' ghosts go red; only those whose state changed are
+    -- touched, as every call into an object costs.
+    local e = edits[open]
+    local index = {}
+    for _, s in ipairs(e.spaces) do index[s.id] = s end
+    for guid, id in pairs(markers) do
+        local red = flagged[id] and true or false
+        if (tinted[guid] or false) ~= red and index[id] then
+            local obj = getObjectFromGUID(guid)
+            if obj then obj.setColorTint(Ghosts.tint(index[id], red)) end
+            tinted[guid] = red
+        end
+    end
 end
 
 function Editor.open(track)
@@ -111,6 +123,8 @@ function Editor.open(track)
     open = track.id
     changed()
     Editor.draw()
+    -- A ghost on every space, a batch at a time.
+    Editor.grab(nil)
 end
 
 function Editor.close()
@@ -123,30 +137,18 @@ function Editor.close()
         if obj then obj.destruct() end
     end
     applying = false
-    markers = {}
+    markers, tinted = {}, {}
     open = nil
 end
 
-local function boardTop(tile)
-    local b = tile.getBounds()
-    return b.center.y + b.size.y / 2
-end
+local boardTop = Ghosts.boardTop
 
 -- `f` is the board's frame and `top` the height of its face, measured once
 -- by the caller for however many markers it is putting out.
-local function spawnMarker(tile, f, top, s)
-    local w = Track.worldIn(tile, f, s.pos[1], s.pos[2])
-    local obj = spawnObject({
-        type = "BlockSquare",
-        position = { x = w.x, y = top + MARKER_LIFT, z = w.z },
-        rotation = { x = 0, y = Track.yawIn(tile, f, s.pos[1], s.pos[2], s.rot), z = 0 },
-        scale = MARKER_SCALE,
-        sound = false,
-    })
-    obj.setColorTint(Track.LANE_COLOUR[s.lane] or { 1, 1, 1 })
-    obj.setName("Space " .. s.id .. " (lane " .. s.lane .. ")")
-    obj.setDescription("Track editor marker. Drag to move, Q/E to turn; right-click for its lane.")
+local function spawnMarker(tile, f, top, s, red)
+    local obj = Ghosts.spawn(tile, f, top, s, red, DESCRIPTION)
     markers[obj.getGUID()] = s.id
+    tinted[obj.getGUID()] = red or false
     -- Right-click menu, so nothing needs a key bound to it.
     for lane = 1, 3 do
         obj.addContextMenuItem("Lane " .. lane, function()
@@ -186,19 +188,35 @@ function Editor.grab(pointer)
     for _, id in pairs(markers) do out[id] = true end
     local f = Track.frame(tile, track)
     local top = boardTop(tile)
-    local px, py = Track.pixelIn(tile, f, pointer)
-    local r = RADIUS / f.world
-    local n = 0
+    -- No pointer: every space.
+    local r, px, py = nil, nil, nil
+    if pointer then
+        px, py = Track.pixelIn(tile, f, pointer)
+        r = RADIUS / f.world
+    end
+    local flagged = Editor.problems()
+    local todo = {}
     for _, s in ipairs(e.spaces) do
         if not out[s.id] then
-            local dx, dy = s.pos[1] - px, s.pos[2] - py
-            if dx * dx + dy * dy <= r * r then
-                spawnMarker(tile, f, top, s)
-                n = n + 1
+            local near = true
+            if r then
+                local dx, dy = s.pos[1] - px, s.pos[2] - py
+                near = dx * dx + dy * dy <= r * r
             end
+            if near then todo[#todo + 1] = s end
         end
     end
-    return n
+    local id = open
+    Ghosts.each(todo, function(s)
+        -- The editor may have closed, or the space gone, while the batches
+        -- were still coming out.
+        if open == id and find(edits[open], s.id) then
+            spawnMarker(tile, f, top, s, flagged[s.id])
+        end
+    end, function()
+        if open == id and Editor.onChange then Editor.onChange() end
+    end)
+    return #todo
 end
 
 --- A new space at a point, in the lane and facing of the nearest one.
@@ -330,8 +348,8 @@ function Editor.setLane(obj, lane)
     s.lane = lane
     edits[open].dirty = true
     changed()
-    obj.setColorTint(Track.LANE_COLOUR[lane] or { 1, 1, 1 })
-    obj.setName("Space " .. s.id .. " (lane " .. lane .. ")")
+    obj.setColorTint(Ghosts.tint(s, tinted[obj.getGUID()]))
+    obj.setName(Ghosts.name(s))
     return true
 end
 
@@ -347,7 +365,6 @@ function Editor.apply()
     local f = Track.frame(tile, track)
     local index = {}
     for _, s in ipairs(e.spaces) do index[s.id] = s end
-    applying = true
     for guid, id in pairs(markers) do
         local obj = getObjectFromGUID(guid)
         local s = index[id]
@@ -356,12 +373,9 @@ function Editor.apply()
             local px, py = Track.pixelIn(tile, f, p)
             s.pos = { px, py }
             s.rot = Track.angleIn(tile, f, p, obj.getRotation().y)
-            obj.destruct()
             n = n + 1
         end
     end
-    applying = false
-    markers = {}
     e.cell = Graph.relink(e.spaces)
     e.dirty = true
     changed()
@@ -442,7 +456,7 @@ function Editor.load(saved, strayMarkers)
     -- Start clean. Loading normally means a fresh script, but if it ever
     -- runs in one that has been editing, the strays below must not still be
     -- counted as live markers -- removing those would delete their spaces.
-    edits, base, markers, open, linkFrom = {}, {}, {}, nil, nil
+    edits, base, markers, tinted, open, linkFrom = {}, {}, {}, {}, nil, nil
     changed()
     for id, e in pairs(saved or {}) do
         -- Edits saved before spaces had codes for ids name them by numbers
@@ -472,9 +486,10 @@ function Editor.revert(id)
             if obj then obj.destruct() end
         end
         applying = false
-        markers = {}
+        markers, tinted = {}, {}
         working(base[id])
         Editor.draw()
+        Editor.grab(nil)
     end
 end
 
