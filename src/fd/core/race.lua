@@ -6,6 +6,7 @@
 -- `state` is plain data so it can go straight through JSON for onSave and undo.
 
 local Moves = require("fd.core.moves")
+local Position = require("fd.core.position")
 
 local Race = {}
 Race.__index = Race
@@ -29,6 +30,10 @@ end
 -- move checked for crossing the line, when the space is not one the roll
 -- reaches: well past the longest roll.
 local LINE_SEARCH = 60
+
+-- Cars closer than this along the track, in cells, are level for turn
+-- order. Staggered lanes put the spaces beside each other half a cell apart.
+local LEVEL = 0.25
 
 function Race.new(rules, saved)
     local self = setmetatable({ rules = rules, events = {} }, Race)
@@ -150,6 +155,9 @@ end
 -- re-read after an undo -- it is only noted, silently: cars are picked up
 -- and put down all the time, and the board shows where they are.
 function Race:placed(color, spaceId, track)
+    if track then
+        self:useTrack(track)
+    end
     local car = self:car(color)
     if not car then return end
     if spaceId ~= car.space then
@@ -158,6 +166,11 @@ function Race:placed(color, spaceId, track)
     car.space = spaceId
     if track and spaceId and car.move then
         self:judgeMove(car, track)
+    end
+    -- The round moves on at the last car's roll, before it is put down:
+    -- until somebody moves in the new round, its order can still change.
+    if self.state.phase == "race" and not self:anyMoved() and self:reorder() then
+        self:emit("info", "Order of play for round " .. self.state.round .. ": " .. self:orderText())
     end
 end
 
@@ -696,10 +709,14 @@ function Race:rolled(color, gear, value)
         return
     end
     local who = self:label(car)
+    local due = self:turn()
     if car.eliminated then
         self:emit("warn", who .. " is out of the race but rolled anyway", color)
     elseif car.place then
         self:emit("warn", who .. " has already finished but rolled anyway", color)
+    elseif due and due ~= car and car.movedRound ~= self.state.round then
+        self:emit("warn", string.format("%s rolls out of turn -- %s plays first this round",
+            who, self:label(due)), color)
     end
     if car.gear ~= gear then
         if car.gear ~= 0 then
@@ -890,6 +907,98 @@ function Race:settleGrid()
     self:emit("info", "Starting grid: " .. table.concat(names, "  "))
 end
 
+--- The track the cars are on, for turn order. Not state: the Global script
+-- hands it over after a load, and every car put down on a track brings it.
+function Race:useTrack(track)
+    self.track = track
+end
+
+--- Put the cars in the order they play this round, by where they are on the
+-- track: the leader first. Level cars (within LEVEL cells) go by gear, the
+-- higher first, then by which is nearer the inside of the corner they are
+-- in or coming to. Cars it cannot place -- no track data, off the track,
+-- out or finished -- keep their slots, and the rest are sorted round them.
+-- Returns whether the order changed.
+function Race:reorder()
+    local s = self.state
+    local P = self.track and Position.of(self.track)
+    if not P then
+        return false
+    end
+    local before = table.concat(s.order, " ")
+    local slots, ranked = {}, {}
+    for i, color in ipairs(s.order) do
+        local car = s.cars[color]
+        local along = car and car.space and P.along[car.space]
+        if along and not car.eliminated and not car.place then
+            slots[#slots + 1] = i
+            ranked[#ranked + 1] = { car = car, was = i, key = car.lap * P.length + along,
+                inside = Position.inside(P, car.space) }
+        end
+    end
+    table.sort(ranked, function(a, b)
+        if a.key ~= b.key then return a.key > b.key end
+        return a.was < b.was
+    end)
+    -- Each run of cars level with the first of it is one group.
+    local i = 1
+    while i <= #ranked do
+        local j = i
+        while j < #ranked and ranked[i].key - ranked[j + 1].key < LEVEL * P.cell do
+            j = j + 1
+        end
+        local group = {}
+        for k = i, j do group[#group + 1] = ranked[k] end
+        table.sort(group, function(a, b)
+            if a.car.rolledGear ~= b.car.rolledGear then return a.car.rolledGear > b.car.rolledGear end
+            if a.inside ~= b.inside then return a.inside > b.inside end
+            return a.was < b.was
+        end)
+        for k, e in ipairs(group) do ranked[i + k - 1] = e end
+        i = j + 1
+    end
+    for k, e in ipairs(ranked) do
+        s.order[slots[k]] = e.car.color
+    end
+    return table.concat(s.order, " ") ~= before
+end
+
+--- Whether any car has moved yet this round.
+function Race:anyMoved()
+    for _, car in pairs(self.state.cars) do
+        if car.movedRound == self.state.round then
+            return true
+        end
+    end
+    return false
+end
+
+--- The car to play next this round: the first in order still running that
+-- has neither moved nor sat out. nil outside a race or once all have.
+function Race:turn()
+    local s = self.state
+    if s.phase ~= "race" then
+        return nil
+    end
+    for _, car in ipairs(self:cars()) do
+        if not car.eliminated and not car.place and car.movedRound ~= s.round and car.stalledRound ~= s.round then
+            return car
+        end
+    end
+    return nil
+end
+
+--- The running cars in the order they play, for announcing a round.
+function Race:orderText()
+    local names = {}
+    for _, car in ipairs(self:cars()) do
+        if not car.eliminated and not car.place then
+            names[#names + 1] = #names + 1 .. ". " .. self:label(car)
+        end
+    end
+    return table.concat(names, "  ")
+end
+
 function Race:startRace()
     local s = self.state
     s.phase = "race"
@@ -900,7 +1009,9 @@ function Race:startRace()
     for _, car in ipairs(self:cars()) do
         resetCar(self.rules, car)
     end
+    self:reorder()
     self:emit("info", "Lights out! Everyone rolls the black die for their start")
+    self:emit("info", "Order of play: " .. self:orderText())
     for _, car in ipairs(self:cars()) do
         self:queueCheck(car, "start")
     end
@@ -924,7 +1035,8 @@ function Race:advanceRound()
         if c.kind == "start" then return end
     end
     s.round = s.round + 1
-    self:emit("info", "Round " .. s.round)
+    self:reorder()
+    self:emit("info", "Round " .. s.round .. " -- " .. self:orderText())
 end
 
 function Race:reset()

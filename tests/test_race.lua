@@ -714,6 +714,84 @@ function T.a_car_that_goes_out_on_the_line_does_not_finish()
     eq(#r:serialize().finishers, 0)
 end
 
+-- Turn order ------------------------------------------------------------------
+
+local FDMonaco = require("fd.data.tracks.FDMonaco")
+
+local function order(r)
+    return table.concat(r:serialize().order, " ")
+end
+
+function T.the_leader_on_the_track_plays_first()
+    local r = started("Red", "Blue")
+    r:useTrack(FDMonaco)
+    r:placed("Red", "i.s2.3")
+    r:placed("Blue", "m.s2.8")
+    eq(order(r), "Blue Red")
+    assert(hasEvent(r, "info", "Order of play for round 1: 1%. Blue  2%. Red"))
+    eq(r:turn().color, "Blue")
+end
+
+function T.the_last_car_put_down_still_counts_for_the_next_round()
+    local r = started("Red", "Blue")
+    r:useTrack(FDMonaco)
+    r:placed("Red", "i.s2.10")
+    r:placed("Blue", "i.s2.3")
+    r:rolled("Red", 1, 2)
+    r:placed("Red", "i.s2.12", FDMonaco)
+    r:rolled("Blue", 1, 2) -- the round moves on here, Blue still behind
+    eq(r:serialize().round, 2)
+    eq(order(r), "Red Blue")
+    r:drain()
+    r:placed("Blue", "m.s2.15", FDMonaco)
+    eq(order(r), "Blue Red", "put down ahead before anyone has moved")
+    assert(hasEvent(r, "info", "Order of play for round 2"))
+    r:rolled("Blue", 2, 4)
+    r:placed("Red", "m.s2.17", FDMonaco)
+    eq(order(r), "Blue Red", "fixed once the round is under way")
+end
+
+function T.level_cars_go_by_gear_then_the_inside()
+    local r = started("Red", "Blue")
+    r:useTrack(FDMonaco)
+    -- Level on the straight into corner 2, which turns left: the outside
+    -- lane of the lap is its inside.
+    r:placed("Red", "i.s2.8")
+    r:placed("Blue", "o.s2.7")
+    eq(order(r), "Blue Red", "same gear: nearer the inside of the next corner")
+    r:car("Red").rolledGear = 3
+    r:reorder()
+    eq(order(r), "Red Blue", "higher gear first")
+end
+
+function T.a_lap_ahead_is_ahead()
+    local r = started("Red", "Blue")
+    r:useTrack(FDMonaco)
+    r:car("Blue").lap = 1
+    r:placed("Red", "o.s11.15")
+    r:placed("Blue", "m.s1.2")
+    eq(order(r), "Blue Red")
+end
+
+function T.cars_it_cannot_place_keep_their_slot()
+    local r = started("Red", "Blue", "Grey")
+    r:useTrack(FDMonaco)
+    r:placed("Red", "i.s2.3")
+    r:placed("Grey", "m.s2.10")
+    eq(order(r), "Grey Blue Red", "Blue is off the track: the others go round it")
+end
+
+function T.rolling_out_of_turn_warns_and_is_played()
+    local r = started("Red", "Blue")
+    r:rolled("Blue", 1, 3)
+    assert(hasEvent(r, "warn", "Blue rolls out of turn %-%- Red plays first"))
+    eq(r:car("Blue").lastRoll, 3)
+    eq(r:turn().color, "Red")
+    r:rolled("Red", 1, 3)
+    assert(not hasEvent(r, "warn", "out of turn"))
+    eq(r:serialize().round, 2)
+end
+
 function T.places_have_the_right_suffix()
     local names = {}
     for _, n in ipairs({ 1, 2, 3, 4, 11, 12, 13, 21, 22 }) do names[#names + 1] = Race.placeName(n) end

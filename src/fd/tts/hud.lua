@@ -129,7 +129,7 @@ local function wearSummary(race, car)
     return table.concat(parts, " ")
 end
 
-local function carLine(race, car, i)
+local function carLine(race, car, i, due)
     local hex = HEX[car.color] or "#FFFFFF"
     local status = nil
     if car.eliminated then
@@ -143,6 +143,9 @@ local function carLine(race, car, i)
         local lap = race:progress(car)
         if lap then
             status = lap .. "  " .. status
+        end
+        if car == due then
+            status = status .. "  <color=#7CFC00>TO PLAY</color>"
         end
     end
     return string.format("%d. <color=%s>%s</color>  %s", i, hex, race:label(car), status)
@@ -179,10 +182,11 @@ function Hud.refresh(race)
     Ui.value("fdr_title", title)
     Ui.value("fdr_laps", s.laps == 1 and "1 lap" or (s.laps .. " laps"))
 
-    -- Finishers first, in their places, so the panel ends as the result.
-    local lines = {}
+    -- Finishers first, in their places, so the panel ends as the result;
+    -- the cars still racing are in the order they play this round.
+    local lines, due = {}, race:turn()
     for i, car in ipairs(race:standings()) do
-        lines[i] = carLine(race, car, i)
+        lines[i] = carLine(race, car, i, due)
     end
     Ui.value("fdr_cars", #lines > 0 and table.concat(lines, "\n") or "No cars yet -- click Join race on a dashboard.")
     Ui.value("fdr_checks", checkLine(race))

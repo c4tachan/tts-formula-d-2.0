@@ -210,6 +210,7 @@ function Mini.refresh(race)
     if not ready then
         return
     end
+    local due = race:turn()
     for _, color in ipairs(COLORS) do
         local p = "fdm_" .. color .. "_"
         local car = race:car(color)
@@ -224,6 +225,9 @@ function Mini.refresh(race)
                 bits[#bits + 1] = "OUT"
             end
             bits[#bits + 1] = race:progress(car)
+            if car == due then
+                bits[#bits + 1] = "your turn"
+            end
             for _, c in ipairs(race:pendingChecks()) do
                 if c.color == color then
                     bits[#bits + 1] = "roll the black die"

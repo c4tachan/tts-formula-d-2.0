@@ -15,15 +15,15 @@ That original is preserved verbatim in [`reference/original-2020/`](reference/or
 | Auto gear dice selection | done (shared dice set, results read automatically) |
 | Rules automation | Formula D basic rules, except those needing track positions |
 | Track data | Monaco done: 497 spaces (detected, then hand-edited in game) and its 10 corners with their stop counts |
-| Space snapping + facings | next -- the data it needs now exists for Monaco |
+| Space snapping + facings | done for Monaco |
 | Damage tracking | done for the basic rules' single 18 WP pool |
-| Movement limits + highlighting | next, on the same track data |
+| Movement limits + highlighting | done for Monaco |
 
 ### What the basic rules cover today
 
 - **Dashboards are the controls.** Each dashboard carries a row of buttons
   past its bottom edge: *Join race* when free; once claimed, a status line
-  plus Brake, Overshoot, Collision?, WP −1/+1 (right-click to add), Pit stop
+  plus Car, Collision?, WP −1/+1 (right-click to add), Pit stop
   and Leave.
 - **Cars:** the **Car** button claims the nearest free car, or takes one from
   the bag and tints it your colour; dropping a car on your dashboard claims it
@@ -54,6 +54,12 @@ That original is preserved verbatim in [`reference/original-2020/`](reference/or
   dropping it on a number sets WP to that number.
 - **Rounds:** a round ends once every running car has moved (stalled cars sit
   it out).
+- **Turn order:** each round the cars play in their order on the track, the
+  leader first. Level cars go by gear, the higher first, then by which is
+  nearer the inside of the corner they are in or coming to. The race panel
+  lists the cars in that order and marks who is to play; rolling out of turn
+  is warned about, and played. Cars off the track data keep their place in
+  the order.
 - **Laps and the finish:** a race is 1 lap or 2 (the **1 lap** button on the
   race panel). Crossing the line off the grid starts lap 1; crossing it at
   the end of the last lap finishes, first home wins. Finished cars sit out
@@ -61,10 +67,10 @@ That original is preserved verbatim in [`reference/original-2020/`](reference/or
   announced. Putting a car back short of the line takes a finish back.
 - **Undo** on the race panel covers any of the above.
 
-Not yet automated: collision adjacency, turn order, and the pit lane
-(see the GitHub issues). Collision and pit stop have buttons in the meantime,
-and on a board without track data, braking and overshoots are the WP -1
-button.
+Not yet automated: the pit lane (see the GitHub issues). Pit stop has a
+button in the meantime, and on a board without track data, braking and
+overshoots are the WP -1 button, collisions the Collision button, and turn
+order stays as the grid set it.
 
 ### Playing
 
@@ -76,7 +82,8 @@ button.
    its grid space, pole first. Then **Start**; each player rolls the black die
    for their start.
 4. On your turn move the gear stick, roll the die that arrives, move your car.
-   The race panel lists the finishers first, in their places.
+   The race panel lists the finishers first, in their places, then the rest
+   in the order they play.
 
 ### Track data: detect, then edit in game
 

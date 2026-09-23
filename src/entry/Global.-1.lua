@@ -33,6 +33,7 @@ local placeOnGrid -- likewise
 local spaceUnder -- likewise
 local showReach -- likewise
 local clearReach -- likewise
+local useBoardTrack -- likewise
 local undo = {}
 local UNDO_LIMIT = 30
 
@@ -67,6 +68,7 @@ function onLoad(saved_data)
     Dashboard.scan()
     Mini.registerAsset()
     setupTrackEditor(saved.edits, saved.markers)
+    useBoardTrack()
     buildUi()
 end
 
@@ -207,6 +209,9 @@ local function dashLabel(car)
                 parts[#parts + 1] = "rolled " .. car.lastRoll
             end
         end
+    end
+    if race:turn() == car then
+        parts[#parts + 1] = "YOUR TURN"
     end
     if not (car.tts.car and getObjectFromGUID(car.tts.car)) then
         parts[#parts + 1] = "no car -- press Car"
@@ -677,6 +682,7 @@ function fdUndo(player)
         return
     end
     race = Race.new(Rules, JSON.decode(last))
+    useBoardTrack()
     clearReach()
     -- Undo puts the race back, not the pieces: the board still says where
     -- the cars are.
@@ -684,6 +690,7 @@ function fdUndo(player)
         local obj = car.tts and car.tts.car and getObjectFromGUID(car.tts.car)
         race:placed(car.color, obj and spaceUnder(obj))
     end
+    race:drain() -- re-reading the board is not news
     printToAll(player.steam_name .. " undid the last change", LEVEL_RGB.info)
     syncDashboards(true)
     refresh()
@@ -781,6 +788,13 @@ local function boardTrack()
     return tile, Editor.trackFor(track)
 end
 
+--- Tell the race which track the cars are on, for turn order: after a load
+-- or an undo, before any car has been put down on it.
+useBoardTrack = function()
+    local _, track = boardTrack()
+    race:useTrack(track)
+end
+
 --- Set a car down at `pos` (on the board face), level and turned to `yaw`.
 local function setDown(obj, pos, yaw)
     obj.setPositionSmooth({ x = pos.x, y = pos.y + SNAP_LIFT, z = pos.z }, false, true)
@@ -819,6 +833,7 @@ placeOnGrid = function()
         race:emit("warn", "No starting grid known for the map on the board -- put the cars on the grid by hand")
         return
     end
+    race:useTrack(track)
     local f = Track.frame(tile, track)
     for i, car in ipairs(race:cars()) do
         local obj = car.tts and car.tts.car and getObjectFromGUID(car.tts.car)
