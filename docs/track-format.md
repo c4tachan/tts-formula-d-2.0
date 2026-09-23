@@ -1,7 +1,8 @@
 # Track data format
 
-*Monaco is the first track through the pipeline; `start`, `finish` and `pit`
-are still empty there, and will settle once they are filled in.*
+*Monaco is the first track through the pipeline; its grid is marked, but
+`finish` and `pit` are still empty there, and will settle once they are
+filled in.*
 
 Everything in objectives 3 and 5 (snapping, facings, movement limits,
 highlighting) reduces to one problem: the mod has no idea where the spaces are.
