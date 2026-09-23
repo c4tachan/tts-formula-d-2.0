@@ -504,6 +504,19 @@ def main():
     # A reading by eye, where there is one, says which spaces fork: the
     # detector's count of heads is the weak part. The detector's links are
     # kept only to compare against.
+    #
+    # TODO: improve corner processing. Checked against Monaco's hand-fixed
+    # links (commit 72930f3), the reading had 19 of 48 middle-lane forks on
+    # the wrong side; the inside and outside lanes, which can only fork one
+    # way, were right. The detector missed 16 of those forks but had the side
+    # right on 30 of the 32 it saw, and "a middle-lane fork leans to the
+    # inside of the bend over +-2 spaces" matches 45 of 48 (it misses where
+    # a chicane changes direction). So: take only *whether* a space forks
+    # from the reading; take the side from the detector's head, else the
+    # bend rule; print any space where the three disagree. Have
+    # arrow_sheets.py label each ring with its lane, not just its id -- the
+    # likely cause of the misreads. And bring tracks/FDMonaco.arrows.json
+    # into line with the hand-fixed links, or --write will undo them.
     reading_path = ROOT / "tracks" / f"{map_id}.arrows.json"
     if reading_path.exists():
         reading = json.loads(reading_path.read_text(encoding="utf-8"))
