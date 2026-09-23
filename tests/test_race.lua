@@ -387,4 +387,155 @@ function T.cars_in_the_way_are_where_they_were_at_the_roll()
     assert(hasEvent(r, "warn", "not a legal"), "Blue was there")
 end
 
+-- Laps and the finish ---------------------------------------------------------
+
+--- A one-lane loop of 20 cells, c0 .. c19, with the line just before c0.
+local function loop()
+    local spaces = {}
+    for k = 0, 19 do
+        spaces[#spaces + 1] = { id = "c" .. k, lane = 1, next = { "c" .. ((k + 1) % 20) } }
+    end
+    return { spaces = spaces, corners = {}, finish = { line = { "c0" } } }
+end
+
+--- `color` rolls `roll` in 5th and is put down on `to`.
+local function drive(r, track, color, roll, to)
+    r:rolled(color, 5, roll)
+    r:placed(color, to, track)
+end
+
+function T.the_first_crossing_starts_the_lap_and_the_next_one_finishes()
+    local track = loop()
+    local r = started("Red")
+    r:placed("Red", "c18")
+    drive(r, track, "Red", 4, "c2")
+    eq(r:car("Red").lap, 1, "off the grid and over the line")
+    eq(r:car("Red").place, nil)
+    drive(r, track, "Red", 15, "c17")
+    drive(r, track, "Red", 3, "c0")
+    eq(r:car("Red").place, 1)
+    assert(hasEvent(r, "finish", "Red wins the race"))
+    eq(r:serialize().phase, "finished", "the only car is home")
+end
+
+function T.the_race_runs_until_every_car_is_home()
+    local track = loop()
+    local r = started("Red", "Blue")
+    r:placed("Red", "c18")
+    r:placed("Blue", "c17")
+    r:car("Red").lap = 1
+    r:car("Blue").lap = 1
+    drive(r, track, "Red", 4, "c2")
+    assert(hasEvent(r, "finish", "Red wins"))
+    eq(r:serialize().phase, "race")
+    drive(r, track, "Blue", 2, "c19")
+    eq(r:serialize().round, 2, "a finished car does not hold up the round")
+    drive(r, track, "Blue", 2, "c1")
+    local events = r:drain()
+    local result = nil
+    for _, e in ipairs(events) do
+        if e.text:find("Result") then result = e.text end
+    end
+    assert(result and result:find("1st Red, 2nd Blue"), "result announced: " .. tostring(result))
+    eq(r:serialize().phase, "finished")
+end
+
+function T.putting_a_car_back_short_of_the_line_takes_the_finish_back()
+    local track = loop()
+    local r = started("Red", "Blue")
+    r:placed("Red", "c18")
+    r:placed("Blue", "c10")
+    r:car("Red").lap = 1
+    r:car("Blue").lap = 1
+    drive(r, track, "Red", 4, "c2")
+    eq(r:car("Red").place, 1)
+    r:placed("Red", "c19", track)
+    eq(r:car("Red").place, nil)
+    eq(r:car("Red").lap, 1)
+    eq(#r:serialize().finishers, 0)
+    r:placed("Red", "c1", track)
+    eq(r:car("Red").place, 1, "and over it again")
+    eq(r:car("Red").lap, 2, "counted once for the move")
+end
+
+function T.a_space_the_roll_cannot_reach_still_counts_as_crossing()
+    local track = loop()
+    local r = started("Red")
+    r:placed("Red", "c18")
+    r:car("Red").lap = 1
+    drive(r, track, "Red", 2, "c5")
+    assert(r:car("Red").place == 1, "the table ruled: over the line")
+end
+
+function T.two_laps_need_two_trips_round()
+    local track = loop()
+    local r = started("Red")
+    r:setLaps(2)
+    r:placed("Red", "c18")
+    drive(r, track, "Red", 4, "c2")
+    drive(r, track, "Red", 18, "c0")
+    assert(hasEvent(r, "info", "starts lap 2 of 2 %-%- last lap"))
+    eq(r:progress(r:car("Red")), "lap 2/2")
+    eq(r:car("Red").place, nil)
+    drive(r, track, "Red", 19, "c19")
+    drive(r, track, "Red", 1, "c0")
+    eq(r:car("Red").place, 1)
+    eq(r:progress(r:car("Red")), "finished 1st")
+end
+
+function T.cutting_the_race_short_finishes_the_cars_already_past_it()
+    local track = loop()
+    local r = started("Red", "Blue")
+    r:setLaps(2)
+    r:car("Red").lap = 2
+    r:car("Blue").lap = 1
+    r:setLaps(1)
+    eq(r:car("Red").place, 1)
+    eq(r:car("Blue").place, nil)
+    r:setLaps(2)
+    eq(r:car("Red").place, nil, "and back again")
+end
+
+function T.the_race_is_over_when_the_rest_are_out()
+    local track = loop()
+    local r = started("Red", "Blue")
+    r:placed("Red", "c18")
+    r:car("Red").lap = 1
+    drive(r, track, "Red", 4, "c2")
+    eq(r:serialize().phase, "race")
+    r:adjust("Blue", nil, -18)
+    eq(r:serialize().phase, "finished")
+    eq(r:standings()[2].color, "Blue")
+    r:adjust("Blue", nil, 3)
+    eq(r:serialize().phase, "race", "a correction reopens it")
+end
+
+function T.a_car_that_goes_out_on_the_line_does_not_finish()
+    local track = loop()
+    local r = started("Red", "Blue")
+    r:placed("Red", "c18")
+    r:car("Red").lap = 1
+    r:car("Red").wear.wp = 1
+    drive(r, track, "Red", 5, "c1") -- over the line, braking 2 with 1 WP left
+    local events = r:drain()
+    for _, e in ipairs(events) do
+        assert(e.level ~= "finish", "no flag for a car going out: " .. e.text)
+    end
+    assert(r:car("Red").eliminated)
+    eq(r:car("Red").place, nil)
+    eq(r:car("Red").lap, 2, "the crossing still counts")
+    r:adjust("Red", nil, 5, "ruling")
+    eq(r:car("Red").place, 1, "put back in the race, it has finished")
+    assert(hasEvent(r, "finish", "Red wins"))
+    r:adjust("Red", nil, -18)
+    eq(r:car("Red").place, nil, "and out again, it has not")
+    eq(#r:serialize().finishers, 0)
+end
+
+function T.places_have_the_right_suffix()
+    local names = {}
+    for _, n in ipairs({ 1, 2, 3, 4, 11, 12, 13, 21, 22 }) do names[#names + 1] = Race.placeName(n) end
+    eq(table.concat(names, " "), "1st 2nd 3rd 4th 11th 12th 13th 21st 22nd")
+end
+
 return T

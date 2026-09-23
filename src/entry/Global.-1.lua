@@ -41,6 +41,7 @@ local LEVEL_RGB = {
     warn = { 1, 0.72, 0.3 },
     wear = { 1, 0.45, 0.35 },
     out = { 1, 0.2, 0.2 },
+    finish = { 1, 0.84, 0.25 },
 }
 
 -- Setup ---------------------------------------------------------------------
@@ -134,7 +135,7 @@ end
 local function relay(events)
     for _, e in ipairs(events) do
         local rgb = LEVEL_RGB[e.level] or LEVEL_RGB.info
-        if e.level == "wear" or e.level == "out" then
+        if e.level == "wear" or e.level == "out" or e.level == "finish" then
             broadcastToAll(e.text, rgb)
         else
             printToAll(e.text, rgb)
@@ -198,10 +199,13 @@ local function dashLabel(car)
     if car.eliminated then
         parts[#parts + 1] = "OUT"
     else
-        parts[#parts + 1] = car.gear > 0 and (Race.gearName(car.gear) .. " gear") or "on the grid"
-        parts[#parts + 1] = Hud.wearSummary(race, car)
-        if car.lastRoll then
-            parts[#parts + 1] = "rolled " .. car.lastRoll
+        parts[#parts + 1] = race:progress(car)
+        if not car.place then
+            parts[#parts + 1] = car.gear > 0 and (Race.gearName(car.gear) .. " gear") or "on the grid"
+            parts[#parts + 1] = Hud.wearSummary(race, car)
+            if car.lastRoll then
+                parts[#parts + 1] = "rolled " .. car.lastRoll
+            end
         end
     end
     if not (car.tts.car and getObjectFromGUID(car.tts.car)) then
@@ -683,6 +687,13 @@ function fdUndo(player)
     printToAll(player.steam_name .. " undid the last change", LEVEL_RGB.info)
     syncDashboards(true)
     refresh()
+end
+
+--- Switch the race between one lap (the basic rules) and two.
+function fdLaps(player)
+    local laps = race:serialize().laps == 1 and 2 or 1
+    printToAll(player.steam_name .. " sets the race distance", LEVEL_RGB.info)
+    act(function() race:setLaps(laps) end)
 end
 
 function fdToggleRace()

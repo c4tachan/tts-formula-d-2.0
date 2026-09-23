@@ -1101,6 +1101,40 @@ function T.strain_roll_queues_black_die_checks()
     assert(S.ui.fdr_checks.value:find("engine"), "race panel lists the check")
 end
 
+function T.laps_button_sets_the_distance_and_undo_puts_it_back()
+    local S = redRacing()
+    eq(S.ui.fdr_laps.value, "1 lap")
+    fdLaps({ steam_name = "host", color = "Red" })
+    eq(state().laps, 2)
+    eq(S.ui.fdr_laps.value, "2 laps")
+    assert(S.logged("The race is 2 laps"))
+    fdUndo({ steam_name = "host", color = "Red" })
+    eq(state().laps, 1)
+end
+
+function T.a_car_over_the_line_on_its_last_lap_wins()
+    local S = redRacing()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local Moves = require("fd.core.moves")
+    local mine = redOn(S, "o.s11.15")
+    -- Round once already: saved and loaded that way, as the state is copied.
+    local saved = onSave()
+    saved.json.race.cars.Red.lap = 1
+    onLoad(saved)
+    roll(S, 1, 2)
+    local over = nil
+    for id, o in pairs(Moves.reach(FDMonaco, "o.s11.15", 2)) do
+        if o.crossed then over = id end
+    end
+    assert(over, "two spaces on from pole is over the line")
+    putNear(S, mine, FDMonaco.byId[over])
+    eq(state().cars.Red.place, 1)
+    eq(state().phase, "finished")
+    assert(S.logged("broadcast: Red"), "announced to everyone")
+    assert(S.logged("wins the race"))
+    assert(S.ui.fdr_title.value:find("Finished"))
+    assert(S.ui.fdr_cars.value:find("finished 1st"))
+end
 function T.spectator_roll_goes_to_the_car_in_that_gear()
     local S = redRacing()
     dropOn(S, S.find("Gear Stick"), "gear", 1)

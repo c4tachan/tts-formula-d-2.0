@@ -223,6 +223,7 @@ function Mini.refresh(race)
             if car.eliminated then
                 bits[#bits + 1] = "OUT"
             end
+            bits[#bits + 1] = race:progress(car)
             for _, c in ipairs(race:pendingChecks()) do
                 if c.color == color then
                     bits[#bits + 1] = "roll the black die"

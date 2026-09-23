@@ -54,9 +54,14 @@ That original is preserved verbatim in [`reference/original-2020/`](reference/or
   dropping it on a number sets WP to that number.
 - **Rounds:** a round ends once every running car has moved (stalled cars sit
   it out).
+- **Laps and the finish:** a race is 1 lap or 2 (the **1 lap** button on the
+  race panel). Crossing the line off the grid starts lap 1; crossing it at
+  the end of the last lap finishes, first home wins. Finished cars sit out
+  the rounds, and once every car still running is home the result is
+  announced. Putting a car back short of the line takes a finish back.
 - **Undo** on the race panel covers any of the above.
 
-Not yet automated: collision adjacency, turn order, laps, and the pit lane
+Not yet automated: collision adjacency, turn order, and the pit lane
 (see the GitHub issues). Collision and pit stop have buttons in the meantime,
 and on a board without track data, braking and overshoots are the WP -1
 button.
@@ -71,6 +76,7 @@ button.
    its grid space, pole first. Then **Start**; each player rolls the black die
    for their start.
 4. On your turn move the gear stick, roll the die that arrives, move your car.
+   The race panel lists the finishers first, in their places.
 
 ### Track data: detect, then edit in game
 

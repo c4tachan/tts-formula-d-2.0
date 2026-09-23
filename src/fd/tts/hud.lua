@@ -58,6 +58,7 @@ local function racePanel(rulesName)
                     button("fdr_track", "Track", "fdTrack", { tooltip = "Show or hide the detected spaces on the board" }),
                 }),
                 el("HorizontalLayout", { spacing = "4", preferredHeight = "30" }, {
+                    button("fdr_laps", "1 lap", "fdLaps", { tooltip = "Race over one lap (basic rules) or two" }),
                     button("fdr_edit", "Edit track", "fdEdit", { tooltip = "Open or close the track editor for the map on the board" }),
                     button("fdr_apply", "Apply", "fdApply", { tooltip = "Put the space markers back into the track" }),
                     button("fdr_export", "Export", "fdExport", { tooltip = "How to get your edits into the repo" }),
@@ -133,10 +134,16 @@ local function carLine(race, car, i)
     local status = nil
     if car.eliminated then
         status = "<color=#FF5252>OUT</color>"
+    elseif car.place then
+        status = "<color=#FFD740>" .. race:progress(car) .. "</color>"
     else
         status = (car.gear > 0 and Race.gearName(car.gear) or "grid")
             .. "  " .. wearSummary(race, car)
             .. (car.lastRoll and ("  last " .. car.lastRoll) or "")
+        local lap = race:progress(car)
+        if lap then
+            status = lap .. "  " .. status
+        end
     end
     return string.format("%d. <color=%s>%s</color>  %s", i, hex, race:label(car), status)
 end
@@ -166,11 +173,15 @@ function Hud.refresh(race)
         title = title .. "  -  Round " .. s.round
     elseif s.phase == "grid" then
         title = title .. "  -  Grid roll"
+    elseif s.phase == "finished" then
+        title = title .. "  -  Finished"
     end
     Ui.value("fdr_title", title)
+    Ui.value("fdr_laps", s.laps == 1 and "1 lap" or (s.laps .. " laps"))
 
+    -- Finishers first, in their places, so the panel ends as the result.
     local lines = {}
-    for i, car in ipairs(race:cars()) do
+    for i, car in ipairs(race:standings()) do
         lines[i] = carLine(race, car, i)
     end
     Ui.value("fdr_cars", #lines > 0 and table.concat(lines, "\n") or "No cars yet -- click Join race on a dashboard.")

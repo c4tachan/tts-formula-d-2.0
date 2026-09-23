@@ -16,15 +16,34 @@ local function gearName(g)
     return ORDINAL[g] or ("gear " .. tostring(g))
 end
 
+--- 1st, 2nd, 3rd, 4th ... 11th, 12th, 13th ... 21st.
+local function placeName(n)
+    local suffix = "th"
+    if n % 100 < 11 or n % 100 > 13 then
+        suffix = ({ "st", "nd", "rd" })[n % 10] or "th"
+    end
+    return n .. suffix
+end
+
+-- How far a car may be put from where it started a move and still have the
+-- move checked for crossing the line, when the space is not one the roll
+-- reaches: well past the longest roll.
+local LINE_SEARCH = 60
+
 function Race.new(rules, saved)
     local self = setmetatable({ rules = rules, events = {} }, Race)
     self.state = saved or {}
     local s = self.state
-    s.phase = s.phase or "setup" -- setup | grid | race
+    s.phase = s.phase or "setup" -- setup | grid | race | finished
     s.round = s.round or 0
     s.order = s.order or {}
     s.cars = s.cars or {}
     s.checks = s.checks or {}
+    s.laps = s.laps or 1
+    s.finishers = s.finishers or {} -- colors, in the order they finished
+    for _, car in pairs(s.cars) do
+        car.lap = car.lap or 0
+    end
     return self
 end
 
@@ -34,7 +53,7 @@ end
 
 -- Events --------------------------------------------------------------------
 
--- level: info | warn | wear | out
+-- level: info | warn | wear | out | finish
 function Race:emit(level, text, color)
     self.events[#self.events + 1] = { level = level, text = text, color = color }
 end
@@ -79,6 +98,8 @@ local function resetCar(rules, car)
     car.move = nil       -- the move since the last roll; see startMove
     car.stops = nil      -- stops made in the corner `space` is in
     car.crashed = nil    -- corner the car went out in, missing its stops
+    car.lap = 0          -- lap it is on; 0 until it first crosses the line
+    car.place = nil      -- where it finished, once it has
 end
 
 function Race:join(color, name)
@@ -105,6 +126,10 @@ function Race:leave(color)
     end
     self:dropChecks(color)
     self:emit("info", self:label(car) .. " leaves the race", color)
+    if car.place then
+        self:unfinish(car)
+    end
+    self:checkRaceOver()
 end
 
 --- Cars in race order.
@@ -153,6 +178,7 @@ function Race:startMove(car, roll)
     car.move = {
         from = car.space, roll = roll, stops = car.stops, occupied = occupied,
         charged = { brake = 0, overshoot = 0 }, -- spaces charged for so far
+        crossed = false, -- whether a crossing of the line was counted for it
     }
 end
 
@@ -206,9 +232,11 @@ end
 
 --- Judge where the car was put down against the roll: brake for spaces
 -- short, overshoot for a corner left too early, out for missing too many
--- stops. Put down again, it is judged again and only the difference is
--- charged. A space the roll cannot reach is warned about and charged
--- nothing -- the track data may be wrong, or the table may have ruled.
+-- stops, a lap for crossing the line. Put down again, it is judged again and
+-- only the difference is charged. A space the roll cannot reach is warned
+-- about and charged nothing -- the track data may be wrong, or the table may
+-- have ruled -- but still counts as crossing the line if the shortest way
+-- there does, so a disputed move cannot keep a car from finishing.
 function Race:judgeMove(car, track)
     local m = car.move
     local reach = self:reachable(car.color, track)
@@ -221,6 +249,9 @@ function Race:judgeMove(car, track)
         self:chargeMove(car, "overshoot", 0)
         car.crashed = nil
         self:checkElimination(car)
+        local any = Moves.reach(track, m.from, LINE_SEARCH)
+        local way = any and any[car.space]
+        self:crossLine(car, way and way.crossed or false)
         return
     end
     car.stops = o.stops
@@ -233,6 +264,142 @@ function Race:judgeMove(car, track)
     end
     car.crashed = crash
     self:checkElimination(car)
+    -- Last, so a car that goes out on the move does not take the flag.
+    self:crossLine(car, o.crossed)
+end
+
+-- Laps and the finish -------------------------------------------------------
+-- Every grid lies behind the line, so the first crossing starts lap 1 and
+-- the one after the last lap finishes the race.
+
+--- Count (or take back) the current move's crossing of the line.
+function Race:crossLine(car, crossed)
+    local m = car.move
+    if (m.crossed or false) == crossed then
+        return
+    end
+    m.crossed = crossed
+    local laps = self.state.laps
+    car.lap = car.lap + (crossed and 1 or -1)
+    if crossed and car.lap > 1 and car.lap <= laps then
+        self:emit("info", string.format("%s starts lap %d of %d%s", self:label(car), car.lap, laps,
+            car.lap == laps and " -- last lap" or ""), car.color)
+    end
+    self:settleFinish(car)
+end
+
+--- Put the car in or out of the finishing order by its lap and whether it
+-- is out: one past the last lap and still running has finished. Every
+-- change that can touch either comes through here, so a car is never both
+-- finished and out.
+function Race:settleFinish(car)
+    local s = self.state
+    if s.phase ~= "race" and s.phase ~= "finished" then
+        return
+    end
+    local home = car.lap > s.laps and not car.eliminated
+    if home and not car.place then
+        self:finish(car)
+    elseif not home and car.place then
+        self:unfinish(car)
+        self:emit("info", self:label(car) .. " has not finished after all", car.color)
+    end
+    self:checkRaceOver()
+end
+
+--- The car has taken the flag: note its place.
+function Race:finish(car)
+    local s = self.state
+    s.finishers[#s.finishers + 1] = car.color
+    car.place = #s.finishers
+    self:dropChecks(car.color)
+    if car.place == 1 then
+        self:emit("finish", self:label(car) .. " wins the race!", car.color)
+    else
+        self:emit("finish", self:label(car) .. " finishes " .. placeName(car.place), car.color)
+    end
+end
+
+--- Take a car back out of the finishing order; those behind it move up.
+function Race:unfinish(car)
+    local s = self.state
+    for i = #s.finishers, 1, -1 do
+        if s.finishers[i] == car.color then table.remove(s.finishers, i) end
+    end
+    car.place = nil
+    for i, color in ipairs(s.finishers) do
+        s.cars[color].place = i
+    end
+end
+
+--- The race is over once a car has finished and every other has finished
+-- or is out; a correction that puts a car back in the running reopens it.
+function Race:checkRaceOver()
+    local s = self.state
+    if s.phase ~= "race" and s.phase ~= "finished" then
+        return
+    end
+    local over = #s.finishers > 0
+    for _, car in ipairs(self:cars()) do
+        if not car.place and not car.eliminated then
+            over = false
+        end
+    end
+    if over and s.phase == "race" then
+        s.phase = "finished"
+        local names = {}
+        for i, car in ipairs(self:standings()) do
+            names[i] = (car.place and placeName(car.place) or "out") .. " " .. self:label(car)
+        end
+        self:emit("finish", "Chequered flag! Result: " .. table.concat(names, ", "))
+    elseif not over and s.phase == "finished" then
+        s.phase = "race"
+        self:emit("info", "The race is back on")
+    end
+end
+
+--- Cars finished, in their places, then those still running in race order,
+-- then those out.
+function Race:standings()
+    local out = {}
+    for _, color in ipairs(self.state.finishers) do
+        out[#out + 1] = self.state.cars[color]
+    end
+    for _, car in ipairs(self:cars()) do
+        if not car.place and not car.eliminated then out[#out + 1] = car end
+    end
+    for _, car in ipairs(self:cars()) do
+        if not car.place and car.eliminated then out[#out + 1] = car end
+    end
+    return out
+end
+
+--- How far round the car is, for the panels: its place once finished, the
+-- lap it is on in a race of more than one, else nil.
+function Race:progress(car)
+    if car.place then
+        return "finished " .. placeName(car.place)
+    elseif self.state.laps > 1 and car.lap > 0 then
+        return string.format("lap %d/%d", math.min(car.lap, self.state.laps), self.state.laps)
+    end
+    return nil
+end
+
+--- Set the race to `laps` laps. Changed mid-race, cars already past the new
+-- distance finish, in race order, and those short of it are back racing.
+function Race:setLaps(laps)
+    local s = self.state
+    s.laps = laps
+    self:emit("info", string.format("The race is %d lap%s", laps, laps == 1 and "" or "s"))
+    -- Those taken out of the order first, so the ones kept close up.
+    for _, car in ipairs(self:standings()) do
+        if car.place and car.lap <= laps then
+            self:settleFinish(car)
+        end
+    end
+    for _, car in ipairs(self:cars()) do
+        self:settleFinish(car)
+    end
 end
 
 function Race:zone(id)
@@ -263,6 +430,7 @@ function Race:checkElimination(car)
         car.eliminated = false
         self:emit("info", self:label(car) .. " is back in the race", car.color)
     end
+    self:settleFinish(car)
 end
 
 --- Apply a zone -> points map of wear, announcing each loss.
@@ -405,6 +573,8 @@ function Race:rolled(color, gear, value)
     local who = self:label(car)
     if car.eliminated then
         self:emit("warn", who .. " is out of the race but rolled anyway", color)
+    elseif car.place then
+        self:emit("warn", who .. " has already finished but rolled anyway", color)
     end
     if car.gear ~= gear then
         if car.gear ~= 0 then
@@ -439,7 +609,7 @@ function Race:rolled(color, gear, value)
         self:emit("warn", "Engine strain! Every car in top gears rolls the black die", color)
         self:queueCheck(car, "engine")
         for _, other in ipairs(self:cars()) do
-            if other ~= car and not other.eliminated and self.rules.engineStrain[other.rolledGear] then
+            if other ~= car and not other.eliminated and not other.place and self.rules.engineStrain[other.rolledGear] then
                 self:queueCheck(other, "engine")
             end
         end
@@ -583,6 +753,7 @@ function Race:startRace()
     s.phase = "race"
     s.round = 1
     s.checks = {}
+    s.finishers = {}
     for _, car in ipairs(self:cars()) do
         resetCar(self.rules, car)
     end
@@ -598,7 +769,7 @@ function Race:advanceRound()
     if s.phase ~= "race" then return end
     local any = false
     for _, car in ipairs(self:cars()) do
-        if not car.eliminated then
+        if not car.eliminated and not car.place then
             any = true
             if car.movedRound ~= s.round and car.stalledRound ~= s.round then
                 return
@@ -618,6 +789,7 @@ function Race:reset()
     s.phase = "setup"
     s.round = 0
     s.checks = {}
+    s.finishers = {}
     for _, car in ipairs(self:cars()) do
         resetCar(self.rules, car)
         car.gridRolls = nil
@@ -626,5 +798,6 @@ function Race:reset()
 end
 
 Race.gearName = gearName
+Race.placeName = placeName
 
 return Race
