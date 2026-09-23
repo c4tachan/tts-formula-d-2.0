@@ -57,7 +57,7 @@ for _, c in ipairs({ "Red", "Blue", "Green", "Yellow" }) do
 end
 fdStart({ steam_name = "host", color = "Red" })
 
-measure("brake (one race action)", S, function() S.dashes.Red.click("fdDashBrake", "Red") end)
+measure("WP -1 (one race action)", S, function() S.dashes.Red.click("fdDashWear", "Red") end)
 measure("shift gear (drop the gear stick)", S, function()
     local Dashboard = require("fd.tts.dashboard")
     local stick = nil

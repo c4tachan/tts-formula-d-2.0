@@ -45,16 +45,21 @@ That original is preserved verbatim in [`reference/original-2020/`](reference/or
   automatically for every car in 5th/6th on a 20 or 30), collision (on request)
   and grid position (ties re-roll). Whoever rolls the black die resolves their
   own oldest check, or the table's oldest if they have none.
-- **Wear:** brake, overshoot, pit stop and manual ±1 buttons; elimination at
+- **Moves:** a car put down after its roll is judged against the track (Monaco
+  so far): braking and corner overshoots are charged, corner stops are
+  counted from move to move, and missing two or more stops puts a car out.
+  Putting the car down again re-judges the move; nothing is ever refused.
+- **Wear:** pit stop and manual ±1 buttons; elimination at
   0 WP. The WP marker follows on the beginner side of the dashboard, and
   dropping it on a number sets WP to that number.
 - **Rounds:** a round ends once every running car has moved (stalled cars sit
   it out).
 - **Undo** on the race panel covers any of the above.
 
-Not yet automated, because they need to know where the spaces are: corner
-stops and overshoot distance, collision adjacency, turn order, laps, and the
-pit lane. The buttons stand in for them until track data exists.
+Not yet automated: collision adjacency, turn order, laps, and the pit lane
+(see the GitHub issues). Collision and pit stop have buttons in the meantime,
+and on a board without track data, braking and overshoots are the WP -1
+button.
 
 ### Playing
 

@@ -301,18 +301,6 @@ function Race:setWear(color, zoneId, value, reason)
     end
 end
 
-function Race:brake(color, spaces)
-    local car = self:car(color)
-    if not car then return end
-    self:applyWear(car, self.rules.brakeWear(spaces), "braked " .. spaces .. " short")
-end
-
-function Race:overshoot(color, spaces)
-    local car = self:car(color)
-    if not car then return end
-    self:applyWear(car, self.rules.overshootWear(spaces), "overshot a corner by " .. spaces)
-end
-
 function Race:pitStop(color)
     local car = self:car(color)
     if not car then return end

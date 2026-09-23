@@ -188,7 +188,7 @@ end
 
 function T.dashboard_buttons_act_on_the_owner()
     local S = redRacing()
-    S.beginner.click("fdDashBrake", "Blue")
+    S.beginner.click("fdDashWear", "Blue")
     eq(state().cars.Red.wear.wp, 17)
     S.beginner.click("fdDashWear", "Red", true)
     eq(state().cars.Red.wear.wp, 18)
@@ -203,7 +203,7 @@ function T.wear_moves_the_marker()
     local marker = S.find("Wear Tracker")
     local before = marker.pos.z
     for _ = 1, 3 do
-        S.beginner.click("fdDashBrake", "Red")
+        S.beginner.click("fdDashWear", "Red")
     end
     eq(state().cars.Red.wear.wp, 15)
     assert(marker.pos.z ~= before, "marker moved down a row")
@@ -263,9 +263,9 @@ end
 
 function T.screen_buttons_act_on_the_clickers_car()
     local S = redRacing()
-    fdUiBrake({ color = "Red" })
+    fdUiWear({ color = "Red" }, "wp:17")
     eq(state().cars.Red.wear.wp, 17)
-    fdUiBrake({ color = "Blue" }) -- not racing: nothing happens
+    fdUiWear({ color = "Blue" }, "wp:12") -- not racing: nothing happens
     eq(state().cars.Red.wear.wp, 17)
     fdUiLeave({ color = "Red" })
     eq(state().cars.Red, nil)
@@ -889,7 +889,7 @@ function T.a_deleted_marker_comes_back_on_the_next_action()
     eq(S.count("Wear Tracker"), 0)
     -- Nothing about the car changed when the marker went, but it is replaced
     -- as soon as anything happens.
-    S.beginner.click("fdDashBrake", "Red")
+    S.beginner.click("fdDashWear", "Red")
     eq(S.count("Wear Tracker"), 1)
 end
 
@@ -905,7 +905,7 @@ end
 
 function T.unchanged_ui_is_not_sent_again()
     local S = redRacing()
-    S.beginner.click("fdDashBrake", "Red")
+    S.beginner.click("fdDashWear", "Red")
     S.resetCounts()
     refresh()
     eq(S.counts.ui, 0, "a refresh with nothing new sends nothing")
@@ -913,7 +913,7 @@ end
 
 function T.undo_restores_the_previous_state()
     local S = redRacing()
-    S.beginner.click("fdDashBrake", "Red")
+    S.beginner.click("fdDashWear", "Red")
     eq(state().cars.Red.wear.wp, 17)
     fdUndo({ steam_name = "host", color = "Red" })
     eq(state().cars.Red.wear.wp, 18)

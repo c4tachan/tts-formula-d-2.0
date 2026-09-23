@@ -33,8 +33,6 @@ local FACES = {
 
 local ACTIONS = {
     { fn = "fdDashCar", label = "Car", tip = "Claim the nearest car, or take one from the bag.\nAlso: drop a car on this dashboard." },
-    { fn = "fdDashBrake", label = "Brake 1", tip = "Stop 1 space short of your roll (1 WP)" },
-    { fn = "fdDashOvershoot", label = "Overshoot 1", tip = "Overshot a corner by 1 space (1 WP)" },
     { fn = "fdDashCollision", label = "Collision?", tip = "Ended next to or behind a car: roll the black die" },
     { fn = "fdDashWear", label = "WP -1 / +1", tip = "Left click: lose 1 WP. Right click: gain 1 WP.\nOr just move your WP marker." },
     { fn = "fdDashPit", label = "Pit stop", tip = "Restore WP; leave in 4th gear or lower" },

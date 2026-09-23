@@ -93,16 +93,9 @@ function T.die_overrides_selected_gear()
     eq(r:car("Red").gear, 3)
 end
 
-function T.brake_and_overshoot_cost_wp()
-    local r = started("Red")
-    r:brake("Red", 2)
-    r:overshoot("Red", 3)
-    eq(r:car("Red").wear.wp, 13)
-end
-
 function T.car_is_out_at_zero_and_back_after_a_correction()
     local r = started("Red")
-    r:overshoot("Red", 18)
+    r:adjust("Red", nil, -18)
     assert(r:car("Red").eliminated)
     assert(hasEvent(r, "out", "out of the race"))
     r:adjust("Red", nil, 1)
@@ -123,7 +116,7 @@ end
 
 function T.gains_are_capped()
     local r = started("Red")
-    r:brake("Red", 1)
+    r:adjust("Red", nil, -1)
     r:adjust("Red", "wp", 5, "bonus")
     eq(r:car("Red").wear.wp, 18)
 end
@@ -206,7 +199,7 @@ end
 function T.pit_stop_restores_and_caps_gear()
     local r = started("Red")
     r:car("Red").rolledGear = 5
-    r:brake("Red", 6)
+    r:adjust("Red", nil, -6)
     r:pitStop("Red")
     eq(r:car("Red").wear.wp, 18)
     r:drain()
@@ -243,7 +236,7 @@ end
 
 function T.state_survives_a_round_trip()
     local r = started("Red")
-    r:brake("Red", 2)
+    r:adjust("Red", nil, -2)
     local copy = Race.new(Rules, r:serialize())
     eq(copy:car("Red").wear.wp, 16)
 end

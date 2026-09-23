@@ -5,8 +5,10 @@
 -- the events it produces and syncs the dashboards and the race panel.
 --
 -- Each player drives from their dashboard: its buttons (fd.tts.controls) join
--- the race and cover braking, damage and pit stops, the gear stick selects a
--- gear when dropped on a slot, and the WP marker sets WP when dropped on a number.
+-- the race and cover damage, pit stops and WP corrections, the gear stick
+-- selects a gear when dropped on a slot, and the WP marker sets WP when dropped
+-- on a number. Braking and overshooting are charged when a car is put down
+-- after its roll.
 
 local Race = require("fd.core.race")
 local Rules = require("fd.rules.beginner")
@@ -529,8 +531,6 @@ local ACTIONS = {
         })
         setCar(car, spawned, "takes a car from the bag")
     end,
-    brake = function(car) race:brake(car.color, 1) end,
-    overshoot = function(car) race:overshoot(car.color, 1) end,
     collision = function(car) race:requestCheck(car.color, "collision") end,
     pit = function(car) race:pitStop(car.color) end,
     wearDown = function(car) race:adjust(car.color, nil, -1, "manual") end,
@@ -592,8 +592,6 @@ local function onDash(dash, name)
 end
 
 function fdDashCar(dash) onDash(dash, "car") end
-function fdDashBrake(dash) onDash(dash, "brake") end
-function fdDashOvershoot(dash) onDash(dash, "overshoot") end
 function fdDashCollision(dash) onDash(dash, "collision") end
 function fdDashPit(dash) onDash(dash, "pit") end
 function fdDashLeave(dash) onDash(dash, "leave") end
@@ -611,8 +609,6 @@ local function mine(player)
 end
 
 function fdUiCar(player) runAction(mine(player), "car") end
-function fdUiBrake(player) runAction(mine(player), "brake") end
-function fdUiOvershoot(player) runAction(mine(player), "overshoot") end
 function fdUiCollision(player) runAction(mine(player), "collision") end
 function fdUiPit(player) runAction(mine(player), "pit") end
 function fdUiLeave(player) runAction(mine(player), "leave") end
