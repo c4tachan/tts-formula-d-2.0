@@ -248,4 +248,40 @@ function T.state_survives_a_round_trip()
     eq(copy:car("Red").wear.wp, 16)
 end
 
+function T.a_move_starts_from_the_space_the_car_was_on()
+    local r = newRace("Red")
+    r:placed("Red", "m.s1.3")
+    r:startRace()
+    eq(r:car("Red").space, "m.s1.3", "starting the race does not move the car")
+    r:blackDie(10, "Red")
+    r:rolled("Red", 1, 2)
+    eq(r:car("Red").moveFrom, "m.s1.3")
+    r:drain()
+    r:placed("Red", "m.s1.5")
+    eq(#r:drain(), 0, "placing a car says nothing")
+    eq(r:car("Red").space, "m.s1.5")
+    eq(r:car("Red").moveFrom, "m.s1.3", "moving the car does not start a new move")
+    r:rolled("Red", 2, 3)
+    eq(r:car("Red").moveFrom, "m.s1.5")
+    local copy = Race.new(Rules, r:serialize())
+    eq(copy:car("Red").space, "m.s1.5")
+end
+
+function T.a_great_start_is_a_move_from_the_grid()
+    local r = newRace("Red")
+    r:placed("Red", "i.s11.4")
+    r:startRace()
+    r:blackDie(18, "Red")
+    eq(r:car("Red").moveFrom, "i.s11.4")
+end
+
+function T.off_the_track_is_no_space()
+    local r = started("Red")
+    r:placed("Red", "m.s1.3")
+    r:placed("Red", nil)
+    eq(r:car("Red").space, nil)
+    r:rolled("Red", 1, 2)
+    eq(r:car("Red").moveFrom, nil)
+end
+
 return T

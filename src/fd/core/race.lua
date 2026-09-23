@@ -62,6 +62,8 @@ local function freshWear(rules)
     return w
 end
 
+-- `space` is not reset: a reset or a fresh start does not move the cars on
+-- the board. `moveFrom` is, as it belongs to the race being thrown away.
 local function resetCar(rules, car)
     car.gear = 0         -- selected on the dashboard
     car.rolledGear = 0   -- gear of the last die actually rolled; 0 = on the grid
@@ -71,6 +73,7 @@ local function resetCar(rules, car)
     car.maxGear = nil
     car.movedRound = nil
     car.stalledRound = nil
+    car.moveFrom = nil
 end
 
 function Race:join(color, name)
@@ -106,6 +109,20 @@ function Race:cars()
         out[#out + 1] = self.state.cars[color]
     end
     return out
+end
+
+--- The car is now on the space `spaceId`, or off the track if nil. Silent:
+-- cars are put down all the time, and the board shows where they are.
+function Race:placed(color, spaceId)
+    local car = self:car(color)
+    if car then
+        car.space = spaceId
+    end
+end
+
+--- Where a car starts the move it is about to make.
+local function startMove(car)
+    car.moveFrom = car.space
 end
 
 function Race:zone(id)
@@ -300,6 +317,7 @@ function Race:rolled(color, gear, value)
     car.lastRoll = value
     car.maxGear = nil
     car.movedRound = self.state.round
+    startMove(car)
     self:emit("info", string.format("%s rolls %s in %s gear", who, tostring(value), gearName(gear)), color)
 
     if self.rules.engineStrain[gear] == value then
@@ -374,6 +392,7 @@ function Race:blackDie(value, roller)
             car.gear = 1
             car.rolledGear = 1
             car.movedRound = self.state.round
+            startMove(car)
         end
     elseif check.kind == "grid" then
         car.gridRolls = car.gridRolls or {}

@@ -27,6 +27,7 @@ setup_packed = false
 local race
 local syncCars -- defined with the rest of the car handling, below
 local snapCar -- defined with the track, below
+local spaceUnder -- likewise
 local undo = {}
 local UNDO_LIMIT = 30
 
@@ -354,6 +355,8 @@ local function setCar(car, obj, verb)
     obj.setName(carName(car))
     obj.setColorTint(tintOf(car.color))
     obj.highlightOn(car.color, 4)
+    -- A car claimed where it stands may already be on the track.
+    race:placed(car.color, spaceUnder(obj))
     race:emit("info", race:label(car) .. " " .. verb, car.color)
 end
 
@@ -366,6 +369,7 @@ local function releaseCar(car)
     end
     car.tts.car = nil
     car.tts.carWas = nil
+    race:placed(car.color, nil)
 end
 
 --- Keep the names right as drivers join, leave or are renamed.
@@ -446,11 +450,13 @@ function onObjectDrop(color, obj)
                 end
             end
         end
-        snapCar(obj)
-        return
     end
-    if carOwning(obj.getGUID()) then
-        snapCar(obj)
+    local owner = carOwning(obj.getGUID())
+    if owner or CAR_NAMES[obj.getName()] then
+        local space = snapCar(obj)
+        if owner then
+            race:placed(owner.color, space and space.id)
+        end
         return
     end
     local car, kind = markerOwner(obj.getGUID())
@@ -652,6 +658,12 @@ function fdUndo(player)
         return
     end
     race = Race.new(Rules, JSON.decode(last))
+    -- Undo puts the race back, not the pieces: the board still says where
+    -- the cars are.
+    for _, car in ipairs(race:cars()) do
+        local obj = car.tts and car.tts.car and getObjectFromGUID(car.tts.car)
+        race:placed(car.color, obj and spaceUnder(obj))
+    end
     printToAll(player.steam_name .. " undid the last change", LEVEL_RGB.info)
     syncDashboards(true)
     refresh()
@@ -723,15 +735,19 @@ end
 local SNAP_REACH = 0.9
 -- How far above the board face a snapped car is set down; it drops from there.
 local SNAP_LIFT = 0.3
+-- How far from a space's centre a car counts as on it, in cells: half a
+-- cell is as far as a car can be from one space and still nearer to it.
+local ON_SPACE = 0.5
 
 --- A car put down on the track: settle it onto the nearest free space, facing
 -- the way the track runs. Advisory like the rest -- it only helps a car land
 -- neatly on a space the player chose, and does nothing off the track.
+-- Returns the space it went to, or nil.
 snapCar = function(obj)
     local tile = Track.tile()
     local track = tile and trackOnBoard()
     if not track then
-        return false
+        return nil
     end
     track = Editor.trackFor(track)
     local others = {}
@@ -743,12 +759,25 @@ snapCar = function(obj)
     end
     local space, pos, yaw = Track.snap(tile, track, obj.getPosition(), SNAP_REACH, others)
     if not space then
-        return false
+        return nil
     end
     obj.setPositionSmooth({ x = pos.x, y = pos.y + SNAP_LIFT, z = pos.z }, false, true)
     -- The car models' noses point along their local +Z.
     obj.setRotationSmooth({ x = 0, y = yaw, z = 0 }, false, true)
-    return true
+    return space
+end
+
+--- The id of the space a car is sitting on, without moving it; nil if it is
+-- off the track or there is no track data for the board.
+spaceUnder = function(obj)
+    local tile = Track.tile()
+    local track = tile and trackOnBoard()
+    if not track then
+        return nil
+    end
+    track = Editor.trackFor(track)
+    local s = Track.spaceNear(tile, Track.frame(tile, track), track, obj.getPosition(), ON_SPACE)
+    return s and s.id
 end
 
 local function pickUpAt(color, pos)

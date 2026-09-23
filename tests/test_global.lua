@@ -425,6 +425,64 @@ function T.a_car_put_down_off_the_track_stays_put()
     eq(car.rot.y, 17)
 end
 
+function T.the_race_knows_which_space_a_car_is_on()
+    local S = redRacing()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    S.beginner.click("fdDashCar", "Red")
+    local mine = getObjectFromGUID(state().cars.Red.tts.car)
+    local space = FDMonaco.spaces[100]
+    putNear(S, mine, space)
+    eq(state().cars.Red.space, space.id)
+
+    roll(S, 1, 2)
+    eq(state().cars.Red.moveFrom, space.id, "the move starts where the car was")
+    local nxt = FDMonaco.byId[space.next[1]]
+    putNear(S, mine, nxt)
+    eq(state().cars.Red.space, nxt.id)
+    eq(state().cars.Red.moveFrom, space.id)
+
+    mine.pos = S.vec(60, 1, 0)
+    onObjectDrop("Red", mine)
+    eq(state().cars.Red.space, nil, "off the track")
+
+    -- Somebody else's car, or nobody's, does not move Red.
+    putNear(S, mine, space)
+    local other = S.object("Formula 1 Solid", { pos = S.vec(0, 1, 40) })
+    putNear(S, other, FDMonaco.spaces[200])
+    eq(state().cars.Red.space, space.id)
+end
+
+function T.a_car_claimed_on_the_track_is_on_its_space()
+    local S = redRacing()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local space = FDMonaco.spaces[100]
+    local car = S.object("Formula 1 Solid", { pos = S.vec(0, 1, 40) })
+    putNear(S, car, space)
+    -- Nobody's car snaps too; claiming it, where it stands, finds it there.
+    -- Red sits by the track, so it is the nearest car.
+    local hand = Player.Red.getHandTransform().position
+    hand.x, hand.z = car.pos.x, car.pos.z - 3
+    S.beginner.click("fdDashCar", "Red")
+    eq(state().cars.Red.tts.car, car.guid)
+    eq(state().cars.Red.space, space.id)
+    S.beginner.click("fdDashLeave", "Red")
+    eq(state().cars.Red, nil)
+end
+
+function T.undo_keeps_the_cars_where_they_are()
+    local S = redRacing()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    S.beginner.click("fdDashCar", "Red")
+    local mine = getObjectFromGUID(state().cars.Red.tts.car)
+    local space = FDMonaco.spaces[100]
+    putNear(S, mine, space)
+    roll(S, 1, 2)
+    putNear(S, mine, FDMonaco.byId[space.next[1]])
+    fdUndo({ color = "Red", steam_name = "RedPlayer" })
+    eq(state().cars.Red.moveFrom, nil, "the roll is undone")
+    eq(state().cars.Red.space, space.next[1], "but the car is still where it was put")
+end
+
 function T.no_snapping_on_a_map_without_track_data()
     local S = world()
     local FDMonaco = require("fd.data.tracks.FDMonaco")
