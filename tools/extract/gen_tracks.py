@@ -23,7 +23,16 @@ def lit(v):
     return '"%s"' % v if isinstance(v, str) else str(v)
 
 
-def lua_track(track):
+def neighbours(pairs):
+    """{id: [ids]} from the pairs in a <id>.adjacency.json, both ways round."""
+    near = {}
+    for a, b in pairs:
+        near.setdefault(a, []).append(b)
+        near.setdefault(b, []).append(a)
+    return {k: sorted(v) for k, v in near.items()}
+
+
+def lua_track(track, near=None):
     L = [f"-- {BANNER.format(track['id'])}", "",
          "local T = {}", "",
          f'T.id = "{track["id"]}"',
@@ -74,6 +83,13 @@ def lua_track(track):
           "-- that steps onto one of these has crossed the line.",
           "T.finish = { line = {" + "".join(" " + lit(v) + "," for v in track.get("finish", {}).get("line", [])).rstrip(",") + (" } }" if track.get("finish", {}).get("line", []) else "} }"),
           "",
+          "-- The spaces touching each one, in any direction and whatever the",
+          "-- arrows say: from tracks/<id>.adjacency.json (find_adjacency.py).",
+          "-- A car ending its move rolls for a collision with each car in one.",
+          "T.near = {"]
+    for sid in sorted(near or {}):
+        L.append("    [{}] = {{ {} }},".format(lit(sid), ", ".join(lit(n) for n in near[sid])))
+    L += ["}", "",
           "T.byId = {}",
           "for _, s in ipairs(T.spaces) do",
           "    T.byId[s.id] = s",
@@ -85,16 +101,22 @@ def lua_track(track):
 
 def main():
     # tracks/<id>.json only: <id>.arrows.json beside it is a reading of the
-    # board's arrows, which find_arrows.py turns into the track's links.
+    # board's arrows, which find_arrows.py turns into the track's links, and
+    # <id>.adjacency.json the spaces that touch, read in below.
     files = sorted(f for f in TRACKS.glob("*.json") if f.stem.count(".") == 0)
     if not files:
         sys.exit("no track files in tracks/")
     OUT.mkdir(parents=True, exist_ok=True)
     for f in files:
         track = json.loads(f.read_text(encoding="utf-8"))
+        adjacency = TRACKS / f"{track['id']}.adjacency.json"
+        near = None
+        if adjacency.exists():
+            near = neighbours(json.loads(adjacency.read_text(encoding="utf-8"))["pairs"])
         path = OUT / f"{track['id']}.lua"
-        path.write_text(lua_track(track), encoding="utf-8")
-        print(f"{track['name']}: {len(track['spaces'])} spaces -> {path.relative_to(ROOT)}")
+        path.write_text(lua_track(track, near), encoding="utf-8")
+        print(f"{track['name']}: {len(track['spaces'])} spaces, {len(near or {})} with neighbours"
+              f" -> {path.relative_to(ROOT)}")
     return 0
 
 

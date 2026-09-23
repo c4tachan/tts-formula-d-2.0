@@ -39,6 +39,8 @@ function Race.new(rules, saved)
     s.order = s.order or {}
     s.cars = s.cars or {}
     s.checks = s.checks or {}
+    s.packs = s.packs or {} -- id -> collision record, see checkCollisions
+    s.lastPack = s.lastPack or 0
     s.laps = s.laps or 1
     s.finishers = s.finishers or {} -- colors, in the order they finished
     for _, car in pairs(s.cars) do
@@ -179,6 +181,7 @@ function Race:startMove(car, roll)
         from = car.space, roll = roll, stops = car.stops, occupied = occupied,
         charged = { brake = 0, overshoot = 0 }, -- spaces charged for so far
         crossed = false, -- whether a crossing of the line was counted for it
+        pack = nil,      -- id of the collisions it set off, see checkCollisions
     }
 end
 
@@ -232,8 +235,9 @@ end
 
 --- Judge where the car was put down against the roll: brake for spaces
 -- short, overshoot for a corner left too early, out for missing too many
--- stops, a lap for crossing the line. Put down again, it is judged again and
--- only the difference is charged. A space the roll cannot reach is warned
+-- stops, a lap for crossing the line, a collision check for each car it
+-- ends up next to. Put down again, it is judged again and only the
+-- difference is charged. A space the roll cannot reach is warned
 -- about and charged nothing -- the track data may be wrong, or the table may
 -- have ruled -- but still counts as crossing the line if the shortest way
 -- there does, so a disputed move cannot keep a car from finishing.
@@ -252,6 +256,7 @@ function Race:judgeMove(car, track)
         local any = Moves.reach(track, m.from, LINE_SEARCH)
         local way = any and any[car.space]
         self:crossLine(car, way and way.crossed or false)
+        self:checkCollisions(car, track)
         return
     end
     car.stops = o.stops
@@ -266,6 +271,126 @@ function Race:judgeMove(car, track)
     self:checkElimination(car)
     -- Last, so a car that goes out on the move does not take the flag.
     self:crossLine(car, o.crossed)
+    self:checkCollisions(car, track)
+end
+
+--- Which cars touch which, among the pack `car` is in: every car it can
+-- be reached from through cars touching (`track.near`), as color -> colors
+-- in race order. Cars out of the race or finished are not on the track.
+function Race:pack(car, track)
+    local near = track.near
+    local running = {}
+    for _, o in ipairs(self:cars()) do
+        if o.space and not o.eliminated and not o.place then running[#running + 1] = o end
+    end
+    local function touching(o)
+        local spaces, out = {}, {}
+        for _, id in ipairs(near and near[o.space] or {}) do spaces[id] = true end
+        for _, p in ipairs(running) do
+            if p ~= o and spaces[p.space] then out[#out + 1] = p.color end
+        end
+        return out
+    end
+    local pack, todo = {}, { car }
+    while #todo > 0 do
+        local o = table.remove(todo)
+        if not pack[o.color] then
+            pack[o.color] = touching(o)
+            for _, color in ipairs(pack[o.color]) do
+                todo[#todo + 1] = self:car(color)
+            end
+        end
+    end
+    return pack
+end
+
+--- `car` rolls for a collision with the car of color `with`, as part of
+-- the contact recorded as pack `id` -- unless it already has.
+function Race:queueCollision(car, with, id)
+    local done = self.state.packs[id].pairs
+    local key = car.color .. ">" .. with
+    if done[key] then
+        return
+    end
+    if self:queueCheck(car, "collision", with, id) then
+        done[key] = "queued"
+    end
+end
+
+--- The move ended among other cars: it rolls once against each car it
+-- touches, and each roll spreads (see Race:collided) until every pair of
+-- touching cars in the pack has rolled twice, once each way.
+--
+-- What touched what is recorded when the move is judged, as a pack in
+-- `state.packs` that its checks point to: the rolls it sets off can come in
+-- long after the mover has moved on. Put down again, the pack is redrawn,
+-- and the mover's own checks for cars it no longer touches are dropped if
+-- not yet rolled; what was rolled stands.
+function Race:checkCollisions(car, track)
+    local s, m = self.state, car.move
+    if not m.pack or not s.packs[m.pack] then
+        s.lastPack = s.lastPack + 1
+        m.pack = "p" .. s.lastPack
+        s.packs[m.pack] = { touching = {}, pairs = {} }
+    end
+    local pack = s.packs[m.pack]
+    pack.touching = {}
+    if not car.eliminated and not car.place then
+        pack.touching = self:pack(car, track)
+    end
+    local wanted = {}
+    for _, color in ipairs(pack.touching[car.color] or {}) do wanted[color] = true end
+    local checks = s.checks
+    for i = #checks, 1, -1 do
+        local c = checks[i]
+        local key = c.with and (c.color .. ">" .. c.with)
+        if c.color == car.color and c.pack == m.pack and key and not wanted[c.with]
+                and pack.pairs[key] == "queued" then
+            table.remove(checks, i)
+            pack.pairs[key] = nil
+            local other = self:car(c.with)
+            self:emit("info", string.format("%s is no longer next to %s -- collision check dropped",
+                self:label(car), other and self:label(other) or c.with), car.color)
+        end
+    end
+    for _, color in ipairs(pack.touching[car.color] or {}) do
+        self:queueCollision(car, color, m.pack)
+    end
+    self:prunePacks()
+end
+
+--- A collision check was rolled: the car it was against rolls back, and
+-- against every other car touching it, so the contact spreads through the
+-- pack.
+function Race:collided(check)
+    local pack = self.state.packs[check.pack]
+    if not pack then
+        return
+    end
+    pack.pairs[check.color .. ">" .. check.with] = "rolled"
+    local hit = self:car(check.with)
+    if hit and not hit.eliminated and not hit.place then
+        self:queueCollision(hit, check.color, check.pack)
+        for _, color in ipairs(pack.touching[hit.color] or {}) do
+            self:queueCollision(hit, color, check.pack)
+        end
+    end
+    self:prunePacks()
+end
+
+--- Forget the packs nothing needs: no check waiting on one, and no car
+-- whose move could be put down again and redraw it.
+function Race:prunePacks()
+    local s, used = self.state, {}
+    for _, c in ipairs(s.checks) do
+        if c.pack then used[c.pack] = true end
+    end
+    for _, car in pairs(s.cars) do
+        if car.move and car.move.pack then used[car.move.pack] = true end
+    end
+    for id in pairs(s.packs) do
+        if not used[id] then s.packs[id] = nil end
+    end
 end
 
 -- Laps and the finish -------------------------------------------------------
@@ -619,15 +744,29 @@ end
 
 -- Black die checks ------------------------------------------------------------
 
-function Race:queueCheck(car, kind)
+--- What a check is for, to show: "collision with Blue".
+function Race:checkName(c)
+    local name = self.rules.checks[c.kind].name
+    local other = c.with and self:car(c.with)
+    if c.with then
+        name = name .. " with " .. (other and self:label(other) or c.with)
+    end
+    return name
+end
+
+--- Ask `car` to roll the black die for a `kind` check. A collision can be
+-- against the car of color `with`, part of the contact recorded as
+-- `state.packs[pack]`. Not twice for the same.
+function Race:queueCheck(car, kind, with, pack)
     for _, c in ipairs(self.state.checks) do
-        if c.color == car.color and c.kind == kind then
+        if c.color == car.color and c.kind == kind and c.with == with then
             return false
         end
     end
-    self.state.checks[#self.state.checks + 1] = { color = car.color, kind = kind }
+    local c = { color = car.color, kind = kind, with = with, pack = pack }
+    self.state.checks[#self.state.checks + 1] = c
     self:emit("info", string.format("%s: roll the black die (%s check)",
-        self:label(car), self.rules.checks[kind].name), car.color)
+        self:label(car), self:checkName(c)), car.color)
     return true
 end
 
@@ -669,6 +808,9 @@ function Race:blackDie(value, roller)
     local outcome = self.rules.checks[check.kind].resolve(value)
     self:emit(outcome.wear and "warn" or "info", string.format("%s rolls %s on the black die: %s",
         self:label(car), tostring(value), outcome.text), car.color)
+    if check.kind == "collision" and check.with and check.pack then
+        self:collided(check)
+    end
 
     if check.kind == "start" then
         if outcome.stall then
@@ -753,6 +895,7 @@ function Race:startRace()
     s.phase = "race"
     s.round = 1
     s.checks = {}
+    s.packs = {}
     s.finishers = {}
     for _, car in ipairs(self:cars()) do
         resetCar(self.rules, car)
@@ -789,6 +932,7 @@ function Race:reset()
     s.phase = "setup"
     s.round = 0
     s.checks = {}
+    s.packs = {}
     s.finishers = {}
     for _, car in ipairs(self:cars()) do
         resetCar(self.rules, car)

@@ -213,7 +213,7 @@ local function dashLabel(car)
     end
     for _, c in ipairs(race:pendingChecks()) do
         if c.color == car.color then
-            parts[#parts + 1] = "ROLL BLACK DIE (" .. race.rules.checks[c.kind].name .. ")"
+            parts[#parts + 1] = "ROLL BLACK DIE (" .. race:checkName(c) .. ")"
             break
         end
     end

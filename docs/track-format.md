@@ -178,6 +178,20 @@ Elsewhere links are worked out from positions and facings
 (`fd.core.trackgraph`), the same rules the in-game editor uses; a space whose
 links were set by hand, or read off an arrow, keeps them (`fixed`).
 
+`tools/extract/find_adjacency.py` answers a different question from the
+links: which spaces touch, in any direction and whatever the arrows say. That
+is what a collision check needs -- a car ending its move rolls the black die
+once for each car on a space touching its own, and the contact spreads through
+the cars touching those until every touching pair has rolled once each way.
+Each patch of road goes to its nearest space, and two spaces touch when their
+patches share an edge and the line between them crosses no kerb (which keeps
+the two legs of a hairpin apart). The next space along the same lane always counts, since the lanes
+either side pinch that border to nothing. It reads the spaces from
+`tracks/<id>.json` as edited and writes the pairs to
+`tracks/<id>.adjacency.json`, which `gen_tracks.py` turns into `T.near` in the
+Lua module. Rerun both after moving spaces. The check image goes to
+`out/<id>_adjacency.png`.
+
 Tracks are expected to need hand correction after extraction -- the editor in
 TTS is for that, and `tools/extract/import_track.py` brings the result back
 from a saved game. The advisory enforcement model means an imperfect track file

@@ -154,7 +154,7 @@ local function checkLine(race)
         local car = race:car(c.color)
         if car then
             parts[#parts + 1] = string.format("<color=%s>%s</color> (%s)",
-                HEX[c.color] or "#FFFFFF", race:label(car), race.rules.checks[c.kind].name)
+                HEX[c.color] or "#FFFFFF", race:label(car), race:checkName(c))
         end
     end
     if #parts == 0 then

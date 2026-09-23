@@ -53,6 +53,7 @@ function Editor.trackFor(track)
         id = track.id, name = track.name, ruleset = track.ruleset, lanes = track.lanes,
         laps = track.laps, image = track.image, outer = track.outer, spaces = e.spaces,
         corners = track.corners, start = e.start or track.start,
+        finish = track.finish, near = track.near,
     }
 end
 

@@ -387,6 +387,188 @@ function T.cars_in_the_way_are_where_they_were_at_the_roll()
     assert(hasEvent(r, "warn", "not a legal"), "Blue was there")
 end
 
+-- Collisions ------------------------------------------------------------------
+
+--- Two lanes, i0 .. i9 and o0 .. o9, side by side, each space touching the
+-- ones ahead, behind and beside it, diagonals included.
+local function twoLanes()
+    local track = { corners = {}, spaces = {}, near = {} }
+    for k = 0, 9 do
+        track.spaces[#track.spaces + 1] = { id = "i" .. k, lane = 1, next = { "i" .. (k + 1), "o" .. (k + 1) } }
+        track.spaces[#track.spaces + 1] = { id = "o" .. k, lane = 2, next = { "o" .. (k + 1), "i" .. (k + 1) } }
+        for _, l in ipairs({ { "i", "o" }, { "o", "i" } }) do
+            local near = { l[2] .. k }
+            for _, d in ipairs({ -1, 1 }) do
+                if k + d >= 0 and k + d <= 9 then
+                    near[#near + 1] = l[1] .. (k + d)
+                    near[#near + 1] = l[2] .. (k + d)
+                end
+            end
+            track.near[l[1] .. k] = near
+        end
+    end
+    return track
+end
+
+local function collisionChecks(r, color)
+    local out = {}
+    for _, c in ipairs(r:pendingChecks()) do
+        if c.color == color and c.kind == "collision" then out[#out + 1] = c.with or "manual" end
+    end
+    table.sort(out)
+    return table.concat(out, ",")
+end
+
+--- Roll the black die for every check as it comes, `value` each time,
+-- until none are left; returns how many times each "roller>other" came up.
+local function rollAll(r, value)
+    local rolled = {}
+    for _ = 1, 100 do
+        local c = r:pendingChecks()[1]
+        if not c then return rolled end
+        local key = c.color .. ">" .. tostring(c.with)
+        rolled[key] = (rolled[key] or 0) + 1
+        r:blackDie(value, c.color)
+    end
+    error("the checks never ran out")
+end
+
+function T.ending_beside_cars_rolls_once_for_each()
+    local track = twoLanes()
+    local r = started("Red", "Blue", "Grey", "Green")
+    r:placed("Red", "i0")
+    r:placed("Blue", "o3")  -- beside where Red ends
+    r:placed("Grey", "i3")  -- directly ahead
+    r:placed("Green", "o6") -- nowhere near
+    r:rolled("Red", 1, 2)
+    r:placed("Red", "i2", track)
+    eq(collisionChecks(r, "Red"), "Blue,Grey")
+    assert(hasEvent(r, "info", "Red: roll the black die %(collision with Blue check%)"))
+    r:blackDie(3, "Red")
+    r:blackDie(15, "Red")
+    eq(r:car("Red").wear.wp, 17, "one roll lost a point, the other did not")
+    eq(collisionChecks(r, "Red"), "")
+end
+
+function T.a_collision_roll_spreads_until_each_pair_has_rolled_twice()
+    -- A chain: Red ends touching Blue, Blue touches Grey, Grey touches
+    -- Green. Nobody else touches Red, and Purple is clear of them all.
+    local track = twoLanes()
+    local r = started("Red", "Blue", "Grey", "Green", "Purple")
+    r:placed("Red", "i0")
+    r:placed("Blue", "i3")
+    r:placed("Grey", "i4")
+    r:placed("Green", "o5")
+    r:placed("Purple", "i9")
+    r:rolled("Red", 1, 2)
+    r:placed("Red", "i2", track)
+    eq(collisionChecks(r, "Red"), "Blue", "the mover only rolls for cars it touches")
+    eq(collisionChecks(r, "Blue"), "", "nobody else rolls until the mover has")
+    r:blackDie(10, "Red")
+    eq(collisionChecks(r, "Blue"), "Grey,Red", "Blue rolls back, and against Grey")
+    local rolled = rollAll(r, 10)
+    rolled["Red>Blue"] = 1
+    local keys = {}
+    for k, n in pairs(rolled) do
+        eq(n, 1, k .. " rolled once")
+        keys[#keys + 1] = k
+    end
+    table.sort(keys)
+    eq(table.concat(keys, " "), "Blue>Grey Blue>Red Green>Grey Grey>Blue Grey>Green Red>Blue")
+    eq(r:car("Purple").wear.wp, 18)
+end
+
+function T.rolls_owed_survive_the_mover_moving_on()
+    local track = twoLanes()
+    local r = started("Red", "Blue")
+    r:placed("Red", "i0")
+    r:placed("Blue", "o3")
+    r:rolled("Red", 1, 2)
+    r:placed("Red", "i2", track)
+    r:blackDie(10, "Red")
+    eq(collisionChecks(r, "Blue"), "Red")
+    -- Red is off on its next move, clear of everyone, before Blue rolls back.
+    r:rolled("Red", 2, 4)
+    r:placed("Red", "i6", track)
+    r:blackDie(10, "Blue")
+    eq(collisionChecks(r, "Red"), "", "Red already rolled against Blue")
+    eq(#r:pendingChecks(), 0)
+    local n = 0
+    for _ in pairs(r:serialize().packs) do n = n + 1 end
+    eq(n, 1, "only the pack Red's open move could redraw is kept")
+end
+
+function T.collision_state_survives_a_round_trip()
+    local track = twoLanes()
+    local r = started("Red", "Blue")
+    r:placed("Red", "i0")
+    r:placed("Blue", "o3")
+    r:rolled("Red", 1, 2)
+    r:placed("Red", "i2", track)
+    r = Race.new(Rules, r:serialize())
+    r:blackDie(10, "Red")
+    eq(collisionChecks(r, "Blue"), "Red", "the roll back still comes after a reload")
+end
+
+function T.every_car_in_the_pack_pays_for_its_own_rolls()
+    local track = twoLanes()
+    local r = started("Red", "Blue", "Grey")
+    r:placed("Red", "i0")
+    r:placed("Blue", "o3")
+    r:placed("Grey", "i3")
+    r:rolled("Red", 1, 2)
+    r:placed("Red", "i2", track)
+    rollAll(r, 1)
+    -- All three touch each other: two rolls each, both lost.
+    eq(r:car("Red").wear.wp, 16)
+    eq(r:car("Blue").wear.wp, 16)
+    eq(r:car("Grey").wear.wp, 16)
+end
+
+function T.moving_away_drops_the_checks_not_yet_rolled()
+    local track = twoLanes()
+    local r = started("Red", "Blue", "Grey")
+    r:placed("Red", "i0")
+    r:placed("Blue", "o3")
+    r:placed("Grey", "i3")
+    r:rolled("Red", 2, 3)
+    r:placed("Red", "i2", track)
+    eq(collisionChecks(r, "Red"), "Blue,Grey")
+    r:blackDie(10, "Red") -- Blue's, rolled
+    r:drain()
+    r:placed("Red", "o1", track)
+    eq(collisionChecks(r, "Red"), "", "Grey's dropped; Blue's already rolled")
+    assert(hasEvent(r, "info", "no longer next to Grey"))
+    r:placed("Red", "i2", track)
+    eq(collisionChecks(r, "Red"), "Grey", "back beside Grey; Blue is not rolled for twice")
+end
+
+function T.cars_out_or_finished_are_not_hit()
+    local track = twoLanes()
+    local r = started("Red", "Blue", "Grey")
+    r:placed("Red", "i0")
+    r:placed("Blue", "o3")
+    r:placed("Grey", "i3")
+    r:car("Blue").eliminated = true
+    r:car("Grey").place = 1
+    r:rolled("Red", 1, 2)
+    r:placed("Red", "i2", track)
+    eq(collisionChecks(r, "Red"), "")
+end
+
+function T.no_neighbour_data_means_no_automatic_checks()
+    local track = twoLanes()
+    track.near = nil
+    local r = started("Red", "Blue")
+    r:placed("Red", "i0")
+    r:placed("Blue", "o2")
+    r:rolled("Red", 1, 2)
+    r:placed("Red", "i2", track)
+    eq(collisionChecks(r, "Red"), "")
+    r:requestCheck("Red", "collision")
+    eq(collisionChecks(r, "Red"), "manual", "the button still works")
+end
+
 -- Laps and the finish ---------------------------------------------------------
 
 --- A one-lane loop of 20 cells, c0 .. c19, with the line just before c0.
