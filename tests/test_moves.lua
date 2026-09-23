@@ -180,4 +180,39 @@ function T.monaco_straight_and_corner()
     eq(r["m.c3.1"].stops, 0)
 end
 
+function T.stepping_onto_the_line_crosses_it()
+    local track = road(12)
+    track.finish = { line = { "i4", "o4" } }
+    local r = Moves.reach(track, "i2", 4)
+    eq(r.i3.crossed, false, "short of the line")
+    eq(r.i4.crossed, true, "onto the line")
+    eq(r.i6.crossed, true, "past it")
+    eq(r.o4.crossed, true, "onto it in the other lane")
+    r = Moves.reach(track, "i4", 3)
+    eq(r.i6.crossed, false, "starting on it is not crossing it")
+    eq(Moves.reach(road(12), "i2", 4).i6.crossed, false, "a track without a line")
+end
+
+function T.monaco_finish_line()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local line = {}
+    for _, id in ipairs(FDMonaco.finish.line) do line[id] = true end
+    eq(#FDMonaco.finish.line, 3, "a space past the line in each lane")
+    -- No link hops over the line: every way into s1 lands on it.
+    for _, s in ipairs(FDMonaco.spaces) do
+        for _, n in ipairs(s.next) do
+            if s.sector ~= "s1" and FDMonaco.byId[n].sector == "s1" then
+                assert(line[n], s.id .. " -> " .. n .. " enters s1 past the line")
+            end
+        end
+    end
+    -- Pole sits right behind it; the grid's back row is further off.
+    local r = Moves.reach(FDMonaco, FDMonaco.start[1], 2)
+    eq(r["o.s1.0"].crossed, true)
+    r = Moves.reach(FDMonaco, FDMonaco.start[#FDMonaco.start], 4)
+    for id, o in pairs(r) do
+        eq(o.crossed, false, id)
+    end
+end
+
 return T

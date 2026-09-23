@@ -1,7 +1,7 @@
 # Track data format
 
-*Monaco is the first track through the pipeline; its grid is marked, but
-`finish` and `pit` are still empty there, and will settle once they are
+*Monaco is the first track through the pipeline; its grid and finish line
+are marked, but `pit` is still empty there, and will settle once it is
 filled in.*
 
 Everything in objectives 3 and 5 (snapping, facings, movement limits,
@@ -64,7 +64,7 @@ the only thing needing measurement in game is the tile itself — not each track
   ],
 
   "start": ["m.s11.4", "i.s11.3"], // grid positions, pole first (below)
-  "finish": { "line": [1, 2, 3] },
+  "finish": { "line": ["i.s1.0", "m.s1.0", "o.s1.0"] }, // (below)
 
   "pit": {                       // omitted on tracks without a pit lane
     "entry": 210,
@@ -89,6 +89,16 @@ A space's id is its code, `<lane>.<sector>.<n>`, given by
   edge, counting up in running order. At the finish line that is the cell the
   checkered band crosses; where the band lies on a cell boundary, as in a lane
   staggered against the others, it is the cell just past it.
+
+## The finish line
+
+`finish.line` is the line as the space just past it in each lane: the `n = 0`
+cell of `s1`, which is where the space codes start counting. A move that
+steps onto one of these has crossed the line (`crossed` on each option from
+`fd.core.moves`); starting on one does not count. That takes every link over
+the line to land on one of them, never further into `s1`, which
+`tests/test_moves.lua` checks for Monaco. `find_corners.py` writes it along
+with the codes.
 
 ## The starting grid
 

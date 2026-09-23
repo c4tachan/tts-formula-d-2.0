@@ -540,6 +540,10 @@ T.corners = {
 -- The starting grid, pole first.
 T.start = { "o.s11.15", "i.s11.15", "o.s11.12", "i.s11.12", "o.s11.9", "i.s11.9", "o.s11.6", "i.s11.6", "o.s11.3", "i.s11.3" }
 
+-- The finish line, as the space just past it in each lane: a move
+-- that steps onto one of these has crossed the line.
+T.finish = { line = { "i.s1.0", "m.s1.0", "o.s1.0" } }
+
 T.byId = {}
 for _, s in ipairs(T.spaces) do
     T.byId[s.id] = s

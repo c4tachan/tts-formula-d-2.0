@@ -29,7 +29,9 @@ local function index(track)
     for _, s in ipairs(track.spaces) do byId[s.id] = s end
     local stops = {}
     for _, c in ipairs(track.corners or {}) do stops[c.id] = c.stops end
-    return byId, stops
+    local line = {}
+    for _, id in ipairs(track.finish and track.finish.line or {}) do line[id] = true end
+    return byId, stops, line
 end
 
 --- The spaces the car on `fromId` can end its move on, having rolled `roll`.
@@ -51,10 +53,12 @@ end
 --   stops     stops made in the corner it ends in, this one included;
 --             0 outside a corner or when the stop does not count
 --   path      the ids stepped on, `fromId` first
+--   crossed   true if the move crossed the finish line: stepped onto one of
+--             `track.finish.line`, the space just past it in each lane
 -- Returns nil if `fromId` is not on the track.
 function Moves.reach(track, fromId, roll, opts)
     opts = opts or {}
-    local byId, need = index(track)
+    local byId, need, line = index(track)
     local from = byId[fromId]
     if not from then
         return nil
@@ -84,8 +88,12 @@ function Moves.reach(track, fromId, roll, opts)
     local function finish(st, moved)
         local o = outcome(st, moved)
         local path, at = {}, st
+        o.crossed = false
         while at do
             table.insert(path, 1, at.space.id)
+            if at.prev and line[at.space.id] then
+                o.crossed = true
+            end
             at = at.prev
         end
         o.path = path

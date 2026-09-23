@@ -23,6 +23,9 @@ A space's code, which is its id, is <lane>.<sector>.<n>:
 Links, and the reading in tracks/<id>.arrows.json, are carried over to the new
 codes, so the file stays whole however often this is run.
 
+The finish line is written as those n = 0 cells of s1, one per lane: a move
+that steps onto one has crossed it.
+
 Stop counts are printed on the board in the corner flags, which is a job for
 eyes rather than code: every corner is cropped to out/_work/<id>_flag_<n>.png
 with its flag in view, and the counts read off them are passed back in.
@@ -367,6 +370,10 @@ def main():
     track["corners"] = corners
     codes = assign_codes(spaces, where, ring, band)
     recode(track, codes, ROOT / "tracks" / f"{map_id}.arrows.json")
+    # The finish line is where the codes start counting: the first cell of
+    # s1 in each lane, the one at or just past the band.
+    track["finish"] = {**track.get("finish", {}),
+                       "line": [s["id"] for s in track["spaces"] if s["id"].split(".")[1:] == ["s1", "0"]]}
     per = Counter(c.rsplit(".", 1)[0] for c in codes.values())
     print("4. codes given: %d spaces, %d lane-sectors, e.g. %s" % (len(codes), len(per), ", ".join(
         s["id"] for s in track["spaces"][:3])))
