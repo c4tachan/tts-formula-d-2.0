@@ -355,6 +355,20 @@ function T.missing_two_stops_is_out_and_a_correction_brings_it_back()
     eq(r:car("Red").wear.wp, 16, "braked 2, stopped in the corner")
 end
 
+function T.reachable_is_what_the_move_will_be_judged_by()
+    local track = lane(20, { 2, 6, 2 })
+    local r = started("Red")
+    eq(r:reachable("Red", track), nil, "no move open")
+    r:placed("Red", "c0")
+    r:rolled("Red", 3, 8)
+    eq(r.opened, "Red", "the Global script is told a move opened")
+    local reach = r:reachable("Red", track)
+    eq(reach.c8.missed, 2)
+    assert(r:moveOut(reach.c8), "through a 2-stop corner without stopping is out")
+    assert(not r:moveOut(reach.c6))
+    eq(reach.c6.brake, 2)
+end
+
 function T.cars_in_the_way_are_where_they_were_at_the_roll()
     -- Two lanes wide, Blue sitting in Red's lane.
     local track = { corners = {}, spaces = {} }

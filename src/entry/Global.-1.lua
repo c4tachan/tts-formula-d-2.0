@@ -30,6 +30,8 @@ local race
 local syncCars -- defined with the rest of the car handling, below
 local snapCar -- defined with the track, below
 local spaceUnder -- likewise
+local showReach -- likewise
+local clearReach -- likewise
 local undo = {}
 local UNDO_LIMIT = 30
 
@@ -234,9 +236,14 @@ local function act(fn)
         table.remove(undo, 1)
     end
     fn()
+    local opened = race.opened
+    race.opened = nil
     relay(race:drain())
     syncDashboards()
     refresh()
+    if opened then
+        showReach(opened)
+    end
 end
 
 local function handPosition(color)
@@ -285,6 +292,7 @@ function onObjectRandomize(obj, color)
     if gear then
         Dice.watch(obj, color, function(value, roller)
             if value then
+                clearReach()
                 act(function() race:rolled(ownerOf(roller, gear), gear, value) end)
             end
         end)
@@ -409,6 +417,8 @@ local function markerOwner(guid)
 end
 
 local function shiftTo(color, gear)
+    -- A shift starts somebody's turn: the last move's options are done with.
+    clearReach()
     act(function() race:shift(color, gear) end)
     local pos = dicePosition(color)
     if pos then
@@ -641,11 +651,13 @@ end
 
 function fdStart(player)
     printToAll(player.steam_name .. " starts the race", LEVEL_RGB.info)
+    clearReach()
     act(function() race:startRace() end)
 end
 
 function fdReset(player)
     printToAll(player.steam_name .. " reset the race (Undo restores it)", LEVEL_RGB.info)
+    clearReach()
     act(function() race:reset() end)
 end
 
@@ -656,6 +668,7 @@ function fdUndo(player)
         return
     end
     race = Race.new(Rules, JSON.decode(last))
+    clearReach()
     -- Undo puts the race back, not the pieces: the board still says where
     -- the cars are.
     for _, car in ipairs(race:cars()) do
@@ -741,13 +754,22 @@ local ON_SPACE = 0.5
 -- the way the track runs. Advisory like the rest -- it only helps a car land
 -- neatly on a space the player chose, and does nothing off the track.
 -- Returns the space it went to and the track it is on, or nil.
-snapCar = function(obj)
+--- The board tile and the track data for the map on it (with any edits
+-- made in the editor), or nil if there is none.
+local function boardTrack()
     local tile = Track.tile()
     local track = tile and trackOnBoard()
     if not track then
         return nil
     end
-    track = Editor.trackFor(track)
+    return tile, Editor.trackFor(track)
+end
+
+snapCar = function(obj)
+    local tile, track = boardTrack()
+    if not track then
+        return nil
+    end
     local others = {}
     for _, c in ipairs(race:cars()) do
         local o = c.tts and c.tts.car ~= obj.getGUID() and c.tts.car and getObjectFromGUID(c.tts.car)
@@ -768,14 +790,45 @@ end
 --- The id of the space a car is sitting on, without moving it; nil if it is
 -- off the track or there is no track data for the board.
 spaceUnder = function(obj)
-    local tile = Track.tile()
-    local track = tile and trackOnBoard()
+    local tile, track = boardTrack()
     if not track then
         return nil
     end
-    track = Editor.trackFor(track)
     local s = Track.spaceNear(tile, Track.frame(tile, track), track, obj.getPosition(), ON_SPACE)
     return s and s.id
+end
+
+--- Mark where the car of `color` can end the move it has just opened: a
+-- green ring for the full roll, amber dots for braking, orange for an
+-- overshoot and red for going out. Advisory: nothing stops a car going
+-- anywhere else.
+showReach = function(color)
+    local tile, track = boardTrack()
+    local reach = track and race:reachable(color, track)
+    if not reach then
+        clearReach()
+        return
+    end
+    local from = race:car(color).move.from
+    local marks = {}
+    for id, o in pairs(reach) do
+        if id ~= from then
+            local kind = "free"
+            if race:moveOut(o) then
+                kind = "out"
+            elseif o.overshoot > 0 then
+                kind = "overshoot"
+            elseif o.brake > 0 then
+                kind = "brake"
+            end
+            marks[#marks + 1] = { id = id, kind = kind }
+        end
+    end
+    Track.setLayer("reach", Track.marks(tile, track, marks))
+end
+
+clearReach = function()
+    Track.setLayer("reach", nil)
 end
 
 local function pickUpAt(color, pos)

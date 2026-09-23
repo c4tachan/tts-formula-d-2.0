@@ -508,6 +508,48 @@ function T.a_car_put_down_after_its_roll_is_charged_for_the_move()
     assert(S.logged("not a legal 2"))
 end
 
+--- The board's vector lines, counted by colour: green rings, amber dots.
+local function marksOn(S)
+    local n = { free = 0, brake = 0, other = 0 }
+    for _, l in ipairs(S.board.lines or {}) do
+        local c = l.color
+        if c[1] == 0.25 and c[2] == 1 then
+            n.free = n.free + 1
+        elseif c[1] == 1 and c[2] == 0.75 then
+            n.brake = n.brake + 1
+        else
+            n.other = n.other + 1
+        end
+    end
+    return n
+end
+
+function T.a_roll_marks_where_the_car_can_go()
+    local S = redRacing()
+    redOn(S, "m.s2.5")
+    roll(S, 1, 2)
+    local n = marksOn(S)
+    eq(n.free, 3, "a full roll ends one space on in each lane")
+    eq(n.brake, 3, "and one short in each")
+    eq(n.other, 0)
+    -- The next shift starts a turn: the marks go.
+    dropOn(S, S.find("Gear Stick"), "gear", 2)
+    eq(#S.board.lines, 0)
+end
+
+function T.marks_and_the_track_overlay_share_the_board()
+    local S = redRacing()
+    redOn(S, "m.s2.5")
+    fdTrack({ color = "Red", steam_name = "RedPlayer" })
+    local overlay = #S.board.lines
+    roll(S, 1, 2)
+    eq(#S.board.lines, overlay + 6, "marks drawn over the overlay")
+    fdTrack({ color = "Red", steam_name = "RedPlayer" })
+    eq(#S.board.lines, 6, "the overlay goes, the marks stay")
+    fdUndo({ color = "Red", steam_name = "RedPlayer" })
+    eq(#S.board.lines, 0, "undo clears them")
+end
+
 function T.undo_keeps_the_cars_where_they_are()
     local S = redRacing()
     local FDMonaco = require("fd.data.tracks.FDMonaco")

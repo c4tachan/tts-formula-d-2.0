@@ -66,6 +66,25 @@ measure("shift gear (drop the gear stick)", S, function()
     stick.pos = S.vec(p.x, p.y, p.z)
     onObjectDrop("Red", stick)
 end)
+do
+    local Track = require("fd.tts.track")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local function putOn(obj, id)
+        local s = FDMonaco.byId[id]
+        obj.pos = Track.worldOf(S.board, FDMonaco, s.pos[1], s.pos[2])
+        onObjectDrop("Red", obj)
+    end
+    S.dashes.Red.click("fdDashCar", "Red")
+    local car = getObjectFromGUID(onSave().json.race.cars.Red.tts.car)
+    putOn(car, "m.s2.5")
+    measure("roll a gear die (marks where it can go)", S, function()
+        local die = nil
+        for _, o in ipairs(S.objects) do if o.name == "First Gear Dice" then die = o break end end
+        die.value = 2
+        onObjectRandomize(die, "Red")
+    end)
+    measure("put the car down (judges the move)", S, function() putOn(car, "m.s2.6") end)
+end
 measure("show the track (ghost cars)", S, function() fdTrack({ color = "Red", steam_name = "host" }) end)
 fdTrack({ color = "Red", steam_name = "host" })
 measure("open the track editor", S, function() fdEdit({ color = "Red", steam_name = "host" }) end)

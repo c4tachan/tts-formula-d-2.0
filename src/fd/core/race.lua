@@ -148,10 +148,34 @@ function Race:startMove(car, roll)
             occupied[#occupied + 1] = o.space
         end
     end
+    -- Not state: lets the Global script show the new move's options.
+    self.opened = car.color
     car.move = {
         from = car.space, roll = roll, stops = car.stops, occupied = occupied,
         charged = { brake = 0, overshoot = 0 }, -- spaces charged for so far
     }
+end
+
+--- Where the car of `color` can end the move it has open, as Moves.reach
+-- gives it (space id -> option), with this ruleset's costs; nil if it has
+-- no move open or started off the track data.
+function Race:reachable(color, track)
+    local car = self:car(color)
+    local m = car and car.move
+    if not m then
+        return nil
+    end
+    local occupied = {}
+    for _, id in ipairs(m.occupied) do occupied[id] = true end
+    return Moves.reach(track, m.from, m.roll, {
+        occupied = occupied, stops = m.stops,
+        cost = function(o) return self:moveCost(o) end,
+    })
+end
+
+--- Whether ending a move as `o` (a Moves.reach option) puts the car out.
+function Race:moveOut(o)
+    return self.rules.overshootOut(o.missed)
 end
 
 --- How bad ending a move this way is, to choose between two ways there.
@@ -160,7 +184,7 @@ function Race:moveCost(o)
     for _, wear in ipairs({ rules.brakeWear(o.brake), rules.overshootWear(o.overshoot) }) do
         for _, pts in pairs(wear) do total = total + pts end
     end
-    if rules.overshootOut(o.missed) then
+    if self:moveOut(o) then
         total = total + 1000
     end
     return total
@@ -187,12 +211,7 @@ end
 -- nothing -- the track data may be wrong, or the table may have ruled.
 function Race:judgeMove(car, track)
     local m = car.move
-    local occupied = {}
-    for _, id in ipairs(m.occupied) do occupied[id] = true end
-    local reach = Moves.reach(track, m.from, m.roll, {
-        occupied = occupied, stops = m.stops,
-        cost = function(o) return self:moveCost(o) end,
-    })
+    local reach = self:reachable(car.color, track)
     local o = reach and reach[car.space]
     local who = self:label(car)
     if not o then
@@ -209,7 +228,7 @@ function Race:judgeMove(car, track)
     self:chargeMove(car, "overshoot", o.overshoot,
         string.format("overshot corner %s by %d", tostring(o.corner), o.overshoot))
     local crash = nil
-    if self.rules.overshootOut(o.missed) then
+    if self:moveOut(o) then
         crash = o.corner
     end
     car.crashed = crash

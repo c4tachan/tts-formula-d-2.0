@@ -239,6 +239,64 @@ function Track.overlay(tile, track, flagged, links)
     return lines
 end
 
+-- Marks on single spaces, by kind: rings where a move can end, small dots
+-- where it only gets by braking. In image pixels.
+local MARKS = {
+    free = { colour = { 0.25, 1, 0.35 }, radius = 13 },
+    brake = { colour = { 1, 0.75, 0.2 }, radius = 5 },
+    overshoot = { colour = { 1, 0.45, 0.1 }, radius = 13 },
+    out = { colour = { 1, 0.15, 0.15 }, radius = 13 },
+}
+
+--- A mark on each space listed in `marks` ({ id, kind } with a kind from
+-- MARKS), as an octagon round its centre.
+function Track.marks(tile, track, marks)
+    local thickness = THICKNESS / math.max(tile.getScale().x, 0.001)
+    local f = Track.frame(tile, track)
+    local byId = {}
+    for _, s in ipairs(track.spaces) do byId[s.id] = s end
+    local lines = {}
+    for _, m in ipairs(marks) do
+        local s, style = byId[m.id], MARKS[m.kind]
+        if s and style then
+            local pts = {}
+            for i = 0, 8 do
+                local a = i * math.pi / 4
+                pts[#pts + 1] = Track.localIn(f, s.pos[1] + style.radius * math.cos(a),
+                    s.pos[2] + style.radius * math.sin(a))
+            end
+            lines[#lines + 1] = { points = pts, color = style.colour, thickness = thickness }
+        end
+    end
+    return lines
+end
+
+-- The tile has one set of vector lines, shared by layers drawn in this
+-- order: the space overlay, then the reach highlight on top.
+local LAYERS = { "overlay", "reach" }
+local layers = {}
+
+--- Replace one layer's lines (nil or empty clears it) and redraw the tile.
+-- Clearing a layer that is already clear sends nothing.
+function Track.setLayer(name, lines)
+    if lines and #lines == 0 then
+        lines = nil
+    end
+    if lines == nil and layers[name] == nil then
+        return
+    end
+    layers[name] = lines
+    local tile = Track.tile()
+    if not tile then
+        return
+    end
+    local all = {}
+    for _, layer in ipairs(LAYERS) do
+        for _, l in ipairs(layers[layer] or {}) do all[#all + 1] = l end
+    end
+    tile.setVectorLines(all)
+end
+
 --- Draw the space graph on the board. Returns false if the board is showing
 -- a different map.
 function Track.show(track, flagged, links)
@@ -249,15 +307,12 @@ function Track.show(track, flagged, links)
     if not Track.onBoard(track, tile) then
         return false, "the board is showing a different map"
     end
-    tile.setVectorLines(Track.overlay(tile, track, flagged, links))
+    Track.setLayer("overlay", Track.overlay(tile, track, flagged, links))
     return true
 end
 
 function Track.hide()
-    local tile = Track.tile()
-    if tile then
-        tile.setVectorLines({})
-    end
+    Track.setLayer("overlay", nil)
 end
 
 Track.LANE_COLOUR = LANE_COLOUR
