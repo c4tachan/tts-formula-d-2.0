@@ -90,7 +90,13 @@ function Dice.watch(obj, color, onResult)
         local w = watching[guid]
         watching[guid] = nil
         if obj ~= nil and w then
-            onResult(tonumber(obj.getValue()), w.color)
+            -- getValue() is the index of the face that is up, not what is
+            -- printed on it: on the 1st gear die, face 4 shows a 2.
+            local value = tonumber(obj.getRotationValue())
+            if value == nil then
+                value = tonumber(obj.getValue())
+            end
+            onResult(value, w.color)
         end
     end
     -- Give the throw a moment to leave the resting state before waiting on it.

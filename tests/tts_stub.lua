@@ -124,7 +124,15 @@ function Stub.object(name, props)
     o.highlightOn = function() end
     o.setColorTint = function(c) o.tint = c end
     o.setRotationValues = function(v) o.rotationValues = v end
-    o.getValue = function() return o.value end
+    -- `value` is what the face that is up shows. As in TTS, getValue() on an
+    -- object with rotation values is that face's index, not its value.
+    o.getRotationValue = function() return o.value end
+    o.getValue = function()
+        for i, rv in ipairs(o.rotationValues or {}) do
+            if rv.value == o.value then return i end
+        end
+        return o.value
+    end
     o.buttons = {}
     o.createButton = function(p) o.buttons[#o.buttons + 1] = p end
     o.clearButtons = function() o.buttons = {} end

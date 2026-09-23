@@ -158,6 +158,16 @@ function T.dropping_the_gear_stick_shifts_and_brings_the_die()
     eq(state().round, 2)
 end
 
+function T.a_gear_die_reads_the_number_on_its_face()
+    local S = redRacing()
+    roll(S, 1, 2)
+    dropOn(S, S.find("Gear Stick"), "gear", 2)
+    -- The 2nd gear die's faces are 3, 3, 4, 4, 4, 2: a 2 is its sixth face.
+    roll(S, 2, 2)
+    eq(state().cars.Red.lastRoll, 2)
+    assert(not S.logged("check the die"))
+end
+
 function T.gear_stick_dropped_off_the_gate_goes_back()
     local S = redRacing()
     local stick = S.find("Gear Stick")
