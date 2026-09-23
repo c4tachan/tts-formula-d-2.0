@@ -41,6 +41,21 @@ function T.links_go_ahead_and_diagonally()
     eq(table.concat(byId(s, 2).next, ","), "3,9")
 end
 
+function T.diagonals_take_the_space_touching_in_a_staggered_lane()
+    -- Middle lane set part of a cell ahead, as printed boards often are, so
+    -- no two lanes line up: from the inside lane's id 2 (x 80) the straight
+    -- move lands at x 120, between middle-lane ids 8 (x 95) and 9 (x 135).
+    -- 9 is nearer that point, but 8 is the space touching 2's front; taking
+    -- 9 would skip it.
+    local s = straight(6)
+    for _, sp in ipairs(s) do
+        if sp.lane == 2 then sp.pos[1] = sp.pos[1] + 15 end
+    end
+    Graph.relink(s)
+    eq(table.concat(byId(s, 2).next, ","), "3,8")
+    eq(table.concat(byId(s, 8).next, ","), "3,9,15")
+end
+
 function T.last_cell_has_nothing_ahead()
     local s = straight(4)
     Graph.relink(s)

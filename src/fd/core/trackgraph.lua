@@ -102,9 +102,12 @@ end
 --- Recompute every space's links from where the spaces are.
 --
 -- A car moves to the next space in its lane, or diagonally into a lane
--- beside it: that is the space in the neighbouring lane nearest to where
--- the straight move lands. Only spaces ahead and within reach count, so a
--- missing space leaves a visible gap rather than a link across the infield.
+-- beside it: that is the nearest space ahead in the neighbouring lane, the
+-- one touching this one's front. (Not the one nearest where the straight
+-- move lands: lanes are staggered by half a cell, so the spaces either side
+-- of that point are equally near it, and the far one skips a space.) Only
+-- spaces ahead and within reach count, so a missing space leaves a visible
+-- gap rather than a link across the infield.
 -- Returns the cell length it worked with, for problems() to reuse.
 function Graph.relink(spaces, reachCells)
     local cell = Graph.cellLength(spaces)
@@ -114,14 +117,14 @@ function Graph.relink(spaces, reachCells)
     end
     local reach = cell * (reachCells or 2.2)
     local grids = byLane(spaces, reach)
-    local function nearestAhead(s, fx, fy, g, target, cone)
+    local function nearestAhead(s, fx, fy, g, cone)
         if not g then return nil end
         local best, bestD = nil, nil
         around(g, s.pos[1], s.pos[2], reach, function(o)
             if o ~= s then
                 local ahead, side = relative(s, fx, fy, o)
-                if ahead > 0.25 * cell and side <= cone * ahead + 0.6 * cell and dist(s, o) <= reach then
-                    local d = target and dist(o, target) or dist(s, o)
+                local d = dist(s, o)
+                if ahead > 0.25 * cell and side <= cone * ahead + 0.6 * cell and d <= reach then
                     if not bestD or d < bestD then best, bestD = o, d end
                 end
             end
@@ -153,12 +156,12 @@ function Graph.relink(spaces, reachCells)
         -- Links set by hand are kept as they are.
         if not s.fixed then
             local fx, fy = facing(s)
-            local straight = nearestAhead(s, fx, fy, grids[s.lane], nil, 0.5)
+            local straight = nearestAhead(s, fx, fy, grids[s.lane], 0.5)
                 or turningAhead(s, fx, fy, grids[s.lane])
             local nxt = {}
             if straight then nxt[#nxt + 1] = straight.id end
             for _, l in ipairs({ s.lane - 1, s.lane + 1 }) do
-                local diag = nearestAhead(s, fx, fy, grids[l], straight, 1.2)
+                local diag = nearestAhead(s, fx, fy, grids[l], 1.2)
                 if diag then nxt[#nxt + 1] = diag.id end
             end
             table.sort(nxt)
