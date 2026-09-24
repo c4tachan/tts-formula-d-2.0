@@ -13,8 +13,31 @@ plus Python tooling for data extraction.
 - **Generated files carry a banner comment.** `src/fd/data/maps.lua` and
   `src/entry/Custom Board.9e2fe8.xml` come from `tools/extract/maps.json` — edit
   the JSON and rerun `tools/extract/gen_registry.py`, never the output.
+  `src/fd/data/dice.lua` likewise comes from `tools/extract/dice_faces.json`
+  via `gen_dice.py`.
+- **`fd.core` and `fd.rules` make no TTS calls.** They are tested under real
+  Lua 5.2 (`tools/test_lua.py`). Anything touching objects, UI or `Wait` goes
+  in `fd.tts` or the entry scripts. `tests/tts_stub.lua` fakes just enough of
+  the TTS API to run `Global.-1.lua`; extend it when the Global script needs more.
+- **Rulesets express wear as `{ zone = points }`.** The basic rules have one
+  zone (`wp`); keep new rules in that shape so the advanced zones slot in.
 - **`reference/original-2020/` is a read-only snapshot** of the mod as inherited.
   Useful for checking behaviour was preserved; not part of the build.
+
+## Which extension
+
+The pipeline here is built for **TTSLua** (`rolandostar.tabletopsimulator-lua`).
+If **TTS Editor** (`sebaestschjin.tts-editor`) is also installed, both bind
+Ctrl+Alt+S and Ctrl+Alt+L, and TTS Editor may take them. It keeps scripts in
+`<workspace>/.tts/objects/` and fails with a missing `.tts` folder here. Use
+"TTSLua: Save And Play" from the command palette, or disable TTS Editor for
+this workspace.
+
+TTSLua's Save & Play also refuses to run ("The workspace does not contain the
+Tabletop Simulator folder") unless its temp folder is open as a workspace
+folder. Open `formula-d.code-workspace`, which includes it. Running "Get Lua
+Scripts" adds it too, but overwrites the temp folder with the in-game scripts,
+so `sync.ps1 push` again afterwards.
 
 ## Module resolution
 
@@ -41,6 +64,8 @@ location, is the portable one.
 
 ```powershell
 python tools/check_lua.py      # luaparser syntax check over src/
+python tools/test_lua.py       # lupa: rules + Global wiring tests
+python tools/test_lua.py --bench   # optional: UI updates / game calls per action
 pwsh tools/sync.ps1 push
 ```
 
@@ -61,9 +86,27 @@ the two seconds.
 
 ## TTS gotchas worth remembering
 
+- TTS runs MoonSharp, not real Lua. Inside a function, a bare `local x` is not
+  reliably `nil` -- it can hold a leftover value from an earlier variable, which
+  real Lua (and so our tests) never shows. Write `local x = nil`;
+  `tools/check_lua.py` rejects the bare form.
+- Every `UI.setAttribute`/`setValue` goes to every player's client, and calls
+  into the game (`getObjects()`, object methods) are slow next to plain Lua.
+  Send UI updates through `fd.tts.ui` (`Ui.set`/`Ui.value`), which drops
+  repeats, and call `Ui.reset()` after any `UI.setXmlTable`. Keep lists of
+  objects you need (see `Dashboard.all()`, `Dice.find`) rather than scanning
+  the table. `python tools/test_lua.py --bench` counts these per action.
 - UI handlers are called as `(player, value, elementId)`, where `value` is the
   argument in the attribute: `onClick="selectMap(FDMonaco)"`.
 - `getObjectFromGUID` returns `nil` for objects inside containers or not yet
   spawned; guard it in `onLoad`.
+- TTS imports OBJ meshes with X mirrored. Anything derived from a mesh file
+  (die faces, dashboard slots) must negate X to match object local space.
+- The dashboard is one model: advanced face on +Y, beginner face on −Y (the
+  beginner bag spawns it flipped). `getTransformUp().y` tells them apart.
+- Steam asset URLs saved as `cloud-3.steamusercontent.com/...` now answer 403.
+  Objects still load from the local TTS cache, so a stale URL only shows up
+  when something fetches it fresh (custom UI assets): use the
+  `steamusercontent-a.akamaihd.net/ugc/<same path>` form instead.
 - Changing a tile's image requires `setCustomObject` followed by `reload()`, and
   `reload()` invalidates the old object reference.

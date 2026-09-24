@@ -48,15 +48,11 @@ end
 
 local function showPanel(active)
     self.UI.setAttribute("menuButtonPanel", "active", active == nil)
-    for _, id in ipairs({ "mapSelectionFD", "mapSelectionFDe", "mapSelectionCustom" }) do
-        self.UI.setAttribute(id, "active", id == active)
-    end
+    self.UI.setAttribute("mapSelectionFD", "active", active == "mapSelectionFD")
 end
 
 function returnToMenu() showPanel(nil) end
 function openMapSelectionFD() showPanel("mapSelectionFD") end
-function openMapSelectionFDe() showPanel("mapSelectionFDe") end
-function openMapSelectionCustom() showPanel("mapSelectionCustom") end
 
 function toggleHideSetup()
     if Global.getVar("setup_packed") then

@@ -1,0 +1,366 @@
+-- Putting a track file onto the board tile.
+--
+-- Track data is in image pixels (see docs/track-format.md) because the tile is
+-- movable; this converts to the tile's own local space, so anything drawn or
+-- snapped to it follows the board when a player drags or turns it.
+
+local Maps = require("fd.data.maps")
+local Graph = require("fd.core.trackgraph")
+
+local Track = {}
+
+Track.TILE_GUID = "ebde54"
+
+-- How far above the board face to float the overlay, in world units.
+local LIFT = 0.12
+
+-- Line thickness in world units. Lines attached to an object are given in its
+-- local space, and the board tile is scaled up ~44x, so this is divided by the
+-- tile's scale or it comes out metres thick.
+local THICKNESS = 0.06
+
+local EDGE_COLOUR = { 1, 0.9, 0.1 }
+
+local LANE_COLOUR = {
+    { 1, 0.82, 0.2 },
+    { 0.3, 0.95, 0.45 },
+    { 0.35, 0.65, 1 },
+}
+
+function Track.tile()
+    return getObjectFromGUID(Track.TILE_GUID)
+end
+
+--- True if the board is currently showing this track's map.
+function Track.onBoard(track, tile)
+    local map = Maps.byId[track.id]
+    local custom = tile and tile.getCustomObject()
+    return not map or not custom or custom.image == map.url
+end
+
+--- How the track's image lies on the tile, measured once.
+--
+-- Asking the tile for its size and scale is a call into the game; an overlay
+-- has a few thousand points, so they are read once here and reused.
+function Track.frame(tile, track)
+    local size = tile.getBoundsNormalized().size
+    local scale = tile.getScale()
+    return {
+        -- Local units per image pixel, and the height to float things at.
+        kx = size.x / scale.x / track.image.width,
+        kz = size.z / scale.z / track.image.height,
+        y = (size.y * 0.5 + LIFT) / scale.y,
+        w = track.image.width,
+        h = track.image.height,
+        -- World units per image pixel, for distances on the board.
+        world = size.x / track.image.width,
+    }
+end
+
+--- A point in image pixels as a position in the tile's local space.
+--
+-- The tile shows its image turned half a turn from its local axes: the top
+-- left of the picture sits at local +X, -Z. Drawn the other way round, the
+-- overlay comes out rotated 180 degrees on the board.
+function Track.localIn(f, px, py)
+    return { x = -(px - f.w / 2) * f.kx, y = f.y, z = (py - f.h / 2) * f.kz }
+end
+
+function Track.localOf(tile, track, px, py)
+    return Track.localIn(Track.frame(tile, track), px, py)
+end
+
+-- The conversions below come in two forms: `...In` takes a frame measured
+-- once (see Track.frame) for work done many times over, `...Of` measures the
+-- board itself for a one-off.
+
+function Track.worldIn(tile, f, px, py)
+    return tile.positionToWorld(Track.localIn(f, px, py))
+end
+
+function Track.worldOf(tile, track, px, py)
+    return Track.worldIn(tile, Track.frame(tile, track), px, py)
+end
+
+--- A world position back to image pixels: the inverse of worldIn.
+function Track.pixelIn(tile, f, world)
+    local l = tile.positionToLocal(world)
+    return f.w / 2 - l.x / f.kx, f.h / 2 + l.z / f.kz
+end
+
+function Track.pixelOf(tile, track, world)
+    return Track.pixelIn(tile, Track.frame(tile, track), world)
+end
+
+--- The world yaw of something facing `rot` degrees in image space at (px, py).
+function Track.yawIn(tile, f, px, py, rot)
+    local a = math.rad(rot)
+    local p0 = Track.worldIn(tile, f, px, py)
+    local p1 = Track.worldIn(tile, f, px + 10 * math.cos(a), py + 10 * math.sin(a))
+    return math.deg(math.atan2(p1.x - p0.x, p1.z - p0.z)) % 360
+end
+
+function Track.yawOf(tile, track, px, py, rot)
+    return Track.yawIn(tile, Track.frame(tile, track), px, py, rot)
+end
+
+--- The image-space facing of something at `world` turned to `yaw` degrees.
+function Track.angleIn(tile, f, world, yaw)
+    local r = math.rad(yaw)
+    local ahead = { x = world.x + math.sin(r), y = world.y, z = world.z + math.cos(r) }
+    local x0, y0 = Track.pixelIn(tile, f, world)
+    local x1, y1 = Track.pixelIn(tile, f, ahead)
+    return math.deg(math.atan2(y1 - y0, x1 - x0)) % 360
+end
+
+function Track.angleOf(tile, track, world, yaw)
+    return Track.angleIn(tile, Track.frame(tile, track), world, yaw)
+end
+
+-- Snapping cars ----------------------------------------------------------------
+
+-- Cell length per track, in image pixels; worked out on first use. Keyed
+-- weakly, so an edited copy of a track that is thrown away takes its entry
+-- with it.
+local cellOf = setmetatable({}, { __mode = "k" })
+
+local function cellLength(track)
+    local c = cellOf[track]
+    if not c then
+        c = Graph.cellLength(track.spaces)
+        cellOf[track] = c
+    end
+    return c
+end
+
+--- The space nearest `world`, within `reach` cells of it, skipping any id
+-- listed in `taken`. Returns the space and the frame, or nil.
+function Track.spaceNear(tile, f, track, world, reach, taken)
+    local px, py = Track.pixelIn(tile, f, world)
+    local limit = cellLength(track) * reach
+    local best, bestD = nil, limit * limit
+    for _, s in ipairs(track.spaces) do
+        if not (taken and taken[s.id]) then
+            local dx, dy = s.pos[1] - px, s.pos[2] - py
+            local d = dx * dx + dy * dy
+            if d <= bestD then best, bestD = s, d end
+        end
+    end
+    return best
+end
+
+--- Where a car on the space `id` sits: the world position and the yaw that
+-- faces the way the track runs. Nil if the track has no such space.
+function Track.seat(tile, f, track, id)
+    for _, s in ipairs(track.spaces) do
+        if s.id == id then
+            return Track.worldIn(tile, f, s.pos[1], s.pos[2]), Track.yawIn(tile, f, s.pos[1], s.pos[2], s.rot)
+        end
+    end
+    return nil
+end
+
+--- Where a car put down at `world` belongs: the nearest free space within
+-- `reach` cells, as a world position and the yaw that faces the way the
+-- track runs. `others` are world positions of cars already on the track;
+-- the spaces they sit on are not offered. Returns nil if there is no space
+-- close enough -- a car put down off the track stays where it was put.
+function Track.snap(tile, track, world, reach, others)
+    local f = Track.frame(tile, track)
+    local taken = {}
+    for _, p in ipairs(others or {}) do
+        local s = Track.spaceNear(tile, f, track, p, 0.5, taken)
+        if s then taken[s.id] = true end
+    end
+    local s = Track.spaceNear(tile, f, track, world, reach, taken)
+    if not s then
+        return nil
+    end
+    return s, Track.worldIn(tile, f, s.pos[1], s.pos[2]), Track.yawIn(tile, f, s.pos[1], s.pos[2], s.rot)
+end
+
+local PROBLEM_COLOUR = { 1, 0.15, 0.15 }
+-- Arrowheads, in image pixels (a printed cell is about 45 long, 25 wide).
+local HEAD_LONG, HEAD_WIDE = 6, 3.5
+-- A link's arrow runs over this stretch of the way between the two spaces'
+-- centres, so its tail and head sit clear of the ghost cars on them.
+local LINK_FROM, LINK_TO = 0.3, 0.72
+
+--- The links between spaces, as arrows; the spaces themselves are shown by
+-- ghost cars (fd.tts.ghosts).
+--
+-- One arrow per link, in the lane colour of the space it leaves, or red if
+-- that space is listed in `flagged` (id -> true). Without `links` only the
+-- link on down each lane is drawn, which is enough to follow the track;
+-- with it, every link, those set by hand in white -- worth seeing while
+-- editing, far too busy otherwise. The track's outside edge is drawn too,
+-- where the file has one.
+function Track.overlay(tile, track, flagged, links)
+    local thickness = THICKNESS / math.max(tile.getScale().x, 0.001)
+    local f = Track.frame(tile, track)
+    local lines = {}
+    local byId = {}
+    for _, s in ipairs(track.spaces) do byId[s.id] = s end
+
+    -- An arrow from (x0, y0) to (x1, y1), image pixels, as one polyline:
+    -- the shaft, then the head drawn back from the tip on either side.
+    local function arrow(x0, y0, x1, y1)
+        local dx, dy = x1 - x0, y1 - y0
+        local len = math.sqrt(dx * dx + dy * dy)
+        if len < 1e-6 then return nil end
+        dx, dy = dx / len, dy / len
+        local bx, by = x1 - dx * HEAD_LONG, y1 - dy * HEAD_LONG
+        return {
+            Track.localIn(f, x0, y0), Track.localIn(f, x1, y1),
+            Track.localIn(f, bx - dy * HEAD_WIDE, by + dx * HEAD_WIDE),
+            Track.localIn(f, x1, y1),
+            Track.localIn(f, bx + dy * HEAD_WIDE, by - dx * HEAD_WIDE),
+        }
+    end
+
+    for _, piece in ipairs(track.outer or {}) do
+        if #piece > 1 then
+            local edge = {}
+            for i, p in ipairs(piece) do
+                edge[i] = Track.localIn(f, p[1], p[2])
+            end
+            lines[#lines + 1] = { points = edge, color = EDGE_COLOUR, thickness = thickness }
+        end
+    end
+
+    for _, s in ipairs(track.spaces) do
+        local colour = (flagged and flagged[s.id]) and PROBLEM_COLOUR or LANE_COLOUR[s.lane] or { 1, 1, 1 }
+        for _, n in ipairs(s.next or {}) do
+            local o = byId[n]
+            if o and (links or o.lane == s.lane) then
+                local dx, dy = o.pos[1] - s.pos[1], o.pos[2] - s.pos[2]
+                local pts = arrow(s.pos[1] + dx * LINK_FROM, s.pos[2] + dy * LINK_FROM,
+                                  s.pos[1] + dx * LINK_TO, s.pos[2] + dy * LINK_TO)
+                if pts then
+                    lines[#lines + 1] = {
+                        points = pts,
+                        color = (links and s.fixed and not (flagged and flagged[s.id])) and { 1, 1, 1 } or colour,
+                        thickness = thickness,
+                    }
+                end
+                if not links then break end
+            end
+        end
+    end
+    return lines
+end
+
+-- Marks on single spaces, by kind: rings where a move can end, small dots
+-- where it only gets by braking. In image pixels.
+local MARKS = {
+    free = { colour = { 0.25, 1, 0.35 }, radius = 13 },
+    brake = { colour = { 1, 0.75, 0.2 }, radius = 5 },
+    overshoot = { colour = { 1, 0.45, 0.1 }, radius = 13 },
+    out = { colour = { 1, 0.15, 0.15 }, radius = 13 },
+}
+
+--- A mark on each space listed in `marks` ({ id, kind } with a kind from
+-- MARKS), as an octagon round its centre.
+function Track.marks(tile, track, marks)
+    local thickness = THICKNESS / math.max(tile.getScale().x, 0.001)
+    local f = Track.frame(tile, track)
+    local byId = {}
+    for _, s in ipairs(track.spaces) do byId[s.id] = s end
+    local lines = {}
+    for _, m in ipairs(marks) do
+        local s, style = byId[m.id], MARKS[m.kind]
+        if s and style then
+            local pts = {}
+            for i = 0, 8 do
+                local a = i * math.pi / 4
+                pts[#pts + 1] = Track.localIn(f, s.pos[1] + style.radius * math.cos(a),
+                    s.pos[2] + style.radius * math.sin(a))
+            end
+            lines[#lines + 1] = { points = pts, color = style.colour, thickness = thickness }
+        end
+    end
+    return lines
+end
+
+local GRID_COLOUR = { 1, 1, 1 }
+local GRID_RADIUS = 16
+
+--- The starting grid, `ids` pole first: a ring on each space (two on pole)
+-- and a line joining them in order, so the order can be checked by eye.
+function Track.grid(tile, track, ids)
+    if not ids or #ids == 0 then return nil end
+    local thickness = THICKNESS / math.max(tile.getScale().x, 0.001)
+    local f = Track.frame(tile, track)
+    local byId = {}
+    for _, s in ipairs(track.spaces) do byId[s.id] = s end
+    local lines, path = {}, {}
+    local function ring(s, r)
+        local pts = {}
+        for i = 0, 8 do
+            local a = i * math.pi / 4
+            pts[#pts + 1] = Track.localIn(f, s.pos[1] + r * math.cos(a), s.pos[2] + r * math.sin(a))
+        end
+        lines[#lines + 1] = { points = pts, color = GRID_COLOUR, thickness = thickness }
+    end
+    for i, id in ipairs(ids) do
+        local s = byId[id]
+        if s then
+            ring(s, GRID_RADIUS)
+            if i == 1 then ring(s, GRID_RADIUS * 0.6) end
+            path[#path + 1] = Track.localIn(f, s.pos[1], s.pos[2])
+        end
+    end
+    if #path > 1 then
+        lines[#lines + 1] = { points = path, color = GRID_COLOUR, thickness = thickness }
+    end
+    return lines
+end
+
+-- The tile has one set of vector lines, shared by layers drawn in this
+-- order: the space overlay, the grid being marked, then the reach
+-- highlight on top.
+local LAYERS = { "overlay", "grid", "reach" }
+local layers = {}
+
+--- Replace one layer's lines (nil or empty clears it) and redraw the tile.
+-- Clearing a layer that is already clear sends nothing.
+function Track.setLayer(name, lines)
+    if lines and #lines == 0 then
+        lines = nil
+    end
+    if lines == nil and layers[name] == nil then
+        return
+    end
+    layers[name] = lines
+    local tile = Track.tile()
+    if not tile then
+        return
+    end
+    local all = {}
+    for _, layer in ipairs(LAYERS) do
+        for _, l in ipairs(layers[layer] or {}) do all[#all + 1] = l end
+    end
+    tile.setVectorLines(all)
+end
+
+--- Draw the space graph on the board. Returns false if the board is showing
+-- a different map.
+function Track.show(track, flagged, links)
+    local tile = Track.tile()
+    if not tile then
+        return false, "the board tile is missing"
+    end
+    if not Track.onBoard(track, tile) then
+        return false, "the board is showing a different map"
+    end
+    Track.setLayer("overlay", Track.overlay(tile, track, flagged, links))
+    return true
+end
+
+function Track.hide()
+    Track.setLayer("overlay", nil)
+end
+
+Track.LANE_COLOUR = LANE_COLOUR
+
+return Track
