@@ -61,6 +61,9 @@ for k, fn in pairs(UI) do
     end
 end
 
+-- TTS's turn marker: plain fields, as the game's own are.
+Turns = { enable = false, order = {} }
+
 Color = { fromString = function(s) return { name = s } end }
 
 local function say(kind)
@@ -121,7 +124,9 @@ function Stub.object(name, props)
     o.setLock = function(l) o.locked = l end
     o.setPositionSmooth = function(p) o.pos = vec(p.x, p.y, p.z) end
     o.setRotationSmooth = function(r) o.rot = r end
-    o.highlightOn = function() end
+    -- The highlight left on: { color, duration }, duration nil if it stays.
+    o.highlightOn = function(c, d) o.highlight = { c, d } end
+    o.highlightOff = function() o.highlight = nil end
     o.setColorTint = function(c) o.tint = c end
     o.setRotationValues = function(v) o.rotationValues = v end
     -- `value` is what the face that is up shows. As in TTS, getValue() on an

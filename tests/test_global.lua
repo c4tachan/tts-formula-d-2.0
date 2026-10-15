@@ -1177,6 +1177,45 @@ function T.the_standings_are_a_table()
     eq(S.ui.fdr_r2.active, "false", "rows go with their cars")
 end
 
+function T.the_car_to_play_is_lit_and_its_driver_told()
+    local S, red, blue = twoCars()
+    gridRoll(S, { Red = 4, Blue = 15 })
+    red.highlight, blue.highlight = nil, nil -- the few seconds' glow from claiming them
+    fdStart(Player.Red)
+    eq(Turns.enable, false, "no turn marker until a car is due")
+    local black = S.find("Damage Dice")
+    black.value = 10
+    onObjectRandomize(black, "Red")
+    assert(not S.logged("Your turn"), "not while the field rolls for the start")
+    onObjectRandomize(black, "Blue")
+
+    local first, second = state().order[1], state().order[2]
+    local cars = { Red = red, Blue = blue }
+    assert(S.logged("Your turn, " .. first .. "Player"))
+    eq(Turns.enable, true)
+    eq(Turns.turn_color, first)
+    eq(table.concat(Turns.order, " "), first .. " " .. second, "TTS follows the race's order")
+    eq(cars[first].highlight[1], first, "the car to play is lit")
+    eq(cars[first].highlight[2], nil, "and stays lit")
+    eq(cars[second].highlight, nil)
+
+    -- A roll ends the move: the turn passes.
+    roll(S, 1, 2, first)
+    assert(S.logged("Your turn, " .. second .. "Player"))
+    eq(Turns.turn_color, second)
+    eq(cars[first].highlight, nil)
+    eq(cars[second].highlight[1], second)
+
+    -- Undoing back is not news; the marker and highlight follow it.
+    local told = #S.log
+    fdUndo(Player.Red)
+    eq(Turns.turn_color, first)
+    eq(cars[first].highlight[1], first)
+    for i = told + 1, #S.log do
+        assert(not S.log[i]:find("Your turn"), S.log[i])
+    end
+end
+
 function T.only_the_host_can_use_the_race_controls()
     local S = redRacing()
     -- Shown only to the host and promoted players.

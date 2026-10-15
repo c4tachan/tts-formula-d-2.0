@@ -43,6 +43,7 @@ local LEVEL_RGB = {
     wear = { 1, 0.45, 0.35 },
     out = { 1, 0.2, 0.2 },
     finish = { 1, 0.84, 0.25 },
+    turn = { 0.49, 0.99, 0 },
 }
 
 -- Setup ---------------------------------------------------------------------
@@ -232,11 +233,80 @@ local function renderDashboards()
     end
 end
 
-function refresh()
+-- The car to play, as last shown: the key of the turn its driver was told
+-- about, and the guid of the car lit up for it.
+local turnTold = nil
+local litCar = nil
+
+local function waitingForStart()
+    for _, c in ipairs(race:pendingChecks()) do
+        if c.kind == "start" then return true end
+    end
+    return false
+end
+
+--- Hand TTS's own turn marker to `due`, in the race's order of play, which
+-- changes every round. Nobody can pass a turn from TTS's menu: the race
+-- says when a turn is over. Off outside a race.
+local function syncTurns(due)
+    local seated = due and Player[due.color] and Player[due.color].seated
+    if not seated then
+        if Turns.enable then Turns.enable = false end
+        return
+    end
+    local order = {}
+    for _, car in ipairs(race:cars()) do
+        if not car.eliminated and not car.place and Player[car.color] and Player[car.color].seated then
+            order[#order + 1] = car.color
+        end
+    end
+    if not Turns.enable then
+        Turns.type = 2 -- custom order
+        Turns.pass_turns = false
+        Turns.enable = true
+    end
+    if table.concat(Turns.order or {}, " ") ~= table.concat(order, " ") then
+        Turns.order = order
+    end
+    if Turns.turn_color ~= due.color then
+        Turns.turn_color = due.color
+    end
+end
+
+--- Point everyone at the car to play: TTS's turn marker and a highlight on
+-- the car. `announce` also tells its driver, once, when the turn passes to
+-- them. Nobody is due while the field is still rolling for the start.
+local function showTurn(announce)
+    local due = race:turn()
+    if due and waitingForStart() then
+        due = nil
+    end
+    local obj = due and due.tts and due.tts.car and getObjectFromGUID(due.tts.car)
+    local guid = obj and obj.getGUID() or nil
+    if guid ~= litCar then
+        local old = litCar and getObjectFromGUID(litCar)
+        if old then old.highlightOff() end
+        if obj then obj.highlightOn(due.color) end
+        litCar = guid
+    end
+    syncTurns(due)
+    local key = due and (race.state.round .. ":" .. due.color)
+    if announce and key and key ~= turnTold then
+        turnTold = key
+        if Player[due.color] and Player[due.color].seated then
+            broadcastToColor("Your turn, " .. race:label(due) .. ": shift, then roll.", due.color, LEVEL_RGB.turn)
+        end
+    end
+end
+
+--- Bring every panel up to date. `announce` is for a change made in play:
+-- a turn that has passed is announced.
+function refresh(announce)
     syncCars()
     Hud.refresh(race)
     Mini.refresh(race)
     renderDashboards()
+    showTurn(announce)
 end
 
 --- Run a change to the race: snapshot for undo, apply, then publish.
@@ -254,7 +324,7 @@ local function act(fn)
     race.opened = nil
     relay(race:drain())
     syncDashboards()
-    refresh()
+    refresh(true)
     if opened then
         showReach(opened)
     end
@@ -378,7 +448,10 @@ local function setCar(car, obj, verb)
     car.tts.carWas = car.tts.carWas or obj.getName()
     obj.setName(carName(car))
     obj.setColorTint(tintOf(car.color))
-    obj.highlightOn(car.color, 4)
+    -- A car that is due stays lit (see showTurn); a timed highlight would end that.
+    if race:turn() ~= car then
+        obj.highlightOn(car.color, 4)
+    end
     -- A car claimed where it stands may already be on the track.
     race:placed(car.color, spaceUnder(obj))
     race:emit("info", race:label(car) .. " " .. verb, car.color)
@@ -534,7 +607,9 @@ local ACTIONS = {
     car = function(car)
         local mine = car.tts.car and getObjectFromGUID(car.tts.car)
         if mine then
-            mine.highlightOn(car.color, 4)
+            if race:turn() ~= car then
+                mine.highlightOn(car.color, 4)
+            end
             race:emit("info", race:label(car) .. "'s car is highlighted", car.color)
             return
         end
