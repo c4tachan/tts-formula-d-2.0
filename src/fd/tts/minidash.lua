@@ -10,6 +10,7 @@
 -- onto the texture, so the two can never drift apart.
 
 local Layout = require("fd.data.dashboard")
+local Dashboard = require("fd.tts.dashboard")
 local Race = require("fd.core.race")
 local Ui = require("fd.tts.ui")
 
@@ -159,13 +160,7 @@ end
 --- Panels for every seat colour, to append to the Global UI.
 function Mini.panels(rules)
     -- Show whichever printed face carries this ruleset's wear zones.
-    for name, f in pairs(Layout.faces) do
-        local fits = true
-        for _, z in ipairs(rules.zones) do
-            if not f.zones[z.id] then fits = false end
-        end
-        if fits then face = name end
-    end
+    face = Dashboard.faceFor(rules)
     local out = {}
     for _, c in ipairs(COLORS) do
         out[#out + 1] = panel(c)

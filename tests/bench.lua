@@ -51,10 +51,7 @@ local function measure(label, S, fn)
         label, c.ui, c.object, c.getObjects, ms)
 end
 
-local S = world()
-for _, c in ipairs({ "Red", "Blue", "Green", "Yellow" }) do
-    S.dashes[c].click("fdDashJoin", c)
-end
+local S = world() -- seated at load, so each is dealt in at their dashboard
 fdStart({ steam_name = "host", color = "Red" })
 
 measure("WP -1 (one race action)", S, function() S.dashes.Red.click("fdDashWear", "Red") end)

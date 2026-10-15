@@ -35,6 +35,8 @@ local spaceUnder -- likewise
 local showReach -- likewise
 local clearReach -- likewise
 local useBoardTrack -- likewise
+local joinAt -- with the dashboard buttons, below
+local deliver, deliverAll -- likewise
 local undo = {}
 local UNDO_LIMIT = 30
 
@@ -102,6 +104,7 @@ function onLoad(saved_data)
     setupTrackEditor(saved.edits, saved.markers)
     useBoardTrack()
     buildUi()
+    deliverAll()
 end
 
 --- (Re)build the race panel and the screen dashboards, then fill them in.
@@ -137,8 +140,10 @@ function onPlayerConnect()
     rebuildUiSoon()
 end
 
-function onPlayerChangeColor()
+function onPlayerChangeColor(color)
     rebuildUiSoon()
+    -- A moment for the seat to count as taken.
+    Wait.time(function() deliver(color) end, 0.5)
 end
 
 function onSave()
@@ -386,6 +391,39 @@ local function dicePosition(color)
         return { x = base.x, y = base.y + 2, z = base.z }
     end
     return { x = base.x - base.x / len * reach, y = base.y + 2, z = base.z - base.z / len * reach }
+end
+
+--- Which way is across the table from `pos` towards its middle (x, z), or
+-- nil right at the middle.
+local function inward(pos)
+    local len = math.sqrt(pos.x ^ 2 + pos.z ^ 2)
+    if len < 1 then
+        return nil
+    end
+    return -pos.x / len, -pos.z / len
+end
+
+-- Height to drop a fresh piece from: just above the table. Hand zones sit
+-- below it, so a seat's own height will not do.
+local DROP_Y = 3
+
+--- Where a car from the bag goes: to the right of its driver's dashboard as
+-- they face the table, or in front of their seat if they have none.
+local function carSpot(car)
+    local dash = car.tts and car.tts.dash and getObjectFromGUID(car.tts.dash)
+    if dash then
+        local p = dash.getPosition()
+        local ix, iz = inward(p)
+        ix, iz = ix or 0, iz or 1
+        return { x = p.x + iz * 7, y = p.y + 2, z = p.z - ix * 7 }
+    end
+    local hand = handPosition(car.color)
+    if not hand then
+        return nil
+    end
+    local ix, iz = inward(hand)
+    ix, iz = ix or 0, iz or 0
+    return { x = hand.x + ix * 8, y = DROP_Y, z = hand.z + iz * 8 }
 end
 
 -- Dice ----------------------------------------------------------------------
@@ -660,14 +698,12 @@ local ACTIONS = {
             return
         end
         local bag = getObjectFromGUID(CAR_BAG)
-        if not bag or not base then
+        local spot = carSpot(car)
+        if not bag or not spot then
             race:emit("warn", race:label(car) .. " has no car nearby -- take one from a car bag", car.color)
             return
         end
-        local spawned = bag.takeObject({
-            position = { x = base.x, y = base.y + 2, z = base.z },
-            rotation = { x = 0, y = 0, z = 0 }, smooth = false,
-        })
+        local spawned = bag.takeObject({ position = spot, rotation = { x = 0, y = 0, z = 0 }, smooth = false })
         setCar(car, spawned, "takes a car from the bag")
     end,
     collision = function(car) race:requestCheck(car.color, "collision") end,
@@ -706,19 +742,99 @@ function fdDashJoin(dash, color)
         broadcastToColor("Take a coloured seat to join the race.", color, LEVEL_RGB.warn)
         return
     end
-    local guid = dash.getGUID()
-    local holder = carOnDash(guid)
+    local holder = carOnDash(dash.getGUID())
     if holder and holder.color ~= color then
         broadcastToColor(race:label(holder) .. " is already using this dashboard.", color, LEVEL_RGB.warn)
         return
     end
-    act(function()
-        local car = race:join(color, Player[color] and Player[color].steam_name)
-        car.tts = car.tts or {}
-        car.tts.dash = guid
-        car.tts.faceWarned = nil
-    end)
+    act(function() joinAt(dash, color) end)
     dash.highlightOn(color, 3)
+end
+
+--- Put `color` in the race at dashboard `dash`. Called inside act.
+joinAt = function(dash, color)
+    local car = race:join(color, Player[color] and Player[color].steam_name)
+    car.tts = car.tts or {}
+    car.tts.dash = dash.getGUID()
+    car.tts.faceWarned = nil
+    return car
+end
+
+-- Delivery ------------------------------------------------------------------
+-- Somebody who sits down before the start is dealt in: a dashboard in front
+-- of their seat -- a free one already there, or a fresh one from the bag for
+-- the ruleset's face -- and a car beside it. Leave takes them out again.
+
+local DASHBOARD_BAGS = { beginner = "edfadc", advanced = "4eb678" }
+-- A free dashboard this close to a seat's hand zone is that seat's.
+local SEAT_RANGE = 12
+-- How far in front of the hand zone a fresh dashboard goes.
+local DASH_AHEAD = 3.5
+
+local delivering = {}  -- colour -> true while their dashboard is on its way
+
+local function dealIn(color, dash)
+    delivering[color] = nil
+    if race:car(color) or carOnDash(dash.getGUID()) then
+        return
+    end
+    act(function()
+        local car = joinAt(dash, color)
+        race:emit("info", race:label(car) .. " sits down and is dealt in", color)
+        ACTIONS.car(car)
+    end)
+end
+
+--- Deal `color` in, if they are seated, not racing yet, and the race has
+-- not started.
+deliver = function(color)
+    local p = Player[color]
+    if not SEATS[color] or not (p and p.seated) or delivering[color] or race:car(color)
+        or race.state.phase ~= "setup" then
+        return
+    end
+    local hand = p.getHandTransform()
+    if not hand then
+        return
+    end
+    local taken = {}
+    for _, c in ipairs(race:cars()) do
+        if c.tts and c.tts.dash then taken[c.tts.dash] = true end
+    end
+    local near = Dashboard.nearest(hand.position, taken)
+    if near then
+        local q = near.getPosition()
+        if (q.x - hand.position.x) ^ 2 + (q.z - hand.position.z) ^ 2 <= SEAT_RANGE * SEAT_RANGE then
+            dealIn(color, near)
+            return
+        end
+    end
+    local face = Dashboard.faceFor(Rules)
+    local bag = getObjectFromGUID(DASHBOARD_BAGS[face])
+    if not bag then
+        return
+    end
+    -- Straight ahead of the seat, the way its hand zone faces.
+    local yaw = hand.rotation and hand.rotation.y or 0
+    local ix, iz = math.sin(math.rad(yaw)), math.cos(math.rad(yaw))
+    delivering[color] = true
+    bag.takeObject({
+        position = { x = hand.position.x + ix * DASH_AHEAD, y = DROP_Y, z = hand.position.z + iz * DASH_AHEAD },
+        -- Turned to face the seat; the beginner face is the underside.
+        rotation = { x = 0, y = yaw, z = face == "beginner" and 180 or 0 },
+        smooth = false,
+        callback_function = function(dash)
+            Dashboard.track(dash)
+            dealIn(color, dash)
+        end,
+    })
+end
+
+--- Deal in everybody seated: at load, for those already sat down.
+deliverAll = function()
+    for _, color in ipairs(getSeatedPlayers()) do
+        deliver(color)
+    end
 end
 
 local function onDash(dash, name)

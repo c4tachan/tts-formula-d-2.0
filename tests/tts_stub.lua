@@ -172,7 +172,13 @@ function Stub.object(name, props)
         error("no button " .. fn .. " on " .. o.name)
     end
     o.takeObject = function(params)
-        local spawned = Stub.object(o.spawns, { pos = params.position })
+        local r = params.rotation or vec(0, 0, 0)
+        local spawned = Stub.object(o.spawns, {
+            pos = params.position, rot = vec(r.x, r.y, r.z),
+            -- Taken out face down, as the beginner dashboard bag does.
+            up = vec(0, math.abs(r.z or 0) == 180 and -1 or 1, 0),
+        })
+        if params.callback_function then params.callback_function(spawned) end
         return spawned
     end
     for k, fn in pairs(o) do
@@ -246,10 +252,23 @@ Player = {}
 function Stub.player(color, handPos, admin)
     local p = {
         color = color, steam_name = color .. "Player", seated = true, admin = admin or false,
-        getHandTransform = function() return { position = handPos } end,
+        -- The hand zone faces into the table, square to its nearest edge.
+        getHandTransform = function()
+            local yaw = math.deg(math.atan2(-handPos.x, -handPos.z))
+            return { position = handPos, rotation = vec(0, (math.floor(yaw / 90 + 0.5) * 90) % 360, 0) }
+        end,
     }
     Player[color] = p
     return p
+end
+
+function getSeatedPlayers()
+    local out = {}
+    for color, p in pairs(Player) do
+        if p.seated then out[#out + 1] = color end
+    end
+    table.sort(out)
+    return out
 end
 
 function Stub.find(name)

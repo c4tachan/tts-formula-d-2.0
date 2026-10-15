@@ -32,10 +32,11 @@ local function world()
         guid = "ebde54", pos = S.vec(0, 1, 0), size = S.vec(44, 1, 44), scale = S.vec(44, 1, 44),
         custom = { image = Maps.byId.FDMonaco.url },
     })
-    S.player("Red", S.vec(0, 1, -38), true) -- the host
-    S.player("Blue", S.vec(0, 1, 38))
     assert(loadfile(ROOT .. "/src/entry/Global.-1.lua"))()
     onLoad("")
+    -- Seated after the load, so nobody is dealt in: these tests join by hand.
+    S.player("Red", S.vec(0, 1, -38), true) -- the host
+    S.player("Blue", S.vec(0, 1, 38))
     return S
 end
 
@@ -97,6 +98,58 @@ function T.the_big_box_menu_is_packed_away_for_the_race()
     eq(S.ui.showModMenuButton.active, "true", "back for choosing the next map")
     fdStart(Player.Red)
     eq(#menuBag.calls, 2, "nothing out to pack the second time")
+end
+
+function T.sitting_down_deals_you_in_at_the_dashboard_there()
+    local S = world()
+    onPlayerChangeColor("Red")
+    local red = state().cars.Red
+    assert(red, "Red is in the race")
+    eq(red.tts.dash, S.beginner.guid, "at the free dashboard in front of the seat")
+    local car = getObjectFromGUID(red.tts.car)
+    assert(car, "with a car")
+    assert(car.pos.y > 1, "on the table, not under it with the hand zone")
+    assert(math.abs(car.pos.z - S.beginner.pos.z) < 1 and math.abs(car.pos.x - S.beginner.pos.x) > 5,
+        "beside the dashboard")
+    assert(S.logged("dealt in"))
+
+    -- Sitting down again changes nothing.
+    onPlayerChangeColor("Red")
+    eq(state().cars.Red.tts.car, red.tts.car)
+    eq(S.count("Formula 1 Solid") + S.count("RedPlayer (Red)"), 1)
+end
+
+function T.a_seat_with_no_dashboard_gets_one_from_the_bag()
+    local S = world()
+    S.object("Beginner Dashboard Bag", { guid = "edfadc", spawns = "Beginner Dashboard" })
+    S.player("Green", S.vec(-24, 1, -38))
+    onPlayerChangeColor("Green")
+    local green = state().cars.Green
+    assert(green, "Green is in the race")
+    local dash = getObjectFromGUID(green.tts.dash)
+    assert(dash ~= S.beginner and dash ~= S.advanced, "a fresh dashboard")
+    eq(dash.up.y, -1, "beginner side up")
+    eq(dash.rot.y, 0, "turned to face the seat")
+    assert(dash.pos.z > -38 and dash.pos.z < -30, "in front of the seat")
+    assert(dash.pos.y > 1, "on the table")
+    eq(dash.buttons[1].click_function, "fdNoop", "its status label is drawn")
+    assert(getObjectFromGUID(green.tts.car), "and a car")
+    eq(S.count("Gear Stick"), 1, "with its gear stick")
+end
+
+function T.nobody_is_dealt_in_once_the_race_has_started()
+    local S = redRacing()
+    onPlayerChangeColor("Blue")
+    eq(state().cars.Blue, nil, "mid-race, Blue joins by hand if they want to")
+    onPlayerChangeColor("Grey")
+    eq(state().cars.Grey, nil, "spectators never")
+end
+
+function T.players_seated_at_load_are_dealt_in()
+    local S = world()
+    onLoad("")
+    eq(state().cars.Red.tts.dash, S.beginner.guid)
+    eq(state().cars.Blue.tts.dash, S.advanced.guid)
 end
 
 function T.free_dashboards_offer_join()
