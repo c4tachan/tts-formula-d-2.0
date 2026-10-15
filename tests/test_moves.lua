@@ -260,6 +260,14 @@ function T.monaco_finish_line()
     for id, o in pairs(r) do
         eq(o.crossed, false, id)
     end
+    -- The lanes are staggered: i.s1.0 and o.s1.0 lead on to m.s1.0, which is
+    -- on the line too. Moving on from the line is not crossing it again.
+    for _, from in ipairs(FDMonaco.finish.line) do
+        for id, o in pairs(Moves.reach(FDMonaco, from, 6)) do
+            eq(o.crossed, false, from .. " -> " .. id)
+        end
+    end
+    eq(Moves.reach(FDMonaco, FDMonaco.start[1], 2)["m.s1.0"].crossed, true, "over it and along it")
 end
 
 return T

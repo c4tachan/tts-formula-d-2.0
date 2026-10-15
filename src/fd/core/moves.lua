@@ -56,7 +56,8 @@ end
 --             0 outside a corner or when the stop does not count
 --   path      the ids stepped on, `fromId` first
 --   crossed   true if the move crossed the finish line: stepped onto one of
---             `track.finish.line`, the space just past it in each lane
+--             `track.finish.line`, the space just past it in each lane,
+--             from a space not on it
 -- Returns nil if `fromId` is not on the track.
 function Moves.reach(track, fromId, roll, opts)
     opts = opts or {}
@@ -93,7 +94,9 @@ function Moves.reach(track, fromId, roll, opts)
         o.crossed = false
         while at do
             table.insert(path, 1, at.space.id)
-            if at.prev and line[at.space.id] then
+            -- Lanes are staggered, so one line space can lead to another:
+            -- that step is along the line, not over it.
+            if at.prev and line[at.space.id] and not line[at.prev.space.id] then
                 o.crossed = true
             end
             at = at.prev

@@ -634,6 +634,20 @@ function T.the_first_crossing_starts_the_lap_and_the_next_one_finishes()
     eq(r:serialize().phase, "finished", "the only car is home")
 end
 
+function T.moving_on_from_the_line_does_not_finish_a_one_lap_race()
+    -- Game night (#21): pole stopped just over the line, then moved on
+    -- across the staggered line spaces and took the flag on lap 1.
+    local Monaco = require("fd.data.tracks.FDMonaco")
+    local r = started("Red")
+    r:placed("Red", Monaco.start[1])
+    drive(r, Monaco, "Red", 1, "o.s1.0")
+    eq(r:car("Red").lap, 1, "over the line")
+    drive(r, Monaco, "Red", 2, "i.s1.1")
+    eq(r:car("Red").lap, 1, "on along it")
+    eq(r:car("Red").place, nil)
+    assert(not hasEvent(r, "finish", "wins"))
+end
+
 function T.the_race_runs_until_every_car_is_home()
     local track = loop()
     local r = started("Red", "Blue")
