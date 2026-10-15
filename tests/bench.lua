@@ -53,6 +53,13 @@ end
 
 local S = world() -- seated at load, so each is dealt in at their dashboard
 fdStart({ steam_name = "host", color = "Red" })
+-- Everyone past the start roll, with a normal start, so the gear rolls count.
+do
+    local random = math.random
+    math.random = function() return 10 end
+    for _, c in ipairs({ "Red", "Blue", "Green", "Yellow" }) do fdRollBlack(Player[c]) end
+    math.random = random
+end
 
 measure("WP -1 (one race action)", S, function() S.dashes.Red.click("fdDashWear", "Red") end)
 measure("shift gear (drop the gear stick)", S, function()
