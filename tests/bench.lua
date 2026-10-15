@@ -32,7 +32,7 @@ local function world()
     S.dashes = {}
     for i, c in ipairs({ "Red", "Blue", "Green", "Yellow" }) do
         S.dashes[c] = S.object("Beginner Dashboard", { pos = S.vec(i * 12, 1, -30), up = S.vec(0, -1, 0) })
-        S.player(c, S.vec(i * 12, 1, -38))
+        S.player(c, S.vec(i * 12, 1, -38), i == 1) -- the first is the host
     end
     assert(loadfile(ROOT .. "/src/entry/Global.-1.lua"))()
     onLoad("")
