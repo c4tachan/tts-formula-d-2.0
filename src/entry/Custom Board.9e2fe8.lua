@@ -65,5 +65,5 @@ end
 function hideModMenu()
     Global.setVar("mod_packed", true)
     memoryBagModMenu.call("buttonClick_recall", {})
-    UI.setAttribute("showModMenuButton", "active", true)
+    Global.call("applyModMenuButton")
 end

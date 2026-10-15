@@ -16,6 +16,7 @@ local Maps = require("fd.data.maps")
 local Dice = require("fd.tts.dice")
 local Dashboard = require("fd.tts.dashboard")
 local Hud = require("fd.tts.hud")
+local Ui = require("fd.tts.ui")
 local Controls = require("fd.tts.controls")
 local Mini = require("fd.tts.minidash")
 local Track = require("fd.tts.track")
@@ -48,8 +49,28 @@ local LEVEL_RGB = {
 
 -- Setup ---------------------------------------------------------------------
 
-local function applyModMenuButton()
-    UI.setAttribute("showModMenuButton", "active", mod_packed and "true" or "false")
+local MOD_MENU_BAG = "a57988"
+local SETUP_BAG = "0fde3b"
+
+--- The Big Box menu button: there while the menu is packed away, but not
+-- during a race -- the map is chosen before the start or after the flag.
+-- Global so the menu board can call it when it closes.
+function applyModMenuButton()
+    local racing = race and race.state.phase == "race"
+    Ui.set("showModMenuButton", "active", tostring(mod_packed and not racing))
+end
+
+--- At the start, put the Big Box menu and the setup board back in their bags.
+local function packTable()
+    local bags = { { MOD_MENU_BAG, mod_packed }, { SETUP_BAG, setup_packed } }
+    for _, b in ipairs(bags) do
+        local bag = not b[2] and getObjectFromGUID(b[1])
+        if bag then
+            bag.call("buttonClick_recall", {})
+        end
+    end
+    -- The bags say so themselves (Global.setVar); this is in case they did not.
+    mod_packed, setup_packed = true, true
 end
 
 function onLoad(saved_data)
@@ -125,7 +146,7 @@ function onSave()
 end
 
 function showModMenu()
-    local memoryBagModMenu = getObjectFromGUID("a57988")
+    local memoryBagModMenu = getObjectFromGUID(MOD_MENU_BAG)
     if memoryBagModMenu then
         memoryBagModMenu.call("buttonClick_place", {})
     end
@@ -307,6 +328,7 @@ function refresh(announce)
     Mini.refresh(race)
     renderDashboards()
     showTurn(announce)
+    applyModMenuButton()
 end
 
 --- Run a change to the race: snapshot for undo, apply, then publish.
@@ -800,6 +822,7 @@ function fdStart(player)
     if not admin(player) then return end
     printToAll(player.steam_name .. " starts the race", LEVEL_RGB.info)
     clearReach()
+    packTable()
     act(function() race:startRace() end)
 end
 

@@ -78,6 +78,27 @@ function T.load_builds_the_panel_and_teaches_the_dice()
     eq(#S.find("First Gear Dice").rotationValues, 4)
 end
 
+function T.the_big_box_menu_is_packed_away_for_the_race()
+    local S = world()
+    local menuBag = S.object("Memory Bag - Mod Menu", { guid = "a57988" })
+    local setupBag = S.object("Memory Bag - Setup Board", { guid = "0fde3b" })
+    showModMenu()
+    eq(menuBag.calls[1], "buttonClick_place")
+    eq(S.ui.showModMenuButton.active, "false", "the menu is out")
+    setup_packed = false -- the setup board is out too
+
+    S.beginner.click("fdDashJoin", "Red")
+    fdStart(Player.Red)
+    eq(menuBag.calls[2], "buttonClick_recall", "the menu goes back in its bag")
+    eq(setupBag.calls[1], "buttonClick_recall", "and the setup board")
+    eq(S.ui.showModMenuButton.active, "false", "no menu button during the race")
+
+    fdReset(Player.Red)
+    eq(S.ui.showModMenuButton.active, "true", "back for choosing the next map")
+    fdStart(Player.Red)
+    eq(#menuBag.calls, 2, "nothing out to pack the second time")
+end
+
 function T.free_dashboards_offer_join()
     local S = world()
     eq(#S.beginner.buttons, 1)

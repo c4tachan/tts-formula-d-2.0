@@ -121,6 +121,9 @@ function Stub.object(name, props)
         if not fn then error("no menu item " .. label .. " on " .. o.name) end
         return fn(color or "Red", pos or o.pos, o)
     end
+    -- Functions called on the object's own script, by name, in order.
+    o.calls = {}
+    o.call = function(fn) o.calls[#o.calls + 1] = fn end
     o.setLock = function(l) o.locked = l end
     o.setPositionSmooth = function(p) o.pos = vec(p.x, p.y, p.z) end
     o.setRotationSmooth = function(r) o.rot = r end
