@@ -225,7 +225,7 @@ function Mini.refresh(race)
                 bits[#bits + 1] = "your turn"
             end
             for _, c in ipairs(race:pendingChecks()) do
-                if c.color == color then
+                if c.color == color and c.kind ~= "start" then
                     bits[#bits + 1] = "roll the black die"
                     break
                 end

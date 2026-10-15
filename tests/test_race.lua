@@ -192,6 +192,22 @@ function T.stalled_start_sits_out_a_round()
     assert(hasEvent(r, "info", "selects 1st"))
 end
 
+function T.roll_checks_rolls_only_the_start_whose_turn_it_is()
+    local r = newRace("Red", "Blue")
+    r.autoRolls = true
+    r:startRace()
+    assert(not hasEvent(r, "info", "roll the black die"), "nobody is asked to roll")
+    r:rollChecks(function() return 10 end)
+    local checks = r:pendingChecks()
+    eq(#checks, 1, "Blue's start waits for Blue's turn")
+    eq(checks[1].color, "Blue")
+    -- A roll made for a check settles that check, not the car's oldest.
+    r:queueCheck(r:car("Blue"), "collision", "Red")
+    r:rollChecks(function() return 10 end)
+    eq(#r:pendingChecks(), 1)
+    eq(r:pendingChecks()[1].kind, "start", "the collision was rolled, the start still waits")
+end
+
 function T.great_start_moves_and_allows_second()
     local r = newRace("Red")
     r:startRace()

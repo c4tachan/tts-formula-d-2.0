@@ -16,6 +16,14 @@ local function world()
         end
     end
     local S = require("tts_stub")
+    -- The script's black die (math.random(20)) rolls a 10 -- a normal start,
+    -- no contact -- unless a test loads it otherwise.
+    local random = S.realRandom or math.random
+    S.realRandom = random
+    math.random = function(m, n)
+        if m == 20 and n == nil then return 10 end
+        return random(m, n)
+    end
     S.object("Gear Stick Bag", { guid = "71d89b", spawns = "Gear Stick" })
     S.object("Wear Tracker Bag", { guid = "a845cd", spawns = "Wear Tracker" })
     S.object("Formula 1 Black Bag", { guid = "1bb99e", spawns = "Formula 1 Solid" })
@@ -48,10 +56,7 @@ end
 local function redRacing()
     local S = world()
     S.beginner.click("fdDashJoin", "Red")
-    fdStart({ steam_name = "host", color = "Red" })
-    local black = S.find("Damage Dice")
-    black.value = 10
-    onObjectRandomize(black, "Red")
+    fdStart({ steam_name = "host", color = "Red" }) -- Red's start is rolled at once
     return S
 end
 
@@ -327,7 +332,8 @@ function T.dashboard_buttons_act_on_the_owner()
     S.beginner.click("fdDashWear", "Red")
     eq(state().cars.Red.wear.wp, 17)
     S.beginner.click("fdDashCollision", "Red")
-    assert(S.beginner.buttons[1].label:find("BLACK DIE"))
+    assert(S.logged("RedPlayer rolls 10 on the black die %(collision%)"), "rolled at once")
+    eq(#state().checks, 0)
 end
 
 function T.wear_moves_the_marker()
@@ -1280,7 +1286,7 @@ function T.undo_restores_the_previous_state()
     eq(state().cars.Red.wear.wp, 18)
 end
 
-function T.strain_roll_queues_black_die_checks()
+function T.strain_is_rolled_at_once()
     local S = redRacing()
     local stick = S.find("Gear Stick")
     local values = { 2, 4, 8, 12, 20 }
@@ -1290,38 +1296,11 @@ function T.strain_roll_queues_black_die_checks()
     end
     eq(state().cars.Red.wear.wp, 18, "shifting up one at a time is free")
     assert(S.logged("Engine strain"))
-    assert(S.ui.fdr_checks.value:find("engine"), "race panel lists the check")
-
-    -- The button on screen rolls it, and goes.
-    eq(S.ui.fdBlack_Red.active, "true")
-    assert(S.ui.fdBlack_Red.text:find("engine check"), S.ui.fdBlack_Red.text)
-    fdRollBlack(Player.Red)
-    eq(#state().checks, 0)
-    eq(S.ui.fdBlack_Red.active, "false")
+    assert(S.logged("RedPlayer rolls 10 on the black die %(engine%): engine holds"))
+    eq(#state().checks, 0, "nothing left to roll")
+    eq(S.ui.fdr_checks.value, "")
 end
 
-function T.a_collision_check_brings_up_the_button_for_its_car_only()
-    local S = twoCars()
-    fdStart(Player.Red)
-    local black = S.find("Damage Dice")
-    black.value = 10
-    onObjectRandomize(black, "Red")
-    onObjectRandomize(black, "Blue")
-    eq(S.ui.fdBlack_Red.active, "false", "start rolls done")
-
-    S.beginner.click("fdDashCollision", "Red")
-    S.beginner.click("fdDashCollision", "Red") -- a second check waits behind it
-    eq(S.ui.fdBlack_Red.active, "true")
-    assert(S.ui.fdBlack_Red.text:find("collision check"), S.ui.fdBlack_Red.text)
-    eq(S.ui.fdBlack_Blue.active, "false", "nothing for Blue to roll")
-    eq(Turns.turn_color, state().order[1], "the turn stays where it was")
-
-    fdRollBlack(Player.Blue) -- not Blue's to roll
-    eq(#state().checks, 1)
-    fdRollBlack(Player.Red)
-    eq(#state().checks, 0)
-    eq(S.ui.fdBlack_Red.active, "false")
-end
 
 function T.laps_button_sets_the_distance_and_undo_puts_it_back()
     local S = redRacing()
@@ -1388,123 +1367,92 @@ end
 function T.each_first_turn_starts_with_the_start_roll()
     local S, red, blue = twoCars()
     gridRoll(S, { Red = 4, Blue = 15 }) -- Blue on pole
-    eq(S.ui.fdBlack_Blue and S.ui.fdBlack_Blue.active or "false", "false", "no button before the start")
     fdStart(Player.Red)
-    assert(not S.logged("RedPlayer: roll the black die"), "nobody is asked before their turn")
 
-    -- The leader is up first: TTS's turn, the highlight and the button.
-    eq(Turns.turn_color, "Blue")
-    eq(blue.highlight[1], "Blue")
-    eq(S.ui.fdBlack_Blue.active, "true")
-    eq(S.ui.fdBlack_Red.active, "false", "Red's start waits for Red's turn")
-    assert(S.logged("Your start, BluePlayer: roll the black die"))
-
-    -- A click out of turn rolls nothing for anyone.
-    fdRollBlack({ color = "Teal" })
-    eq(#state().checks, 2)
-
-    local random = math.random
-    math.random = function() return 10 end
-    fdRollBlack(Player.Blue)
-    math.random = random
-    assert(S.logged("BluePlayer rolls 10 on the black die"))
-    eq(S.ui.fdBlack_Blue.active, "false", "the button goes once used")
-
-    -- A normal start: still Blue's turn, to shift, roll and move.
+    -- The leader's start is rolled at once; Red's waits for Red's turn.
+    assert(S.logged("BluePlayer rolls 10 on the black die %(start%): normal start"))
+    assert(not S.logged("RedPlayer rolls 10 on the black die %(start%)"))
     eq(Turns.turn_color, "Blue")
     assert(S.logged("Your turn, BluePlayer"))
-    eq(S.ui.fdBlack_Red.active, "false")
+
+    -- A normal start: still Blue's turn, to shift, roll and move.
     fdUiShift(Player.Blue, "1")
     roll(S, 1, 2, "Blue")
     eq(state().cars.Blue.lastRoll, 2)
-    eq(Turns.turn_color, "Blue", "until the car is put down")
     onObjectDrop("Blue", blue)
 
     -- Then Red's first turn, starting with Red's start.
+    assert(S.logged("RedPlayer rolls 10 on the black die %(start%): normal start"))
     eq(Turns.turn_color, "Red")
-    eq(S.ui.fdBlack_Red.active, "true")
-    assert(S.logged("Your start, RedPlayer: roll the black die"))
-    fdUiShift(Player.Red, "1")
-    roll(S, 1, 2, "Red")
-    assert(S.logged("RedPlayer has to roll the black die for the start first %-%- not counted"))
-    eq(state().cars.Red.lastRoll, nil)
-
-    -- The die on the table counts too, and puts the button away.
-    local black = S.find("Damage Dice")
-    black.value = 10
-    onObjectRandomize(black, "Red")
-    eq(S.ui.fdBlack_Red.active, "false")
-    eq(#state().checks, 0)
     assert(S.logged("Your turn, RedPlayer"))
+    eq(#state().checks, 0)
 end
 
-function T.a_collision_is_rolled_before_play_goes_on()
+function T.a_stall_rolls_the_next_start_too()
+    local S, red, blue = twoCars()
+    gridRoll(S, { Red = 4, Blue = 15 })
+    local random = math.random
+    local rolls = { 1, 10 } -- Blue stalls; Red starts normally
+    math.random = function(m, n)
+        if m == 20 and n == nil then return table.remove(rolls, 1) or 10 end
+        return random(m, n)
+    end
+    fdStart(Player.Red)
+    math.random = random
+    assert(S.logged("BluePlayer rolls 1 on the black die %(start%): stalled"))
+    assert(S.logged("RedPlayer rolls 10 on the black die %(start%): normal start"))
+    eq(Turns.turn_color, "Red", "Blue sits out the round")
+end
+
+function T.a_collision_is_rolled_at_once()
     local S, red, blue = twoCars()
     local FDMonaco = require("fd.data.tracks.FDMonaco")
     local Moves = require("fd.core.moves")
     gridRoll(S, { Red = 4, Blue = 15 }) -- Blue on pole
     fdStart(Player.Red)
-    local random = math.random
-    math.random = function() return 10 end
-    fdRollBlack(Player.Blue)
+    -- Somewhere Blue can go in 2 with a space beside it that Red can reach
+    -- in 2, picked in a fixed order.
+    local function sorted(t)
+        local ids = {}
+        for id in pairs(t) do ids[#ids + 1] = id end
+        table.sort(ids)
+        return ids
+    end
+    local redCan = Moves.reach(FDMonaco, state().cars.Red.space, 2)
+    local ahead, beside = nil, nil
+    for _, id in ipairs(sorted(Moves.reach(FDMonaco, state().cars.Blue.space, 2))) do
+        for _, n in ipairs(FDMonaco.near[id] or {}) do
+            if not beside and redCan[n] and n ~= state().cars.Red.space then ahead, beside = id, n end
+        end
+    end
+    assert(beside, "a space beside Blue's in Red's reach")
     fdUiShift(Player.Blue, "1")
     roll(S, 1, 2, "Blue")
-    local ahead = next(Moves.reach(FDMonaco, state().cars.Blue.space, 2))
     putNear(S, blue, FDMonaco.byId[ahead], 0, 0, "Blue")
-    fdRollBlack(Player.Red)
     fdUiShift(Player.Red, "1")
     roll(S, 1, 2, "Red")
     -- Red ends its move beside Blue.
-    local near, beside = {}, nil
-    for _, id in ipairs(FDMonaco.near[state().cars.Blue.space]) do near[id] = true end
-    for id in pairs(Moves.reach(FDMonaco, state().cars.Red.space, 2)) do
-        if near[id] then beside = id end
-    end
-    assert(beside, "a space beside Blue in reach")
+    S.log = {}
     putNear(S, red, FDMonaco.byId[beside], 0, 0, "Red")
 
-    -- Red rolls for it before Blue's turn: the turn, the highlight, the button.
-    eq(Turns.turn_color, "Red", "the collision is Red's to roll first")
-    eq(red.highlight[1], "Red")
-    eq(S.ui.fdBlack_Red.active, "true")
-    assert(S.logged("Roll the black die: collision with BluePlayer check"))
-    local toldBlue = 0 -- Blue's first turn, before Red's
-    for _, l in ipairs(S.log) do if l:find("Your turn, BluePlayer") then toldBlue = toldBlue + 1 end end
-
-    -- Blue jumping the gun is held, once.
-    fdUiShift(Player.Blue, "2")
-    roll(S, 2, 3, "Blue")
-    assert(S.logged("RedPlayer has the black die to roll %(collision with BluePlayer%)"))
-    eq(state().cars.Blue.lastRoll, 2, "Blue's roll not counted")
-
-    -- Red's roll passes the contact on: Blue rolls back.
-    fdRollBlack(Player.Red)
-    eq(Turns.turn_color, "Blue")
-    eq(S.ui.fdBlack_Blue.active, "true")
-    eq(S.ui.fdBlack_Red.active, "false")
-    assert(S.logged("Roll the black die: collision with RedPlayer check"))
-    fdRollBlack(Player.Blue)
-    math.random = random
-
-    -- Only now is Blue told it is their turn.
+    -- Red rolls against Blue, Blue back against Red, then Blue's turn.
+    local function at(pattern)
+        for i, l in ipairs(S.log) do if l:find(pattern) then return i end end
+        error("nothing said like " .. pattern)
+    end
+    local redRoll = at("RedPlayer rolls 10 on the black die %(collision with BluePlayer%): no contact")
+    local blueRoll = at("BluePlayer rolls 10 on the black die %(collision with RedPlayer%): no contact")
+    assert(redRoll < blueRoll, "the contact spreads from the car that moved")
+    assert(blueRoll < at("Your turn, BluePlayer"), "and is over before the next turn")
+    assert(not S.logged("roll the black die"), "nobody is asked to roll")
     eq(#state().checks, 0)
-    local told = 0
-    for _, l in ipairs(S.log) do if l:find("Your turn, BluePlayer") then told = told + 1 end end
-    eq(told, toldBlue + 1, "Blue's turn announced once the rolls are done")
-    eq(Turns.turn_color, "Blue")
 end
 
 function T.the_car_to_play_is_lit_and_its_driver_told()
     local S, red, blue = twoCars()
     gridRoll(S, { Red = 4, Blue = 15 })
     red.highlight, blue.highlight = nil, nil -- the few seconds' glow from claiming them
-    fdStart(Player.Red)
-    -- The start rolls (see the next test), here on the die on the table.
-    local black = S.find("Damage Dice")
-    black.value = 10
-    onObjectRandomize(black, "Red")
-    assert(not S.logged("Your turn"), "not while the field rolls for the start")
-    onObjectRandomize(black, "Blue")
+    fdStart(Player.Red) -- the leader's start is rolled at once
 
     local first, second = state().order[1], state().order[2]
     local cars = { Red = red, Blue = blue }

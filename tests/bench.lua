@@ -51,14 +51,23 @@ local function measure(label, S, fn)
         label, c.ui, c.object, c.getObjects, ms)
 end
 
-local S = world() -- seated at load, so each is dealt in at their dashboard
-fdStart({ steam_name = "host", color = "Red" })
--- Everyone past the start roll, with a normal start, so the gear rolls count.
+-- The script's black die always rolls a 10: normal starts, no contact.
 do
     local random = math.random
-    math.random = function() return 10 end
-    for _, c in ipairs({ "Red", "Blue", "Green", "Yellow" }) do fdRollBlack(Player[c]) end
-    math.random = random
+    math.random = function(m, n)
+        if m == 20 and n == nil then return 10 end
+        return random(m, n)
+    end
+end
+local S = world() -- seated at load, so each is dealt in at their dashboard
+fdStart({ steam_name = "host", color = "Red" })
+-- The leader's start is rolled by the script; the others throw the die on
+-- the table for theirs now, so every gear roll below counts.
+do
+    local black = nil
+    for _, o in ipairs(S.objects) do if o.name == "Damage Dice" then black = o end end
+    black.value = 10
+    for _, c in ipairs({ "Red", "Blue", "Green", "Yellow" }) do onObjectRandomize(black, c) end
 end
 
 measure("WP -1 (one race action)", S, function() S.dashes.Red.click("fdDashWear", "Red") end)

@@ -776,11 +776,10 @@ end
 -- round. Anything else, a die knocked or picked up by mistake, is reported
 -- and left out.
 --
--- While another car's move is open (rolled, its car not yet put down), or
--- another car has a collision or engine strain to roll, a roll waits for
--- it: the first is not counted, in case it was knocked, and the same player
--- rolling again goes ahead, ending that move -- so nothing left undone can
--- hold up the game. The checks stay, to be rolled when they are.
+-- While another car's move is open (rolled, its car not yet put down) a
+-- roll waits for it: the first is not counted, in case it was knocked, and
+-- the same player rolling again goes ahead, ending that move -- so a car
+-- that is never put down cannot hold up the game.
 function Race:countRoll(car, gear, value)
     local who = self:label(car)
     local selected = car.gear > 0 and car.gear or 1
@@ -806,12 +805,6 @@ function Race:countRoll(car, gear, value)
     for _, other in ipairs(self:cars()) do
         if other ~= car and other.rolledRound == round and other.movedRound ~= round then
             waits[#waits + 1] = self:label(other) .. " is still moving"
-        end
-    end
-    for _, c in ipairs(self.state.checks) do
-        local other = self:car(c.color)
-        if other and other ~= car and c.kind ~= "start" and c.kind ~= "grid" then
-            waits[#waits + 1] = string.format("%s has the black die to roll (%s)", self:label(other), self:checkName(c))
         end
     end
     if #waits > 0 then
@@ -890,8 +883,9 @@ function Race:queueCheck(car, kind, with, pack)
     end
     local c = { color = car.color, kind = kind, with = with, pack = pack }
     self.state.checks[#self.state.checks + 1] = c
-    -- Nobody is asked to roll what is being rolled for them (see rollForGrid).
-    if not self.rolling then
+    -- Nobody is asked to roll what is being rolled for them (see rollForGrid
+    -- and rollChecks).
+    if not self.rolling and not self.autoRolls then
         self:emit("info", string.format("%s: roll the black die (%s check)",
             self:label(car), self:checkName(c)), car.color)
     end
@@ -917,26 +911,50 @@ function Race:pendingChecks()
     return self.state.checks
 end
 
---- The oldest check play waits on: a collision or engine strain, rolled
--- before the next car goes. A start is part of its car's own turn instead.
+--- The next check play waits on: a collision or engine strain, oldest
+-- first, or else the start of the car whose turn it is. Other cars' starts
+-- wait for their turns.
 function Race:checkWaiting()
     for _, c in ipairs(self.state.checks) do
         if c.kind ~= "start" and c.kind ~= "grid" and self:car(c.color) then
             return c
         end
     end
+    local due = self:turn()
+    for _, c in ipairs(self.state.checks) do
+        if due and c.kind == "start" and c.color == due.color then
+            return c
+        end
+    end
     return nil
+end
+
+-- The most black die rolls made in one go: far more than any pack needs.
+local AUTO_ROLLS = 100
+
+--- Roll the black die, with `die` (a function returning one roll of it),
+-- for every check play waits on: collisions and engine strain as soon as
+-- they come up, the rolls they pass on included, and each car's start as
+-- its first turn comes round.
+function Race:rollChecks(die)
+    for _ = 1, AUTO_ROLLS do
+        local c = self:checkWaiting()
+        if not c then
+            return
+        end
+        self:blackDie(die(), c.color, c)
+    end
 end
 
 --- The black die came to rest. Resolves the roller's oldest check, or the
 -- oldest check overall if the roller has none (someone rolling for a friend).
-function Race:blackDie(value, roller)
+function Race:blackDie(value, roller, which)
     local checks = self.state.checks
     local idx = nil
     for i, c in ipairs(checks) do
-        if c.color == roller then idx = i break end
+        if (which and c == which) or (not which and c.color == roller) then idx = i break end
     end
-    idx = idx or (#checks > 0 and 1 or nil)
+    idx = idx or (not which and #checks > 0 and 1 or nil)
     if not idx then
         self:emit("roll", "Black die: " .. tostring(value), roller)
         return
@@ -945,8 +963,8 @@ function Race:blackDie(value, roller)
     local car = self:car(check.color)
     if not car then return end
     local outcome = self.rules.checks[check.kind].resolve(value)
-    self:emit(outcome.wear and "warn" or "info", string.format("%s rolls %s on the black die: %s",
-        self:label(car), tostring(value), outcome.text), car.color)
+    self:emit(outcome.wear and "warn" or "info", string.format("%s rolls %s on the black die (%s): %s",
+        self:label(car), tostring(value), self:checkName(check), outcome.text), car.color)
     if check.kind == "collision" and check.with and check.pack then
         self:collided(check)
     end

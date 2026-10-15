@@ -127,21 +127,6 @@ local function racePanel(rules, cols)
     })
 end
 
-local SEATS = { "White", "Brown", "Red", "Orange", "Yellow", "Green", "Teal", "Blue", "Purple", "Pink" }
-
---- The big button in the middle of a player's screen when the black die is
--- theirs to roll: one per seat, each shown only to its own, hidden until
--- asked for (see Hud.askToRoll).
-local function rollButton(color)
-    return el("Button", {
-        id = "fdBlack_" .. color, visibility = color, active = "false",
-        rectAlignment = "MiddleCenter", offsetXY = "0 120", width = "360", height = "110",
-        text = "Roll the black die", fontSize = "28", fontStyle = "Bold", textColor = "#FFFFFF",
-        colors = "#1B1D21F0|#2E3238F0|#0E0F11F0|#1B1D2180", outline = HEX[color], outlineSize = "4 -4",
-        onClick = "fdRollBlack", tooltip = "Rolls it for you; the result is in the chat",
-    })
-end
-
 local collapsed = false
 local editorText = ""
 local cols = {}
@@ -165,9 +150,6 @@ function Hud.build(rules, extras, onReady)
             end
         end
         kept[#kept + 1] = racePanel(rules, cols)
-        for _, c in ipairs(SEATS) do
-            kept[#kept + 1] = rollButton(c)
-        end
         for _, node in ipairs(extras or {}) do
             kept[#kept + 1] = node
         end
@@ -181,25 +163,6 @@ function Hud.build(rules, extras, onReady)
             end, function() return not UI.loading end)
         end, 2)
     end, function() return not UI.loading end)
-end
-
---- Show the black die button to each colour in `asks` (colour -> what the
--- roll is for), and to nobody else.
-function Hud.askToRoll(asks)
-    if not ready then
-        return
-    end
-    for _, c in ipairs(SEATS) do
-        local why = asks[c]
-        if why then
-            -- Setting a button's text puts its text colour back to TTS's
-            -- default dark grey, so the colour goes in the text as well.
-            Ui.set("fdBlack_" .. c, "text",
-                "<color=#FFFFFF>Roll the black die\n<size=18>" .. why .. "</size></color>")
-            Ui.set("fdBlack_" .. c, "textColor", "#FFFFFF")
-        end
-        Ui.set("fdBlack_" .. c, "active", tostring(why ~= nil))
-    end
 end
 
 --- The track editor's status line; nil hides it.
@@ -254,7 +217,8 @@ local function checkLine(race)
     local parts = {}
     for _, c in ipairs(race:pendingChecks()) do
         local car = race:car(c.color)
-        if car then
+        -- A start waiting for its turn is rolled then, by the script.
+        if car and c.kind ~= "start" then
             parts[#parts + 1] = string.format("<color=%s>%s</color> (%s)",
                 HEX[c.color] or "#FFFFFF", race:label(car), race:checkName(c))
         end

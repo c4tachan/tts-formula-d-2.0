@@ -40,6 +40,13 @@ local deliver, deliverAll -- likewise
 local undo = {}
 local UNDO_LIMIT = 30
 
+--- One roll of the black die, made by the script: the grid, starts,
+-- collisions and engine strain are all rolled this way, the result told in
+-- the chat. (The die on the table still counts if somebody throws it.)
+local function rollBlack()
+    return math.random(20)
+end
+
 -- The colour of each kind of message in chat. A roll is shown in the colour
 -- of the seat that rolled it, when there is one (see relay).
 local LEVEL_RGB = {
@@ -98,6 +105,7 @@ function onLoad(saved_data)
     applyModMenuButton()
 
     race = Race.new(Rules, saved.race)
+    race.autoRolls = true
     Dice.prepareAll()
     Dashboard.scan()
     Mini.registerAsset()
@@ -257,7 +265,8 @@ local function dashLabel(car)
         parts[#parts + 1] = "no car -- press Car"
     end
     for _, c in ipairs(race:pendingChecks()) do
-        if c.color == car.color then
+        -- A start waiting for its turn is rolled then, by the script.
+        if c.color == car.color and c.kind ~= "start" then
             parts[#parts + 1] = "ROLL BLACK DIE (" .. race:checkName(c) .. ")"
             break
         end
@@ -276,15 +285,6 @@ end
 -- about, and the guid of the car lit up for it.
 local turnTold = nil
 local litCar = nil
-
---- Whether `car` has still to roll the black die for its start: the first
--- thing it does on its first turn.
-local function startDue(car)
-    for _, c in ipairs(race:pendingChecks()) do
-        if c.kind == "start" and c.color == car.color then return true end
-    end
-    return false
-end
 
 --- Hand TTS's own turn marker to `due`, in the race's order of play, which
 -- changes every round. Nobody can pass a turn from TTS's menu: the race
@@ -314,58 +314,26 @@ local function syncTurns(due)
     end
 end
 
---- Who has the black die to roll, and what for: everyone with a check
--- waiting (a collision, engine strain), for the oldest of theirs -- but a
--- start only on that car's own turn, `due`.
-local function rollsWanted(due)
-    local asks = {}
-    for _, c in ipairs(race:pendingChecks()) do
-        if c.kind == "start" then
-            if due and c.color == due.color and not asks[c.color] then
-                asks[c.color] = "for your start"
-            end
-        elseif not asks[c.color] then
-            asks[c.color] = race:checkName(c) .. " check"
-        end
-    end
-    return asks
-end
-
 --- Point everyone at the car to play: TTS's turn marker and a highlight on
 -- the car. `announce` also tells its driver, once, when the turn passes to
--- them. A car's first turn begins with its start roll, with a button on
--- screen for the black die; then it shifts, rolls and moves as ever.
+-- them. (Black die rolls are made at once, so nothing else is waited on.)
 local function showTurn(announce)
     local due = race:turn()
-    local starting = due and startDue(due)
-    Hud.askToRoll(rollsWanted(due))
-    -- A collision or engine strain is rolled before play goes on: whoever has
-    -- one waiting is the one to act, in the order they were asked.
-    local check = race:checkWaiting()
-    local up = check and race:car(check.color) or due
-    local obj = up and up.tts and up.tts.car and getObjectFromGUID(up.tts.car)
+    local obj = due and due.tts and due.tts.car and getObjectFromGUID(due.tts.car)
     local guid = obj and obj.getGUID() or nil
     if guid ~= litCar then
         local old = litCar and getObjectFromGUID(litCar)
         if old then old.highlightOff() end
-        if obj then obj.highlightOn(up.color) end
+        if obj then obj.highlightOn(due.color) end
         litCar = guid
     end
-    syncTurns(up)
-    local key, text = nil, nil
-    if check then
-        local what = race:checkName(check)
-        key = "check:" .. check.color .. ":" .. what .. ":" .. tostring(check.pack)
-        text = "Roll the black die: " .. what .. " check."
-    elseif due then
-        key = (starting and "start" or race.state.round) .. ":" .. due.color
-        text = starting and ("Your start, " .. race:label(due) .. ": roll the black die.")
-            or ("Your turn, " .. race:label(due) .. ": shift, roll, then move your car.")
-    end
+    syncTurns(due)
+    local key = due and (race.state.round .. ":" .. due.color)
     if announce and key and key ~= turnTold then
         turnTold = key
-        if Player[up.color] and Player[up.color].seated then
-            broadcastToColor(text, up.color, LEVEL_RGB.turn)
+        if Player[due.color] and Player[due.color].seated then
+            broadcastToColor("Your turn, " .. race:label(due) .. ": shift, roll, then move your car.",
+                due.color, LEVEL_RGB.turn)
         end
     end
 end
@@ -388,6 +356,7 @@ local function act(fn)
         table.remove(undo, 1)
     end
     fn()
+    race:rollChecks(rollBlack)
     if race.gridSettled then
         race.gridSettled = nil
         placeOnGrid()
@@ -975,19 +944,7 @@ end
 function fdGrid(player)
     if not admin(player) then return end
     printToAll(player.steam_name .. " calls the grid roll", LEVEL_RGB.info)
-    act(function() race:rollForGrid(function() return math.random(20) end) end)
-end
-
---- The big button on screen: the black die rolled for the player's oldest
--- check by a die of the script's own, as for the grid. Gone once used, as
--- the check it was for is.
-function fdRollBlack(player)
-    for _, c in ipairs(race:pendingChecks()) do
-        if c.color == player.color then
-            act(function() race:blackDie(math.random(20), player.color) end)
-            return
-        end
-    end
+    act(function() race:rollForGrid(rollBlack) end)
 end
 
 function fdStart(player)
@@ -1022,6 +979,7 @@ function fdUndo(player)
         return
     end
     race = Race.new(Rules, JSON.decode(last))
+    race.autoRolls = true
     useBoardTrack()
     clearReach()
     -- Undo puts the race back, not the pieces: the board still says where
@@ -1032,6 +990,9 @@ function fdUndo(player)
     end
     race:drain() -- re-reading the board is not news
     printToAll(player.steam_name .. " undid the last change", LEVEL_RGB.info)
+    -- In case the state undone to has a roll waiting: it is rolled now.
+    race:rollChecks(rollBlack)
+    relay(race:drain())
     syncDashboards(true)
     refresh()
 end
