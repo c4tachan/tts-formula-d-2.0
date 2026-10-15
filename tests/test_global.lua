@@ -1438,6 +1438,62 @@ function T.each_first_turn_starts_with_the_start_roll()
     assert(S.logged("Your turn, RedPlayer"))
 end
 
+function T.a_collision_is_rolled_before_play_goes_on()
+    local S, red, blue = twoCars()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local Moves = require("fd.core.moves")
+    gridRoll(S, { Red = 4, Blue = 15 }) -- Blue on pole
+    fdStart(Player.Red)
+    local random = math.random
+    math.random = function() return 10 end
+    fdRollBlack(Player.Blue)
+    fdUiShift(Player.Blue, "1")
+    roll(S, 1, 2, "Blue")
+    local ahead = next(Moves.reach(FDMonaco, state().cars.Blue.space, 2))
+    putNear(S, blue, FDMonaco.byId[ahead], 0, 0, "Blue")
+    fdRollBlack(Player.Red)
+    fdUiShift(Player.Red, "1")
+    roll(S, 1, 2, "Red")
+    -- Red ends its move beside Blue.
+    local near, beside = {}, nil
+    for _, id in ipairs(FDMonaco.near[state().cars.Blue.space]) do near[id] = true end
+    for id in pairs(Moves.reach(FDMonaco, state().cars.Red.space, 2)) do
+        if near[id] then beside = id end
+    end
+    assert(beside, "a space beside Blue in reach")
+    putNear(S, red, FDMonaco.byId[beside], 0, 0, "Red")
+
+    -- Red rolls for it before Blue's turn: the turn, the highlight, the button.
+    eq(Turns.turn_color, "Red", "the collision is Red's to roll first")
+    eq(red.highlight[1], "Red")
+    eq(S.ui.fdBlack_Red.active, "true")
+    assert(S.logged("Roll the black die: collision with BluePlayer check"))
+    local toldBlue = 0 -- Blue's first turn, before Red's
+    for _, l in ipairs(S.log) do if l:find("Your turn, BluePlayer") then toldBlue = toldBlue + 1 end end
+
+    -- Blue jumping the gun is held, once.
+    fdUiShift(Player.Blue, "2")
+    roll(S, 2, 3, "Blue")
+    assert(S.logged("RedPlayer has the black die to roll %(collision with BluePlayer%)"))
+    eq(state().cars.Blue.lastRoll, 2, "Blue's roll not counted")
+
+    -- Red's roll passes the contact on: Blue rolls back.
+    fdRollBlack(Player.Red)
+    eq(Turns.turn_color, "Blue")
+    eq(S.ui.fdBlack_Blue.active, "true")
+    eq(S.ui.fdBlack_Red.active, "false")
+    assert(S.logged("Roll the black die: collision with RedPlayer check"))
+    fdRollBlack(Player.Blue)
+    math.random = random
+
+    -- Only now is Blue told it is their turn.
+    eq(#state().checks, 0)
+    local told = 0
+    for _, l in ipairs(S.log) do if l:find("Your turn, BluePlayer") then told = told + 1 end end
+    eq(told, toldBlue + 1, "Blue's turn announced once the rolls are done")
+    eq(Turns.turn_color, "Blue")
+end
+
 function T.the_car_to_play_is_lit_and_its_driver_told()
     local S, red, blue = twoCars()
     gridRoll(S, { Red = 4, Blue = 15 })

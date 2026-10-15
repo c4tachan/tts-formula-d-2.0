@@ -776,10 +776,11 @@ end
 -- round. Anything else, a die knocked or picked up by mistake, is reported
 -- and left out.
 --
--- While another car's move is open (rolled, its car not yet put down) a
--- roll waits for it: the first is not counted, in case it was knocked, and
--- the same player rolling again goes ahead, ending that move -- so a car
--- that is never put down cannot hold up the game.
+-- While another car's move is open (rolled, its car not yet put down), or
+-- another car has a collision or engine strain to roll, a roll waits for
+-- it: the first is not counted, in case it was knocked, and the same player
+-- rolling again goes ahead, ending that move -- so nothing left undone can
+-- hold up the game. The checks stay, to be rolled when they are.
 function Race:countRoll(car, gear, value)
     local who = self:label(car)
     local selected = car.gear > 0 and car.gear or 1
@@ -801,18 +802,24 @@ function Race:countRoll(car, gear, value)
             .. "(Undo first to roll again)", gearName(gear), tostring(value), who), car.color)
         return false
     end
-    local moving = {}
+    local waits = {}
     for _, other in ipairs(self:cars()) do
         if other ~= car and other.rolledRound == round and other.movedRound ~= round then
-            moving[#moving + 1] = self:label(other)
+            waits[#waits + 1] = self:label(other) .. " is still moving"
         end
     end
-    if #moving > 0 then
+    for _, c in ipairs(self.state.checks) do
+        local other = self:car(c.color)
+        if other and other ~= car and c.kind ~= "start" and c.kind ~= "grid" then
+            waits[#waits + 1] = string.format("%s has the black die to roll (%s)", self:label(other), self:checkName(c))
+        end
+    end
+    if #waits > 0 then
         local key = car.color .. ":" .. round
         if self.held ~= key then
             self.held = key
-            self:emit("warn", string.format("%s is still moving -- %s's roll of %s not counted. "
-                .. "Roll again to go on without waiting.", table.concat(moving, " and "), who, tostring(value)), car.color)
+            self:emit("warn", string.format("%s -- %s's roll of %s not counted. "
+                .. "Roll again to go on without waiting.", table.concat(waits, "; "), who, tostring(value)), car.color)
             return false
         end
         self.held = nil
@@ -908,6 +915,17 @@ end
 
 function Race:pendingChecks()
     return self.state.checks
+end
+
+--- The oldest check play waits on: a collision or engine strain, rolled
+-- before the next car goes. A start is part of its car's own turn instead.
+function Race:checkWaiting()
+    for _, c in ipairs(self.state.checks) do
+        if c.kind ~= "start" and c.kind ~= "grid" and self:car(c.color) then
+            return c
+        end
+    end
+    return nil
 end
 
 --- The black die came to rest. Resolves the roller's oldest check, or the

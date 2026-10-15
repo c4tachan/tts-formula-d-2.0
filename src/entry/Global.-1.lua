@@ -339,22 +339,33 @@ local function showTurn(announce)
     local due = race:turn()
     local starting = due and startDue(due)
     Hud.askToRoll(rollsWanted(due))
-    local obj = due and due.tts and due.tts.car and getObjectFromGUID(due.tts.car)
+    -- A collision or engine strain is rolled before play goes on: whoever has
+    -- one waiting is the one to act, in the order they were asked.
+    local check = race:checkWaiting()
+    local up = check and race:car(check.color) or due
+    local obj = up and up.tts and up.tts.car and getObjectFromGUID(up.tts.car)
     local guid = obj and obj.getGUID() or nil
     if guid ~= litCar then
         local old = litCar and getObjectFromGUID(litCar)
         if old then old.highlightOff() end
-        if obj then obj.highlightOn(due.color) end
+        if obj then obj.highlightOn(up.color) end
         litCar = guid
     end
-    syncTurns(due)
-    local key = due and ((starting and "start" or race.state.round) .. ":" .. due.color)
+    syncTurns(up)
+    local key, text = nil, nil
+    if check then
+        local what = race:checkName(check)
+        key = "check:" .. check.color .. ":" .. what .. ":" .. tostring(check.pack)
+        text = "Roll the black die: " .. what .. " check."
+    elseif due then
+        key = (starting and "start" or race.state.round) .. ":" .. due.color
+        text = starting and ("Your start, " .. race:label(due) .. ": roll the black die.")
+            or ("Your turn, " .. race:label(due) .. ": shift, roll, then move your car.")
+    end
     if announce and key and key ~= turnTold then
         turnTold = key
-        if Player[due.color] and Player[due.color].seated then
-            broadcastToColor(starting
-                and ("Your start, " .. race:label(due) .. ": roll the black die.")
-                or ("Your turn, " .. race:label(due) .. ": shift, roll, then move your car."), due.color, LEVEL_RGB.turn)
+        if Player[up.color] and Player[up.color].seated then
+            broadcastToColor(text, up.color, LEVEL_RGB.turn)
         end
     end
 end
