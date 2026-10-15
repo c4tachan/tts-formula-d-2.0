@@ -353,7 +353,7 @@ local function showTurn(announce)
         if Player[due.color] and Player[due.color].seated then
             broadcastToColor(starting
                 and ("Your start, " .. race:label(due) .. ": roll the black die.")
-                or ("Your turn, " .. race:label(due) .. ": shift, then roll."), due.color, LEVEL_RGB.turn)
+                or ("Your turn, " .. race:label(due) .. ": shift, roll, then move your car."), due.color, LEVEL_RGB.turn)
         end
     end
 end
@@ -653,8 +653,12 @@ function onObjectDrop(color, obj)
         local space, track = snapCar(obj)
         if owner then
             -- Put down during its move, the move is judged and charged:
-            -- undoable, and the dashboards show the result.
-            act(function() race:placed(owner.color, space and space.id, track) end)
+            -- undoable, and the dashboards show the result. Put down after
+            -- its roll, the car's turn is over.
+            act(function()
+                race:placed(owner.color, space and space.id, track)
+                race:putDown(owner.color)
+            end)
         end
         return
     end

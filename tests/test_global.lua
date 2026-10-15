@@ -409,6 +409,17 @@ function T.chat_is_coloured_by_kind_of_event()
     eq(said("rolls 2 in 1st gear").name, "Red", "a roll in the roller's own colour")
 end
 
+function T.a_knocked_die_from_another_gear_changes_nothing()
+    local S = redRacing()
+    fdUiShift(Player.Red, "2")
+    roll(S, 5, 14, "Red") -- the 5th gear die, knocked while reaching for the 2nd
+    assert(S.logged("5th gear die shows 14, but RedPlayer is in 2nd gear %-%- not counted"))
+    eq(state().cars.Red.gear, 2, "still in 2nd")
+    eq(state().cars.Red.lastRoll, nil, "no roll counted")
+    roll(S, 2, 3, "Red")
+    eq(state().cars.Red.lastRoll, 3, "the right die still counts")
+end
+
 function T.the_roll_button_rolls_the_die_for_your_gear()
     local S = redRacing()
     fdUiRoll(Player.Red)
@@ -1432,8 +1443,12 @@ function T.the_car_to_play_is_lit_and_its_driver_told()
     eq(cars[first].highlight[2], nil, "and stays lit")
     eq(cars[second].highlight, nil)
 
-    -- A roll ends the move: the turn passes.
+    -- A roll opens the move; the turn passes once the car is put down.
     roll(S, 1, 2, first)
+    eq(Turns.turn_color, first, "still moving")
+    eq(cars[first].highlight[1], first)
+    assert(not S.logged("Your turn, " .. second .. "Player"))
+    onObjectDrop(first, cars[first])
     assert(S.logged("Your turn, " .. second .. "Player"))
     eq(Turns.turn_color, second)
     eq(cars[first].highlight, nil)
