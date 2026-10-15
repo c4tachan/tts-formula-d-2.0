@@ -66,8 +66,14 @@ Turns = { enable = false, order = {} }
 
 Color = { fromString = function(s) return { name = s } end }
 
+-- Stub.said keeps the colour each message was sent in, by its text.
+Stub.said = {}
 local function say(kind)
-    return function(msg) Stub.log[#Stub.log + 1] = kind .. ": " .. msg end
+    return function(msg, a, b)
+        Stub.log[#Stub.log + 1] = kind .. ": " .. msg
+        -- broadcastToColor(msg, color, rgb); the others (msg, rgb).
+        Stub.said[msg] = kind == "broadcast" and type(a) == "string" and b or a
+    end
 end
 printToAll = say("print")
 broadcastToAll = say("broadcast")

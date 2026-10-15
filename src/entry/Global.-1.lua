@@ -38,6 +38,8 @@ local useBoardTrack -- likewise
 local undo = {}
 local UNDO_LIMIT = 30
 
+-- The colour of each kind of message in chat. A roll is shown in the colour
+-- of the seat that rolled it, when there is one (see relay).
 local LEVEL_RGB = {
     info = { 0.85, 0.85, 0.85 },
     warn = { 1, 0.72, 0.3 },
@@ -45,6 +47,14 @@ local LEVEL_RGB = {
     out = { 1, 0.2, 0.2 },
     finish = { 1, 0.84, 0.25 },
     turn = { 0.49, 0.99, 0 },
+    order = { 0.55, 0.8, 1 },
+    lap = { 0.78, 0.62, 1 },
+    roll = { 1, 1, 1 },
+}
+
+local SEATS = {
+    White = true, Brown = true, Red = true, Orange = true, Yellow = true,
+    Green = true, Teal = true, Blue = true, Purple = true, Pink = true,
 }
 
 -- Setup ---------------------------------------------------------------------
@@ -156,9 +166,16 @@ end
 
 -- Plumbing ------------------------------------------------------------------
 
+local function tintOf(color)
+    return Color.fromString(color)
+end
+
 local function relay(events)
     for _, e in ipairs(events) do
         local rgb = LEVEL_RGB[e.level] or LEVEL_RGB.info
+        if e.level == "roll" and SEATS[e.color] then
+            rgb = tintOf(e.color)
+        end
         if e.level == "wear" or e.level == "out" or e.level == "finish" then
             broadcastToAll(e.text, rgb)
         else
@@ -168,10 +185,6 @@ local function relay(events)
             end
         end
     end
-end
-
-local function tintOf(color)
-    return Color.fromString(color)
 end
 
 -- What each car's dashboard last showed, so an action that leaves a car alone
@@ -687,11 +700,6 @@ end
 -- apply to the car that owns the dashboard, whoever clicks.
 
 function fdNoop() end
-
-local SEATS = {
-    White = true, Brown = true, Red = true, Orange = true, Yellow = true,
-    Green = true, Teal = true, Blue = true, Purple = true, Pink = true,
-}
 
 function fdDashJoin(dash, color)
     if not SEATS[color] then

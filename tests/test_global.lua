@@ -282,6 +282,22 @@ function T.screen_and_dashboard_stay_in_step()
     assert(S.ui["fdm_Red_label"].value:find("4 WP"))
 end
 
+function T.chat_is_coloured_by_kind_of_event()
+    local S = redRacing()
+    local function said(pattern)
+        for msg, rgb in pairs(S.said) do
+            if msg:find(pattern) then return rgb end
+        end
+        error("nothing said like " .. pattern)
+    end
+    local order = said("^Order of play")
+    local info = said("joins the race")
+    assert(order[1] ~= info[1] or order[3] ~= info[3], "the order of play stands out from the rest")
+    dropOn(S, S.find("Gear Stick"), "gear", 1)
+    roll(S, 1, 2)
+    eq(said("rolls 2 in 1st gear").name, "Red", "a roll in the roller's own colour")
+end
+
 function T.the_roll_button_rolls_the_die_for_your_gear()
     local S = redRacing()
     fdUiRoll(Player.Red)

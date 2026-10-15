@@ -60,7 +60,8 @@ end
 
 -- Events --------------------------------------------------------------------
 
--- level: info | warn | wear | out | finish
+-- level: info | warn | wear | out | finish, or for what is only coloured
+-- apart: order (grid, order of play, rounds) | lap | roll (die results)
 function Race:emit(level, text, color)
     self.events[#self.events + 1] = { level = level, text = text, color = color }
 end
@@ -170,7 +171,7 @@ function Race:placed(color, spaceId, track)
     -- The round moves on at the last car's roll, before it is put down:
     -- until somebody moves in the new round, its order can still change.
     if self.state.phase == "race" and not self:anyMoved() and self:reorder() then
-        self:emit("info", "Order of play for round " .. self.state.round .. ": " .. self:orderText())
+        self:emit("order", "Order of play for round " .. self.state.round .. ": " .. self:orderText())
     end
 end
 
@@ -420,7 +421,7 @@ function Race:crossLine(car, crossed)
     local laps = self.state.laps
     car.lap = car.lap + (crossed and 1 or -1)
     if crossed and car.lap > 1 and car.lap <= laps then
-        self:emit("info", string.format("%s starts lap %d of %d%s", self:label(car), car.lap, laps,
+        self:emit("lap", string.format("%s starts lap %d of %d%s", self:label(car), car.lap, laps,
             car.lap == laps and " -- last lap" or ""), car.color)
     end
     self:settleFinish(car)
@@ -528,7 +529,7 @@ end
 function Race:setLaps(laps)
     local s = self.state
     s.laps = laps
-    self:emit("info", string.format("The race is %d lap%s", laps, laps == 1 and "" or "s"))
+    self:emit("lap", string.format("The race is %d lap%s", laps, laps == 1 and "" or "s"))
     -- Those taken out of the order first, so the ones kept close up.
     for _, car in ipairs(self:standings()) do
         if car.place and car.lap <= laps then
@@ -745,7 +746,7 @@ function Race:rolled(color, gear, value)
     car.maxGear = nil
     car.movedRound = self.state.round
     self:startMove(car, value)
-    self:emit("info", string.format("%s rolls %s in %s gear", who, tostring(value), gearName(gear)), color)
+    self:emit("roll", string.format("%s rolls %s in %s gear", who, tostring(value), gearName(gear)), color)
 
     if self.rules.engineStrain[gear] == value then
         self:emit("warn", "Engine strain! Every car in top gears rolls the black die", color)
@@ -819,7 +820,7 @@ function Race:blackDie(value, roller)
     end
     idx = idx or (#checks > 0 and 1 or nil)
     if not idx then
-        self:emit("info", "Black die: " .. tostring(value), roller)
+        self:emit("roll", "Black die: " .. tostring(value), roller)
         return
     end
     local check = table.remove(checks, idx)
@@ -924,7 +925,7 @@ function Race:settleGrid()
     self.state.phase = "setup"
     -- Not state: lets the Global script put the cars on the grid.
     self.gridSettled = true
-    self:emit("info", "Starting grid: " .. table.concat(names, "  "))
+    self:emit("order", "Starting grid: " .. table.concat(names, "  "))
 end
 
 --- The track the cars are on, for turn order. Not state: the Global script
@@ -1030,8 +1031,8 @@ function Race:startRace()
         resetCar(self.rules, car)
     end
     self:reorder()
-    self:emit("info", "Lights out! Everyone rolls the black die for their start")
-    self:emit("info", "Order of play: " .. self:orderText())
+    self:emit("order", "Lights out! Everyone rolls the black die for their start")
+    self:emit("order", "Order of play: " .. self:orderText())
     for _, car in ipairs(self:cars()) do
         self:queueCheck(car, "start")
     end
@@ -1056,7 +1057,7 @@ function Race:advanceRound()
     end
     s.round = s.round + 1
     self:reorder()
-    self:emit("info", "Round " .. s.round .. " -- " .. self:orderText())
+    self:emit("order", "Round " .. s.round .. " -- " .. self:orderText())
 end
 
 function Race:reset()
