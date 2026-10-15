@@ -77,7 +77,7 @@ function buildUi()
     -- Until the new XML has loaded, updates would go to elements on their way
     -- out and then be skipped as repeats once it has (see fd.tts.ui).
     Mini.setReady(false)
-    Hud.build(Rules.name, Mini.panels(Rules), function()
+    Hud.build(Rules, Mini.panels(Rules), function()
         applyModMenuButton()
         Mini.setReady()
         refresh()

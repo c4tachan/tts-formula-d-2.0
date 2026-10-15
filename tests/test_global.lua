@@ -1147,8 +1147,36 @@ function T.a_car_over_the_line_on_its_last_lap_wins()
     assert(S.logged("broadcast: Red"), "announced to everyone")
     assert(S.logged("wins the race"))
     assert(S.ui.fdr_title.value:find("Finished"))
-    assert(S.ui.fdr_cars.value:find("finished 1st"))
+    eq(S.ui.fdr_r1_pos.value, "1")
+    eq(S.ui.fdr_r1_status.value, "finished")
 end
+function T.the_standings_are_a_table()
+    local S = world()
+    eq(S.ui.fdr_empty.active, "true", "an empty race says how to join")
+    eq(S.ui.fdr_r1.active, "false")
+    S.beginner.click("fdDashJoin", "Red")
+    S.advanced.click("fdDashJoin", "Blue")
+    eq(S.ui.fdr_empty.active, "false")
+    eq(S.ui.fdr_r1.active, "true")
+    eq(S.ui.fdr_r2.active, "true")
+    eq(S.ui.fdr_r3.active, "false", "a row per car")
+    eq(S.ui.fdr_r1_driver.value, "RedPlayer")
+    eq(S.ui.fdr_r1_driver.color, "#DA1918", "in the seat's colour")
+    eq(S.ui.fdr_r1_w_wp.value, "18", "a number under the WP heading")
+    eq(S.ui.fdr_r1_gear.value, "grid")
+
+    fdStart(Player.Red)
+    local black = S.find("Damage Dice")
+    black.value = 10
+    onObjectRandomize(black, "Red")
+    onObjectRandomize(black, "Blue")
+    local due = state().order[1]
+    local row = S.ui.fdr_r1_driver.value == due .. "Player" and 1 or 2
+    eq(S.ui["fdr_r" .. row .. "_status"].value, "TO PLAY")
+    S.beginner.click("fdDashLeave", "Red")
+    eq(S.ui.fdr_r2.active, "false", "rows go with their cars")
+end
+
 function T.only_the_host_can_use_the_race_controls()
     local S = redRacing()
     -- Shown only to the host and promoted players.
