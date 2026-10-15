@@ -657,27 +657,52 @@ function fdUiWear(player, value)
 end
 
 -- Race panel ----------------------------------------------------------------
+-- The race-wide controls belong to the host and promoted players. The panel
+-- only shows them to those players; the check here covers a click that got
+-- through anyway, and the editor's keys and menus, which anyone can reach.
+
+--- Whether `player` may use the race controls. `player` is a TTS Player, or
+-- just a colour as the hotkeys and context menus give it.
+local function isAdmin(player)
+    if player.admin ~= nil then
+        return player.admin
+    end
+    local p = Player[player.color]
+    return p and p.admin or false
+end
+
+local function admin(player)
+    if isAdmin(player) then
+        return true
+    end
+    broadcastToColor("Only the host or a promoted player can use the race controls.", player.color, LEVEL_RGB.warn)
+    return false
+end
 
 --- The grid is rolled for everybody, on a black die of the script's own:
 -- nobody has to wait their turn with the one on the table.
 function fdGrid(player)
+    if not admin(player) then return end
     printToAll(player.steam_name .. " calls the grid roll", LEVEL_RGB.info)
     act(function() race:rollForGrid(function() return math.random(20) end) end)
 end
 
 function fdStart(player)
+    if not admin(player) then return end
     printToAll(player.steam_name .. " starts the race", LEVEL_RGB.info)
     clearReach()
     act(function() race:startRace() end)
 end
 
 function fdReset(player)
+    if not admin(player) then return end
     printToAll(player.steam_name .. " reset the race (Undo restores it)", LEVEL_RGB.info)
     clearReach()
     act(function() race:reset() end)
 end
 
 function fdUndo(player)
+    if not admin(player) then return end
     local last = table.remove(undo)
     if not last then
         broadcastToColor("Nothing to undo.", player.color, LEVEL_RGB.info)
@@ -700,6 +725,7 @@ end
 
 --- Switch the race between one lap (the basic rules) and two.
 function fdLaps(player)
+    if not admin(player) then return end
     local laps = race:serialize().laps == 1 and 2 or 1
     printToAll(player.steam_name .. " sets the race distance", LEVEL_RGB.info)
     act(function() race:setLaps(laps) end)
@@ -739,6 +765,7 @@ end
 
 --- Draw the spaces over the board, to check them against the print.
 function fdTrack(player)
+    if not admin(player) then return end
     if Editor.isOpen() then
         broadcastToColor("The editor is open; close it to hide the spaces.", player.color, LEVEL_RGB.info)
         return
@@ -922,10 +949,15 @@ local function boardMenu(on)
     if not tile then return end
     tile.clearContextMenu()
     if not on then return end
-    tile.addContextMenuItem("Pick up spaces here", function(color, pos) pickUpAt(color, pos) end)
-    tile.addContextMenuItem("Add a space here", function(color, pos) addAt(color, pos) end)
-    tile.addContextMenuItem("Apply track edits", function(color) fdApply({ color = color }) end)
-    tile.addContextMenuItem("Clear the grid", function(color)
+    local function item(label, fn)
+        tile.addContextMenuItem(label, function(color, pos)
+            if admin({ color = color }) then fn(color, pos) end
+        end)
+    end
+    item("Pick up spaces here", pickUpAt)
+    item("Add a space here", addAt)
+    item("Apply track edits", function(color) fdApply({ color = color }) end)
+    item("Clear the grid", function(color)
         broadcastToColor(Editor.clearGrid(), color, LEVEL_RGB.info)
         editorStatus()
     end)
@@ -933,6 +965,7 @@ end
 
 --- Open or close the track editor for the map on the board.
 function fdEdit(player)
+    if not admin(player) then return end
     if Editor.isOpen() then
         local n = Editor.markerCount()
         Editor.close()
@@ -962,6 +995,7 @@ function fdEdit(player)
 end
 
 function fdApply(player)
+    if not admin(player) then return end
     if not Editor.isOpen() then
         return
     end
@@ -972,6 +1006,7 @@ end
 
 --- Getting edits out of the game and into the repo.
 function fdExport(player)
+    if not admin(player) then return end
     local saved = Editor.save()
     local names = {}
     for id, e in pairs(saved) do
@@ -989,7 +1024,7 @@ end
 
 local function editorKey(fn)
     return function(color, hovered, pointer, up)
-        if up then return end
+        if up or not admin({ color = color }) then return end
         if not Editor.isOpen() then
             broadcastToColor("Open the track editor first (Edit on the race panel).", color, LEVEL_RGB.warn)
             return

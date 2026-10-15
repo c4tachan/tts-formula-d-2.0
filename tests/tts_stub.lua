@@ -225,9 +225,10 @@ function getObjectFromGUID(guid)
 end
 
 Player = {}
-function Stub.player(color, handPos)
+--- A seated player. `admin` makes them the host (or a promoted player).
+function Stub.player(color, handPos, admin)
     local p = {
-        color = color, steam_name = color .. "Player", seated = true,
+        color = color, steam_name = color .. "Player", seated = true, admin = admin or false,
         getHandTransform = function() return { position = handPos } end,
     }
     Player[color] = p

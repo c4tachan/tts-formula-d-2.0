@@ -15,6 +15,9 @@ local HEX = {
 
 local PANEL_BG = "#15181CE8"
 
+-- Who sees the race controls: the host and promoted players.
+local ADMIN = "Host|Admin"
+
 local ready = false
 
 local function el(tag, attrs, children, value)
@@ -50,14 +53,16 @@ local function racePanel(rulesName)
                 text("fdr_rules", rulesName, { fontSize = "12", color = "#AAB0B8", preferredHeight = "16" }),
                 text("fdr_cars", "No cars yet -- click Join race on a dashboard.", { preferredHeight = "180", fontSize = "15" }),
                 text("fdr_checks", "", { preferredHeight = "40", color = "#FFB74D" }),
-                el("HorizontalLayout", { spacing = "4", preferredHeight = "34" }, {
+                -- The race-wide buttons are for the host and promoted players
+                -- only; Global checks again when one is pressed.
+                el("HorizontalLayout", { spacing = "4", preferredHeight = "34", visibility = ADMIN }, {
                     button("fdr_grid", "Grid roll", "fdGrid", { tooltip = "Roll the black die for everyone and put the cars on the grid" }),
                     button("fdr_start", "Start", "fdStart", { tooltip = "Reset cars and roll for the start" }),
                     button("fdr_undo", "Undo", "fdUndo", { tooltip = "Undo the last change" }),
                     button("fdr_reset", "Reset", "fdReset", { tooltip = "Back to setup, keeping the drivers" }),
                     button("fdr_track", "Track", "fdTrack", { tooltip = "Show or hide the detected spaces on the board" }),
                 }),
-                el("HorizontalLayout", { spacing = "4", preferredHeight = "30" }, {
+                el("HorizontalLayout", { spacing = "4", preferredHeight = "30", visibility = ADMIN }, {
                     button("fdr_laps", "1 lap", "fdLaps", { tooltip = "Race over one lap (basic rules) or two" }),
                     button("fdr_edit", "Edit track", "fdEdit", { tooltip = "Open or close the track editor for the map on the board" }),
                     button("fdr_apply", "Apply", "fdApply", { tooltip = "Put the space markers back into the track" }),

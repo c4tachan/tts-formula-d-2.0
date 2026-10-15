@@ -32,7 +32,7 @@ local function world()
         guid = "ebde54", pos = S.vec(0, 1, 0), size = S.vec(44, 1, 44), scale = S.vec(44, 1, 44),
         custom = { image = Maps.byId.FDMonaco.url },
     })
-    S.player("Red", S.vec(0, 1, -38))
+    S.player("Red", S.vec(0, 1, -38), true) -- the host
     S.player("Blue", S.vec(0, 1, 38))
     assert(loadfile(ROOT .. "/src/entry/Global.-1.lua"))()
     onLoad("")
@@ -1149,6 +1149,34 @@ function T.a_car_over_the_line_on_its_last_lap_wins()
     assert(S.ui.fdr_title.value:find("Finished"))
     assert(S.ui.fdr_cars.value:find("finished 1st"))
 end
+function T.only_the_host_can_use_the_race_controls()
+    local S = redRacing()
+    -- Shown only to the host and promoted players.
+    local rows = 0
+    local function walk(node)
+        if node.attributes.visibility == "Host|Admin" then rows = rows + 1 end
+        for _, c in ipairs(node.children or {}) do walk(c) end
+    end
+    for _, node in ipairs(S.xml) do walk(node) end
+    eq(rows, 2, "both button rows are the host's")
+
+    -- A click that gets through anyway does nothing.
+    S.advanced.click("fdDashJoin", "Blue")
+    local blue = Player.Blue
+    fdReset(blue)
+    eq(state().phase, "race", "not reset")
+    assert(S.logged("Only the host"))
+    fdLaps(blue)
+    eq(state().laps, 1)
+    fdEdit(blue)
+    eq(require("fd.tts.track_editor").isOpen(), false)
+    S.press("Track editor: apply", "Blue")
+    -- The host can, promoted players too.
+    blue.admin = true
+    fdLaps(blue)
+    eq(state().laps, 2)
+end
+
 function T.spectator_roll_goes_to_the_car_in_that_gear()
     local S = redRacing()
     dropOn(S, S.find("Gear Stick"), "gear", 1)
