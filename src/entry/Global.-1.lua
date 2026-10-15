@@ -980,6 +980,15 @@ function fdStart(player)
     clearReach()
     packTable()
     act(function() race:startRace() end)
+    -- Packing the setup board sweeps up the loose dice with it: once it has,
+    -- put out again whatever is missing.
+    Wait.time(function()
+        Dice.ensureAll(function(n)
+            if n > 0 then
+                printToAll(string.format("Put %d dice out for the race", n), LEVEL_RGB.info)
+            end
+        end)
+    end, 1)
 end
 
 function fdReset(player)

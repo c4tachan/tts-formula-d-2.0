@@ -171,13 +171,33 @@ function Stub.object(name, props)
         end
         error("no button " .. fn .. " on " .. o.name)
     end
+    -- A container: `contents` is what is inside ({ name, guid }), else it is
+    -- an infinite bag of `spawns`, each holding `spawnContents` if given.
+    o.contents = o.contents or {}
+    o.getObjects = function()
+        local out = {}
+        for i, c in ipairs(o.contents) do out[i] = { name = c.name, guid = c.guid, index = i - 1 } end
+        return out
+    end
     o.takeObject = function(params)
         local r = params.rotation or vec(0, 0, 0)
-        local spawned = Stub.object(o.spawns, {
-            pos = params.position, rot = vec(r.x, r.y, r.z),
-            -- Taken out face down, as the beginner dashboard bag does.
-            up = vec(0, math.abs(r.z or 0) == 180 and -1 or 1, 0),
-        })
+        local name, props = o.spawns, {}
+        if params.guid then
+            for i, c in ipairs(o.contents) do
+                if c.guid == params.guid then
+                    name, props.guid = c.name, c.guid
+                    table.remove(o.contents, i)
+                    break
+                end
+            end
+        elseif o.spawnContents then
+            props.contents = deepcopy(o.spawnContents)
+        end
+        props.pos = params.position
+        props.rot = vec(r.x or 0, r.y or 0, r.z or 0)
+        -- Taken out face down, as the beginner dashboard bag does.
+        props.up = vec(0, math.abs(r.z or 0) == 180 and -1 or 1, 0)
+        local spawned = Stub.object(name, props)
         if params.callback_function then params.callback_function(spawned) end
         return spawned
     end

@@ -152,6 +152,64 @@ function T.players_seated_at_load_are_dealt_in()
     eq(state().cars.Blue.tts.dash, S.advanced.guid)
 end
 
+--- Every one of the seven dice off the table, as packed away.
+local function packDice(S)
+    local gone = {}
+    for _, n in ipairs({ "First", "Second", "Third", "Fourth", "Fifth", "Sixth" }) do
+        gone[#gone + 1] = n .. " Gear Dice"
+    end
+    gone[#gone + 1] = "Damage Dice"
+    for _, name in ipairs(gone) do S.find(name).destruct() end
+    return gone
+end
+
+function T.the_start_fetches_dice_swept_up_with_the_setup_board()
+    local S = world()
+    S.find("First Gear Dice").destruct()
+    S.find("Damage Dice").destruct()
+    S.object("Memory Bag - Setup Board", { guid = "0fde3b", contents = {
+        { name = "Setup Board", guid = "632ae8" },
+        { name = "First Gear Dice", guid = "a8062d" },
+        { name = "Damage Dice", guid = "6e3283" },
+    } })
+    S.beginner.click("fdDashJoin", "Red")
+    fdStart(Player.Red)
+    local first = S.find("First Gear Dice")
+    assert(first, "the 1st gear die is back")
+    eq(first.guid, "a8062d", "the same die, out of the bag")
+    eq(#first.rotationValues, 4, "and taught its faces")
+    assert(first.pos.y > 1, "on the table")
+    assert(S.find("Damage Dice"), "the black die too")
+    eq(S.count("Setup Board"), 0, "the setup board stays packed")
+    assert(S.logged("Put 2 dice out"))
+end
+
+function T.the_start_falls_back_on_the_spare_dice_set()
+    local S = world()
+    local names = packDice(S)
+    local set = {}
+    for i, name in ipairs(names) do set[i] = { name = name, guid = "d" .. i } end
+    S.object("Dice Set Bag", { guid = "ac4939", spawns = "Dice Set", spawnContents = set })
+    S.beginner.click("fdDashJoin", "Red")
+    fdStart(Player.Red)
+    for _, name in ipairs(names) do
+        eq(S.count(name), 1, name)
+    end
+    eq(S.count("Dice Set"), 0, "the spare set's bag is put away")
+    assert(S.logged("Put 7 dice out"))
+    -- And the fetched dice are the ones the race uses.
+    dropOn(S, S.find("Gear Stick"), "gear", 1)
+    local die = S.find("First Gear Dice")
+    assert(die.pos.z < 0, "brought to Red on the shift")
+end
+
+function T.no_dice_fetched_when_all_are_out()
+    local S = world()
+    S.beginner.click("fdDashJoin", "Red")
+    fdStart(Player.Red)
+    assert(not S.logged("dice out"))
+end
+
 function T.free_dashboards_offer_join()
     local S = world()
     eq(#S.beginner.buttons, 1)
