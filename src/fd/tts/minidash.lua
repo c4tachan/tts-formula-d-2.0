@@ -36,6 +36,7 @@ local MARKER = 18      -- square marker, about the size of a printed hole
 local HIT = 30         -- invisible click target over a slot
 
 local ACTIONS = {
+    { fn = "fdUiRoll", label = "Roll", tip = "Roll the gear die for the gear you are in" },
     { fn = "fdUiCar", label = "Car", tip = "Claim the nearest car, or take one from the bag" },
     { fn = "fdUiCollision", label = "Collision?", tip = "Ended next to or behind a car: roll the black die" },
     { fn = "fdUiPit", label = "Pit stop", tip = "Restore WP; leave in 4th gear or lower" },

@@ -371,15 +371,20 @@ local function ownerOf(color, gear)
     return match or color
 end
 
+--- Read gear die `obj` for `gear` once it settles, as rolled by `color`.
+local function watchGearDie(obj, color, gear)
+    Dice.watch(obj, color, function(value, roller)
+        if value then
+            clearReach()
+            act(function() race:rolled(ownerOf(roller, gear), gear, value) end)
+        end
+    end)
+end
+
 function onObjectRandomize(obj, color)
     local gear = Dice.gearOf(obj)
     if gear then
-        Dice.watch(obj, color, function(value, roller)
-            if value then
-                clearReach()
-                act(function() race:rolled(ownerOf(roller, gear), gear, value) end)
-            end
-        end)
+        watchGearDie(obj, color, gear)
     elseif Dice.isBlack(obj) then
         Dice.watch(obj, color, function(value, roller)
             if value then
@@ -711,6 +716,35 @@ function fdUiCar(player) runAction(mine(player), "car") end
 function fdUiCollision(player) runAction(mine(player), "collision") end
 function fdUiPit(player) runAction(mine(player), "pit") end
 function fdUiLeave(player) runAction(mine(player), "leave") end
+
+--- Roll the gear die for the player's gear, fetching it first if it is
+-- elsewhere: the same die, read the same way, as throwing it by hand.
+function fdUiRoll(player)
+    local car = mine(player)
+    if not car then
+        return
+    end
+    if car.gear == 0 then
+        broadcastToColor("Shift into a gear first: click one on your dashboard.", player.color, LEVEL_RGB.warn)
+        return
+    end
+    local pos = dicePosition(player.color)
+    local die = pos and Dice.bring(car.gear, pos, player.color) or Dice.find(car.gear)
+    if not die then
+        broadcastToColor("The " .. Race.gearName(car.gear) .. " gear die is not on the table.", player.color, LEVEL_RGB.warn)
+        return
+    end
+    if die.held_by_color then
+        broadcastToColor("Someone is holding the " .. Race.gearName(car.gear) .. " gear die.", player.color, LEVEL_RGB.warn)
+        return
+    end
+    local gear = car.gear
+    Wait.condition(function()
+        if die == nil then return end
+        die.roll()
+        watchGearDie(die, player.color, gear)
+    end, function() return die == nil or not die.isSmoothMoving() end, 5)
+end
 
 function fdUiShift(player, value)
     local gear = tonumber(value)

@@ -261,6 +261,25 @@ function T.screen_and_dashboard_stay_in_step()
     assert(S.ui["fdm_Red_label"].value:find("4 WP"))
 end
 
+function T.the_roll_button_rolls_the_die_for_your_gear()
+    local S = redRacing()
+    fdUiRoll(Player.Red)
+    assert(S.logged("Shift into a gear first"), "no gear, no roll")
+
+    fdUiShift(Player.Red, "2")
+    local die = S.find("Second Gear Dice")
+    die.pos = S.vec(40, 1, 40) -- wandered off after the shift
+    die.value = 4
+    fdUiRoll(Player.Red)
+    eq(die.rolls, 1, "thrown once")
+    assert(die.pos.z < 0, "fetched to Red's side first")
+    eq(state().cars.Red.lastRoll, 4, "read like a roll by hand")
+
+    -- Someone else's button rolls nothing for Red.
+    fdUiRoll(Player.Blue)
+    eq(die.rolls, 1)
+end
+
 function T.screen_buttons_act_on_the_clickers_car()
     local S = redRacing()
     fdUiWear({ color = "Red" }, "wp:17")

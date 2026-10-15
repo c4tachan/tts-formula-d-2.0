@@ -124,6 +124,9 @@ function Stub.object(name, props)
     o.setLock = function(l) o.locked = l end
     o.setPositionSmooth = function(p) o.pos = vec(p.x, p.y, p.z) end
     o.setRotationSmooth = function(r) o.rot = r end
+    o.isSmoothMoving = function() return false end
+    -- A roll leaves `value` as the test set it; it only counts the throws.
+    o.roll = function() o.rolls = (o.rolls or 0) + 1 end
     -- The highlight left on: { color, duration }, duration nil if it stays.
     o.highlightOn = function(c, d) o.highlight = { c, d } end
     o.highlightOff = function() o.highlight = nil end
