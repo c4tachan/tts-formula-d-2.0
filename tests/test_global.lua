@@ -1286,12 +1286,48 @@ function T.the_standings_are_a_table()
     eq(S.ui.fdr_r2.active, "false", "rows go with their cars")
 end
 
+function T.the_start_goes_down_the_order_with_a_button_to_roll()
+    local S, red, blue = twoCars()
+    gridRoll(S, { Red = 4, Blue = 15 }) -- Blue on pole
+    eq(S.ui.fdBlack_Blue and S.ui.fdBlack_Blue.active or "false", "false", "no button before the start")
+    fdStart(Player.Red)
+
+    -- The leader is up first: TTS's turn, the highlight and the button.
+    eq(Turns.turn_color, "Blue")
+    eq(blue.highlight[1], "Blue")
+    eq(S.ui.fdBlack_Blue.active, "true")
+    eq(S.ui.fdBlack_Red.active, "false", "only for the player whose roll it is")
+    assert(S.logged("Your start, BluePlayer: roll the black die"))
+
+    -- A click out of turn rolls nothing for anyone.
+    fdRollBlack(Player.Teal or { color = "Teal" })
+    eq(#state().checks, 2)
+
+    local random = math.random
+    math.random = function() return 10 end
+    fdRollBlack(Player.Blue)
+    math.random = random
+    assert(S.logged("BluePlayer rolls 10 on the black die"))
+    eq(S.ui.fdBlack_Blue.active, "false", "the button goes once used")
+    eq(Turns.turn_color, "Red", "on to the next car's start")
+    eq(S.ui.fdBlack_Red.active, "true")
+
+    -- The die on the table still counts, and puts the button away too.
+    local black = S.find("Damage Dice")
+    black.value = 10
+    onObjectRandomize(black, "Red")
+    eq(S.ui.fdBlack_Red.active, "false")
+    eq(#state().checks, 0)
+    eq(Turns.turn_color, "Blue", "and the leader plays first")
+    assert(S.logged("Your turn, BluePlayer"))
+end
+
 function T.the_car_to_play_is_lit_and_its_driver_told()
     local S, red, blue = twoCars()
     gridRoll(S, { Red = 4, Blue = 15 })
     red.highlight, blue.highlight = nil, nil -- the few seconds' glow from claiming them
     fdStart(Player.Red)
-    eq(Turns.enable, false, "no turn marker until a car is due")
+    -- The start rolls (see the next test), here on the die on the table.
     local black = S.find("Damage Dice")
     black.value = 10
     onObjectRandomize(black, "Red")

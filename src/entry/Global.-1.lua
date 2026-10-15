@@ -277,11 +277,13 @@ end
 local turnTold = nil
 local litCar = nil
 
-local function waitingForStart()
+--- The car next to roll for its start, while the field is: the checks are
+-- queued in race order, so the leader rolls first. nil once all have.
+local function startRoller()
     for _, c in ipairs(race:pendingChecks()) do
-        if c.kind == "start" then return true end
+        if c.kind == "start" then return race:car(c.color) end
     end
-    return false
+    return nil
 end
 
 --- Hand TTS's own turn marker to `due`, in the race's order of play, which
@@ -314,12 +316,12 @@ end
 
 --- Point everyone at the car to play: TTS's turn marker and a highlight on
 -- the car. `announce` also tells its driver, once, when the turn passes to
--- them. Nobody is due while the field is still rolling for the start.
+-- them. At the start, the turn goes down the order for the start rolls
+-- first, each with a button on screen to roll the black die.
 local function showTurn(announce)
-    local due = race:turn()
-    if due and waitingForStart() then
-        due = nil
-    end
+    local starting = race.state.phase == "race" and startRoller() or nil
+    local due = starting or race:turn()
+    Hud.askToRoll(starting and starting.color)
     local obj = due and due.tts and due.tts.car and getObjectFromGUID(due.tts.car)
     local guid = obj and obj.getGUID() or nil
     if guid ~= litCar then
@@ -329,11 +331,13 @@ local function showTurn(announce)
         litCar = guid
     end
     syncTurns(due)
-    local key = due and (race.state.round .. ":" .. due.color)
+    local key = due and ((starting and "start" or race.state.round) .. ":" .. due.color)
     if announce and key and key ~= turnTold then
         turnTold = key
         if Player[due.color] and Player[due.color].seated then
-            broadcastToColor("Your turn, " .. race:label(due) .. ": shift, then roll.", due.color, LEVEL_RGB.turn)
+            broadcastToColor(starting
+                and ("Your start, " .. race:label(due) .. ": roll the black die.")
+                or ("Your turn, " .. race:label(due) .. ": shift, then roll."), due.color, LEVEL_RGB.turn)
         end
     end
 end
@@ -940,6 +944,18 @@ function fdGrid(player)
     if not admin(player) then return end
     printToAll(player.steam_name .. " calls the grid roll", LEVEL_RGB.info)
     act(function() race:rollForGrid(function() return math.random(20) end) end)
+end
+
+--- The big button on screen: the black die rolled for the player's oldest
+-- check by a die of the script's own, as for the grid. Gone once used, as
+-- the check it was for is.
+function fdRollBlack(player)
+    for _, c in ipairs(race:pendingChecks()) do
+        if c.color == player.color then
+            act(function() race:blackDie(math.random(20), player.color) end)
+            return
+        end
+    end
 end
 
 function fdStart(player)
