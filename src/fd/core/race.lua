@@ -788,6 +788,13 @@ function Race:countRoll(car, gear, value)
             .. "(shift first to roll another gear)", gearName(gear), tostring(value), who, gearName(selected)), car.color)
         return false
     end
+    for _, c in ipairs(self.state.checks) do
+        if c.kind == "start" and c.color == car.color then
+            self:emit("warn", string.format("%s gear die shows %s, but %s has to roll the black die for "
+                .. "the start first -- not counted", gearName(gear), tostring(value), who), car.color)
+            return false
+        end
+    end
     local round = self.state.round
     if (car.rolledRound == round or car.movedRound == round) and not self:onlyOpenMovesLeft(car) then
         self:emit("warn", string.format("%s gear die shows %s, but %s has rolled already this round -- not counted "
@@ -1127,11 +1134,14 @@ function Race:startRace()
         resetCar(self.rules, car)
     end
     self:reorder()
-    self:emit("order", "Lights out! Everyone rolls the black die for their start")
+    self:emit("order", "Lights out! Each driver rolls the black die for their start on their first turn")
     self:emit("order", "Order of play: " .. self:orderText())
+    -- Not announced now: each driver is told on their first turn.
+    self.rolling = true
     for _, car in ipairs(self:cars()) do
         self:queueCheck(car, "start")
     end
+    self.rolling = nil
 end
 
 --- Move to the next round once every running car has moved or sat out.

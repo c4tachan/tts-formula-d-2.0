@@ -1385,21 +1385,22 @@ function T.the_standings_are_a_table()
     eq(S.ui.fdr_r2.active, "false", "rows go with their cars")
 end
 
-function T.the_start_goes_down_the_order_with_a_button_to_roll()
+function T.each_first_turn_starts_with_the_start_roll()
     local S, red, blue = twoCars()
     gridRoll(S, { Red = 4, Blue = 15 }) -- Blue on pole
     eq(S.ui.fdBlack_Blue and S.ui.fdBlack_Blue.active or "false", "false", "no button before the start")
     fdStart(Player.Red)
+    assert(not S.logged("RedPlayer: roll the black die"), "nobody is asked before their turn")
 
     -- The leader is up first: TTS's turn, the highlight and the button.
     eq(Turns.turn_color, "Blue")
     eq(blue.highlight[1], "Blue")
     eq(S.ui.fdBlack_Blue.active, "true")
-    eq(S.ui.fdBlack_Red.active, "false", "only for the player whose roll it is")
+    eq(S.ui.fdBlack_Red.active, "false", "Red's start waits for Red's turn")
     assert(S.logged("Your start, BluePlayer: roll the black die"))
 
     -- A click out of turn rolls nothing for anyone.
-    fdRollBlack(Player.Teal or { color = "Teal" })
+    fdRollBlack({ color = "Teal" })
     eq(#state().checks, 2)
 
     local random = math.random
@@ -1408,17 +1409,33 @@ function T.the_start_goes_down_the_order_with_a_button_to_roll()
     math.random = random
     assert(S.logged("BluePlayer rolls 10 on the black die"))
     eq(S.ui.fdBlack_Blue.active, "false", "the button goes once used")
-    eq(Turns.turn_color, "Red", "on to the next car's start")
-    eq(S.ui.fdBlack_Red.active, "true")
 
-    -- The die on the table still counts, and puts the button away too.
+    -- A normal start: still Blue's turn, to shift, roll and move.
+    eq(Turns.turn_color, "Blue")
+    assert(S.logged("Your turn, BluePlayer"))
+    eq(S.ui.fdBlack_Red.active, "false")
+    fdUiShift(Player.Blue, "1")
+    roll(S, 1, 2, "Blue")
+    eq(state().cars.Blue.lastRoll, 2)
+    eq(Turns.turn_color, "Blue", "until the car is put down")
+    onObjectDrop("Blue", blue)
+
+    -- Then Red's first turn, starting with Red's start.
+    eq(Turns.turn_color, "Red")
+    eq(S.ui.fdBlack_Red.active, "true")
+    assert(S.logged("Your start, RedPlayer: roll the black die"))
+    fdUiShift(Player.Red, "1")
+    roll(S, 1, 2, "Red")
+    assert(S.logged("RedPlayer has to roll the black die for the start first %-%- not counted"))
+    eq(state().cars.Red.lastRoll, nil)
+
+    -- The die on the table counts too, and puts the button away.
     local black = S.find("Damage Dice")
     black.value = 10
     onObjectRandomize(black, "Red")
     eq(S.ui.fdBlack_Red.active, "false")
     eq(#state().checks, 0)
-    eq(Turns.turn_color, "Blue", "and the leader plays first")
-    assert(S.logged("Your turn, BluePlayer"))
+    assert(S.logged("Your turn, RedPlayer"))
 end
 
 function T.the_car_to_play_is_lit_and_its_driver_told()

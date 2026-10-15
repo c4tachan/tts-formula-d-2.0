@@ -277,13 +277,13 @@ end
 local turnTold = nil
 local litCar = nil
 
---- The car next to roll for its start, while the field is: the checks are
--- queued in race order, so the leader rolls first. nil once all have.
-local function startRoller()
+--- Whether `car` has still to roll the black die for its start: the first
+-- thing it does on its first turn.
+local function startDue(car)
     for _, c in ipairs(race:pendingChecks()) do
-        if c.kind == "start" then return race:car(c.color) end
+        if c.kind == "start" and c.color == car.color then return true end
     end
-    return nil
+    return false
 end
 
 --- Hand TTS's own turn marker to `due`, in the race's order of play, which
@@ -314,16 +314,17 @@ local function syncTurns(due)
     end
 end
 
---- Who has the black die to roll, and what for: the one car whose start it
--- is, while the field rolls for the start; otherwise everyone with a check
--- waiting (a collision, engine strain), for the oldest of theirs.
-local function rollsWanted(starting)
-    if starting then
-        return { [starting.color] = "for your start" }
-    end
+--- Who has the black die to roll, and what for: everyone with a check
+-- waiting (a collision, engine strain), for the oldest of theirs -- but a
+-- start only on that car's own turn, `due`.
+local function rollsWanted(due)
     local asks = {}
     for _, c in ipairs(race:pendingChecks()) do
-        if not asks[c.color] then
+        if c.kind == "start" then
+            if due and c.color == due.color and not asks[c.color] then
+                asks[c.color] = "for your start"
+            end
+        elseif not asks[c.color] then
             asks[c.color] = race:checkName(c) .. " check"
         end
     end
@@ -332,12 +333,12 @@ end
 
 --- Point everyone at the car to play: TTS's turn marker and a highlight on
 -- the car. `announce` also tells its driver, once, when the turn passes to
--- them. At the start, the turn goes down the order for the start rolls
--- first, each with a button on screen to roll the black die.
+-- them. A car's first turn begins with its start roll, with a button on
+-- screen for the black die; then it shifts, rolls and moves as ever.
 local function showTurn(announce)
-    local starting = race.state.phase == "race" and startRoller() or nil
-    local due = starting or race:turn()
-    Hud.askToRoll(rollsWanted(starting))
+    local due = race:turn()
+    local starting = due and startDue(due)
+    Hud.askToRoll(rollsWanted(due))
     local obj = due and due.tts and due.tts.car and getObjectFromGUID(due.tts.car)
     local guid = obj and obj.getGUID() or nil
     if guid ~= litCar then
