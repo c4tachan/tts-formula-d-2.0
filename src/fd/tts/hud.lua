@@ -192,7 +192,11 @@ function Hud.askToRoll(asks)
     for _, c in ipairs(SEATS) do
         local why = asks[c]
         if why then
-            Ui.set("fdBlack_" .. c, "text", "Roll the black die\n<size=18>" .. why .. "</size>")
+            -- Setting a button's text puts its text colour back to TTS's
+            -- default dark grey, so the colour goes in the text as well.
+            Ui.set("fdBlack_" .. c, "text",
+                "<color=#FFFFFF>Roll the black die\n<size=18>" .. why .. "</size></color>")
+            Ui.set("fdBlack_" .. c, "textColor", "#FFFFFF")
         end
         Ui.set("fdBlack_" .. c, "active", tostring(why ~= nil))
     end
