@@ -314,6 +314,22 @@ local function syncTurns(due)
     end
 end
 
+--- Who has the black die to roll, and what for: the one car whose start it
+-- is, while the field rolls for the start; otherwise everyone with a check
+-- waiting (a collision, engine strain), for the oldest of theirs.
+local function rollsWanted(starting)
+    if starting then
+        return { [starting.color] = "for your start" }
+    end
+    local asks = {}
+    for _, c in ipairs(race:pendingChecks()) do
+        if not asks[c.color] then
+            asks[c.color] = race:checkName(c) .. " check"
+        end
+    end
+    return asks
+end
+
 --- Point everyone at the car to play: TTS's turn marker and a highlight on
 -- the car. `announce` also tells its driver, once, when the turn passes to
 -- them. At the start, the turn goes down the order for the start rolls
@@ -321,7 +337,7 @@ end
 local function showTurn(announce)
     local starting = race.state.phase == "race" and startRoller() or nil
     local due = starting or race:turn()
-    Hud.askToRoll(starting and starting.color)
+    Hud.askToRoll(rollsWanted(starting))
     local obj = due and due.tts and due.tts.car and getObjectFromGUID(due.tts.car)
     local guid = obj and obj.getGUID() or nil
     if guid ~= litCar then

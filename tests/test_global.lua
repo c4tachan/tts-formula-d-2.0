@@ -1222,6 +1222,36 @@ function T.strain_roll_queues_black_die_checks()
     eq(state().cars.Red.wear.wp, 18, "shifting up one at a time is free")
     assert(S.logged("Engine strain"))
     assert(S.ui.fdr_checks.value:find("engine"), "race panel lists the check")
+
+    -- The button on screen rolls it, and goes.
+    eq(S.ui.fdBlack_Red.active, "true")
+    assert(S.ui.fdBlack_Red.text:find("engine check"), S.ui.fdBlack_Red.text)
+    fdRollBlack(Player.Red)
+    eq(#state().checks, 0)
+    eq(S.ui.fdBlack_Red.active, "false")
+end
+
+function T.a_collision_check_brings_up_the_button_for_its_car_only()
+    local S = twoCars()
+    fdStart(Player.Red)
+    local black = S.find("Damage Dice")
+    black.value = 10
+    onObjectRandomize(black, "Red")
+    onObjectRandomize(black, "Blue")
+    eq(S.ui.fdBlack_Red.active, "false", "start rolls done")
+
+    S.beginner.click("fdDashCollision", "Red")
+    S.beginner.click("fdDashCollision", "Red") -- a second check waits behind it
+    eq(S.ui.fdBlack_Red.active, "true")
+    assert(S.ui.fdBlack_Red.text:find("collision check"), S.ui.fdBlack_Red.text)
+    eq(S.ui.fdBlack_Blue.active, "false", "nothing for Blue to roll")
+    eq(Turns.turn_color, state().order[1], "the turn stays where it was")
+
+    fdRollBlack(Player.Blue) -- not Blue's to roll
+    eq(#state().checks, 1)
+    fdRollBlack(Player.Red)
+    eq(#state().checks, 0)
+    eq(S.ui.fdBlack_Red.active, "false")
 end
 
 function T.laps_button_sets_the_distance_and_undo_puts_it_back()

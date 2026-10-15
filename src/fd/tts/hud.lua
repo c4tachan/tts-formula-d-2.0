@@ -135,8 +135,8 @@ local SEATS = { "White", "Brown", "Red", "Orange", "Yellow", "Green", "Teal", "B
 local function rollButton(color)
     return el("Button", {
         id = "fdBlack_" .. color, visibility = color, active = "false",
-        rectAlignment = "MiddleCenter", offsetXY = "0 120", width = "360", height = "96",
-        text = "Roll the black die", fontSize = "30", fontStyle = "Bold", textColor = "#FFFFFF",
+        rectAlignment = "MiddleCenter", offsetXY = "0 120", width = "360", height = "110",
+        text = "Roll the black die", fontSize = "28", fontStyle = "Bold", textColor = "#FFFFFF",
         colors = "#1B1D21F0|#2E3238F0|#0E0F11F0|#1B1D2180", outline = HEX[color], outlineSize = "4 -4",
         onClick = "fdRollBlack", tooltip = "Rolls it for you; the result is in the chat",
     })
@@ -183,13 +183,18 @@ function Hud.build(rules, extras, onReady)
     end, function() return not UI.loading end)
 end
 
---- Show the black die button to `color` alone, or (nil) to nobody.
-function Hud.askToRoll(color)
+--- Show the black die button to each colour in `asks` (colour -> what the
+-- roll is for), and to nobody else.
+function Hud.askToRoll(asks)
     if not ready then
         return
     end
     for _, c in ipairs(SEATS) do
-        Ui.set("fdBlack_" .. c, "active", tostring(c == color))
+        local why = asks[c]
+        if why then
+            Ui.set("fdBlack_" .. c, "text", "Roll the black die\n<size=18>" .. why .. "</size>")
+        end
+        Ui.set("fdBlack_" .. c, "active", tostring(why ~= nil))
     end
 end
 
