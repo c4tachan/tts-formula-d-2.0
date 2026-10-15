@@ -3,7 +3,9 @@
 --
 -- A move is `roll` steps along the track's links (on down a lane, or across
 -- to the next space in a lane beside it), never through or onto another car.
--- Ending short is braking. A corner needs a number of stops -- moves ended
+-- Ending short is braking: on a straight, short of the shortest way there,
+-- as a car may not weave to use up its roll; in a corner, short of the
+-- longest way there along the arrows. A corner needs a number of stops -- moves ended
 -- inside it -- before a car may leave it; leaving early is overshooting,
 -- and every space from there on is overshot, in the lane the car left the
 -- corner in. Ending in a corner while overshooting does not count as a stop
@@ -100,13 +102,43 @@ function Moves.reach(track, fromId, roll, opts)
         return o
     end
 
-    -- A state is a way of standing on a space after some steps. Each space
-    -- is only reached the shortest way: lanes on a straight are staggered
-    -- by half a cell, so weaving across them takes more steps to go as far,
-    -- and a car may not weave to burn off its roll -- what it does not use
-    -- going the short way is braking. Of the ways to a space that are
-    -- equally short, the cheapest is kept, and the move carries on from it.
-    local start = { space = from, made = made, over = nil, prev = nil }
+    -- Steps from `a` to each space, going round the cars: a run of straight
+    -- steps from `a` may take no more than this. Worked out once per `a`.
+    local dists = {}
+    local function distFrom(a)
+        if dists[a.id] then
+            return dists[a.id]
+        end
+        local d, ring = { [a.id] = 0 }, { a }
+        for k = 1, roll do
+            local nxt = {}
+            for _, s in ipairs(ring) do
+                for _, nid in ipairs(s.next or {}) do
+                    local t = byId[nid]
+                    if t and not occupied[nid] and not d[nid] then
+                        d[nid] = k
+                        nxt[#nxt + 1] = t
+                    end
+                end
+            end
+            ring = nxt
+        end
+        dists[a.id] = d
+        return d
+    end
+
+    -- A state is a way of standing on a space after some steps. On a
+    -- straight, a run of steps must go the shortest way from where it began
+    -- (`run`, where the move started or the car left a corner): lanes there
+    -- are staggered by half a cell, so weaving across them takes more steps
+    -- to go as far, and a car may not weave to burn off its roll -- what it
+    -- does not use going the short way is braking. A step into, through or
+    -- out of a corner is free to: the arrows there are the moves, and two
+    -- ways along them to one space can differ in length. Of the ways to a
+    -- space, the cheapest is kept -- the longest, unless it costs more on
+    -- the way -- and of those ending one step count on, the move carries on
+    -- from the cheapest per run.
+    local start = { space = from, made = made, over = nil, prev = nil, run = from, runAt = 0 }
     local results = { [from.id] = finish(start, 0) }
     local level = { start }
     for moved = 1, roll do
@@ -115,7 +147,15 @@ function Moves.reach(track, fromId, roll, opts)
             local s = st.space
             for _, nid in ipairs(s.next or {}) do
                 local t = byId[nid]
-                if t and not occupied[nid] and not results[nid] then
+                local run, runAt, ok = st.run, st.runAt, false
+                if t and not occupied[nid] then
+                    if s.corner or t.corner then
+                        run, runAt, ok = t, moved, true
+                    else
+                        ok = distFrom(run)[nid] == moved - runAt
+                    end
+                end
+                if ok then
                     local over, tMade = st.over, st.made
                     if over then
                         over = { corner = over.corner, missed = over.missed, spaces = over.spaces + 1 }
@@ -128,22 +168,28 @@ function Moves.reach(track, fromId, roll, opts)
                     end
                     -- Overshooting, a car keeps to its lane.
                     if not over or t.lane == s.lane then
-                        local nst = { space = t, made = tMade, over = over, prev = st }
-                        local had = best[nid]
+                        local nst = { space = t, made = tMade, over = over, prev = st,
+                                      run = run, runAt = runAt }
+                        local key = nid .. "<" .. run.id
+                        local had = best[key]
                         if not had then
-                            order[#order + 1] = nid
-                            best[nid] = nst
+                            order[#order + 1] = key
+                            best[key] = nst
                         elseif cost(outcome(nst, moved)) < cost(outcome(had, moved)) then
-                            best[nid] = nst
+                            best[key] = nst
                         end
                     end
                 end
             end
         end
         level = {}
-        for _, id in ipairs(order) do
-            results[id] = finish(best[id], moved)
-            level[#level + 1] = best[id]
+        for _, key in ipairs(order) do
+            local st = best[key]
+            local had = results[st.space.id]
+            if not had or cost(outcome(st, moved)) <= cost(had) then
+                results[st.space.id] = finish(st, moved)
+            end
+            level[#level + 1] = st
         end
     end
     return results
