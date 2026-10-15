@@ -70,7 +70,9 @@ Rules.checks = {
             if v == 1 then
                 return { stall = true, text = "stalled -- no move this round, start in 1st next round" }
             elseif v >= 17 then
-                return { bonus = 4, text = "great start! Move 4 spaces now, still in 1st gear (may change 1-2 lanes)" }
+                -- The 4 spaces are the car's whole first move: no 1st gear roll.
+                return { bonus = 4, text = "great start! Move 4 spaces now (may change 1-2 lanes) -- that is "
+                    .. "your move this round, instead of the 1st gear roll; shift to 2nd next round if you like" }
             end
             return { text = "normal start -- roll the 1st gear die" }
         end,
