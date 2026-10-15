@@ -782,8 +782,11 @@ function Race:queueCheck(car, kind, with, pack)
     end
     local c = { color = car.color, kind = kind, with = with, pack = pack }
     self.state.checks[#self.state.checks + 1] = c
-    self:emit("info", string.format("%s: roll the black die (%s check)",
-        self:label(car), self:checkName(c)), car.color)
+    -- Nobody is asked to roll what is being rolled for them (see rollForGrid).
+    if not self.rolling then
+        self:emit("info", string.format("%s: roll the black die (%s check)",
+            self:label(car), self:checkName(c)), car.color)
+    end
     return true
 end
 
@@ -851,12 +854,29 @@ end
 
 -- Grid and rounds -----------------------------------------------------------
 
-function Race:rollForGrid()
+-- The most rolls made for the drivers in one grid roll: far more than any
+-- run of ties needs. Past it, whoever is still tied rolls by hand.
+local GRID_ROLLS = 200
+
+--- Everyone rolls the black die for grid position. With `die`, a function
+-- returning one roll of it, the rolls are made for them, ties and all, and
+-- the grid is settled when this returns; without, each driver rolls.
+function Race:rollForGrid(die)
     self.state.phase = "grid"
+    self.rolling = die ~= nil
     for _, car in ipairs(self:cars()) do
         car.gridRolls = {}
         self:queueCheck(car, "grid")
     end
+    for _ = 1, die and GRID_ROLLS or 0 do
+        local check = nil
+        for _, c in ipairs(self.state.checks) do
+            if c.kind == "grid" then check = c break end
+        end
+        if not check then break end
+        self:blackDie(die(), check.color)
+    end
+    self.rolling = nil
 end
 
 local function compareRolls(a, b)

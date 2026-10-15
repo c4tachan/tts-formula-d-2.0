@@ -563,14 +563,24 @@ function T.undo_keeps_the_cars_where_they_are()
     eq(state().cars.Red.space, "m.s2.6", "and the car is still where it was put")
 end
 
---- Everyone rolls the black die for the grid: `rolls` is color -> value.
-local function gridRoll(S, rolls)
-    fdGrid({ steam_name = "host", color = "Red" })
-    local black = S.find("Damage Dice")
-    for color, value in pairs(rolls) do
-        black.value = value
-        onObjectRandomize(black, color)
+--- Grid roll, with the script's die loaded: `rolls` is color -> value, and
+-- `more` the values it comes up with after those, for breaking ties.
+local function gridRoll(S, rolls, more)
+    local values = {}
+    for _, color in ipairs(state().order) do
+        values[#values + 1] = rolls[color]
     end
+    for _, v in ipairs(more or {}) do
+        values[#values + 1] = v
+    end
+    local random, i = math.random, 0
+    math.random = function()
+        i = i + 1
+        return values[i]
+    end
+    local ok, err = pcall(fdGrid, { steam_name = "host", color = "Red" })
+    math.random = random
+    assert(ok, err)
 end
 
 --- Red and Blue in the race, each with a car parked off the board.
@@ -594,13 +604,17 @@ function T.the_grid_roll_puts_the_cars_on_the_grid()
     eq(state().cars.Red.space, second.id)
 end
 
-function T.the_grid_waits_for_ties_to_be_broken()
-    local S, red = twoCars()
-    local at = red.pos
-    gridRoll(S, { Red = 9, Blue = 9 })
-    eq(red.pos, at, "nobody moves on a tie")
-    gridRoll(S, { Red = 12, Blue = 3 })
-    eq(state().cars.Red.space, require("fd.data.tracks.FDMonaco").start[1])
+function T.the_grid_roll_breaks_its_own_ties()
+    local S = twoCars()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    gridRoll(S, { Red = 9, Blue = 9 }, { 12, 3 })
+    assert(S.logged("Tie for the grid"))
+    assert(not S.logged("roll the black die"), "nobody is asked to roll")
+    eq(#state().checks, 0)
+    local pole = state().cars[state().order[1]]
+    eq(pole.gridRolls[2], 12, "the higher second roll takes pole")
+    eq(pole.space, FDMonaco.start[1])
+    eq(state().cars[state().order[2]].space, FDMonaco.start[2])
 end
 
 function T.a_driver_without_a_car_is_told_at_the_grid()

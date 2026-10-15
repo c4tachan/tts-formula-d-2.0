@@ -228,6 +228,40 @@ function T.grid_orders_by_roll_and_rerolls_ties()
     eq(order[3], "Red")
 end
 
+--- A die that comes up with each of `values` in turn.
+local function loaded(values)
+    local i = 0
+    return function()
+        i = i + 1
+        return values[i]
+    end
+end
+
+function T.the_grid_can_be_rolled_for_everybody()
+    local r = newRace("Red", "Blue", "Green")
+    r:rollForGrid(loaded({ 5, 12, 12, 3, 9 }))
+    assert(r.gridSettled, "settled in one go, the tie rolled again")
+    eq(#r:pendingChecks(), 0)
+    eq(r:serialize().phase, "setup")
+    eq(r:serialize().order[3], "Red")
+    eq(#r:car("Red").gridRolls, 1, "only the tied cars rolled again")
+    eq(#r:car(r:serialize().order[1]).gridRolls, 2)
+    assert(hasEvent(r, "warn", "Tie"))
+    assert(not hasEvent(r, "info", "roll the black die"), "nobody is asked to roll")
+end
+
+function T.a_grid_that_will_not_settle_is_left_to_the_drivers()
+    local r = newRace("Red", "Blue")
+    r:rollForGrid(function() return 7 end)
+    eq(r.gridSettled, nil)
+    eq(#r:pendingChecks(), 2, "the tie is theirs to break")
+    r:drain()
+    r:blackDie(8, "Red")
+    r:blackDie(2, "Blue")
+    assert(r.gridSettled)
+    eq(r:serialize().order[1], "Red")
+end
+
 function T.leaving_drops_pending_checks()
     local r = started("Red", "Blue")
     r:requestCheck("Red", "collision")

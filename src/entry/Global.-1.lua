@@ -658,9 +658,11 @@ end
 
 -- Race panel ----------------------------------------------------------------
 
+--- The grid is rolled for everybody, on a black die of the script's own:
+-- nobody has to wait their turn with the one on the table.
 function fdGrid(player)
     printToAll(player.steam_name .. " calls the grid roll", LEVEL_RGB.info)
-    act(function() race:rollForGrid() end)
+    act(function() race:rollForGrid(function() return math.random(20) end) end)
 end
 
 function fdStart(player)

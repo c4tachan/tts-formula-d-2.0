@@ -51,7 +51,7 @@ local function racePanel(rulesName)
                 text("fdr_cars", "No cars yet -- click Join race on a dashboard.", { preferredHeight = "180", fontSize = "15" }),
                 text("fdr_checks", "", { preferredHeight = "40", color = "#FFB74D" }),
                 el("HorizontalLayout", { spacing = "4", preferredHeight = "34" }, {
-                    button("fdr_grid", "Grid roll", "fdGrid", { tooltip = "Everyone rolls the black die for grid position" }),
+                    button("fdr_grid", "Grid roll", "fdGrid", { tooltip = "Roll the black die for everyone and put the cars on the grid" }),
                     button("fdr_start", "Start", "fdStart", { tooltip = "Reset cars and roll for the start" }),
                     button("fdr_undo", "Undo", "fdUndo", { tooltip = "Undo the last change" }),
                     button("fdr_reset", "Reset", "fdReset", { tooltip = "Back to setup, keeping the drivers" }),
