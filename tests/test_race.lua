@@ -178,6 +178,18 @@ function T.black_die_resolves_the_rollers_check_first()
     eq(r:car("Red").wear.wp, 17, "spectator roll takes the oldest check")
 end
 
+function T.black_die_thrown_by_another_does_not_decide_a_start()
+    local r = newRace("Red", "Blue")
+    r:startRace()
+    r:drain()
+    r:blackDie(1, "Grey")
+    eq(#r:pendingChecks(), 2, "both starts still wait")
+    assert(hasEvent(r, "roll", "Black die: 1"))
+    r:blackDie(1, "Blue")
+    eq(#r:pendingChecks(), 1, "Blue's own start is Blue's to roll")
+    eq(r:pendingChecks()[1].color, "Red")
+end
+
 function T.stalled_start_sits_out_a_round()
     local r = newRace("Red", "Blue")
     r:startRace()

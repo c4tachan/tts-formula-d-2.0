@@ -112,7 +112,12 @@ function onLoad(saved_data)
     setupTrackEditor(saved.edits, saved.markers)
     useBoardTrack()
     buildUi()
-    deliverAll()
+    -- A moment for every object to have spawned: a dashboard not there yet
+    -- would look deleted, and its driver be taken out.
+    Wait.time(function()
+        Dashboard.scan()
+        deliverAll()
+    end, 1)
 end
 
 --- (Re)build the race panel and the screen dashboards, then fill them in.
@@ -823,6 +828,9 @@ deliver = function(color)
     local yaw = hand.rotation and hand.rotation.y or 0
     local ix, iz = math.sin(math.rad(yaw)), math.cos(math.rad(yaw))
     delivering[color] = true
+    -- Should the bag never hand it over, the seat is not held up for good;
+    -- dealIn checks again, so a late arrival does no harm.
+    Wait.time(function() delivering[color] = nil end, 10)
     bag.takeObject({
         position = { x = hand.position.x + ix * DASH_AHEAD, y = DROP_Y, z = hand.position.z + iz * DASH_AHEAD },
         -- Turned to face the seat; the beginner face is the underside.
@@ -908,7 +916,10 @@ function fdUiRoll(player)
         if die == nil then return end
         die.roll()
         watchGearDie(die, player.color, gear)
-    end, function() return die == nil or not die.isSmoothMoving() end, 5)
+    end, function() return die == nil or not die.isSmoothMoving() end, 5, function()
+        broadcastToColor("The " .. Race.gearName(gear) .. " gear die did not arrive -- click Roll again.",
+            player.color, LEVEL_RGB.warn)
+    end)
 end
 
 function fdUiShift(player, value)
@@ -1352,7 +1363,7 @@ end
 function onObjectDestroy(obj)
     Dashboard.forget(obj)
     -- A driver's dashboard deleted before the start takes them out of the race.
-    local driver = race.state.phase == "setup" and carOnDash(obj.getGUID())
+    local driver = race and race.state.phase == "setup" and carOnDash(obj.getGUID())
     if driver then
         runAction(driver, "leave")
     end

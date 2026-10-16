@@ -947,14 +947,20 @@ function Race:rollChecks(die)
 end
 
 --- The black die came to rest. Resolves the roller's oldest check, or the
--- oldest check overall if the roller has none (someone rolling for a friend).
+-- oldest check overall if the roller has none (someone rolling for a friend)
+-- -- but never another driver's start: that waits for their turn, and a die
+-- thrown by somebody else must not decide it.
 function Race:blackDie(value, roller, which)
     local checks = self.state.checks
     local idx = nil
     for i, c in ipairs(checks) do
         if (which and c == which) or (not which and c.color == roller) then idx = i break end
     end
-    idx = idx or (not which and #checks > 0 and 1 or nil)
+    if not idx and not which then
+        for i, c in ipairs(checks) do
+            if c.kind ~= "start" then idx = i break end
+        end
+    end
     if not idx then
         self:emit("roll", "Black die: " .. tostring(value), roller)
         return

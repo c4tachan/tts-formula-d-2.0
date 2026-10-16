@@ -74,16 +74,21 @@ order stays as the grid set it.
 
 ### Playing
 
-1. Take a car and a dashboard from the Beginner Dashboard bag.
-2. Click **Join race** under the dashboard. It gets a gear stick and WP
-   marker in your colour.
-3. Optionally **Grid roll** on the race panel (top left): the black die is
+1. Sit down in a coloured seat before the start: you are dealt a dashboard
+   and a car. (Or take them from the Beginner Dashboard bag and click
+   **Join race** under the dashboard.) The dashboard gets a gear stick and
+   WP marker in your colour.
+2. Optionally **Grid roll** on the race panel (top left): the black die is
    rolled for everyone, ties rolled again, and each claimed car is set down
-   on its grid space, pole first. Then **Start**; each player rolls the black
-   die for their start.
-4. On your turn move the gear stick, roll the die that arrives, move your car.
-   The race panel lists the finishers first, in their places, then the rest
-   in the order they play.
+   on its grid space, pole first. Then **Start**. The race controls are for
+   the host and promoted players.
+3. Each driver's start is rolled on the black die for them on their first
+   turn, and collisions and engine strain as soon as they come up; the
+   results are in the chat.
+4. On your turn move the gear stick, then roll the die that arrives (or
+   click **Roll** on your screen dashboard), and put your car down where it
+   ends: that ends your turn. The race panel lists the finishers first, in
+   their places, then the rest in the order they play.
 
 ### Track data: detect, then edit in game
 
