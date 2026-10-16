@@ -297,7 +297,10 @@ local litCar = nil
 
 --- Hand TTS's own turn marker to `due`, in the race's order of play, which
 -- changes every round. Nobody can pass a turn from TTS's menu: the race
--- says when a turn is over. Off outside a race.
+-- says when a turn is over. Outside a race it is switched off again -- but
+-- only if it was switched on here: Turns that were on already (hotseat
+-- runs its own) are left alone, as switching them off sets TTS handing the
+-- turn round every seat.
 --
 -- Each part is written only when it changes from what was last written, not
 -- from what Turns reads back: TTS does not always read back what it was
@@ -305,7 +308,7 @@ local litCar = nil
 local function syncTurns(due)
     local seated = due and Player[due.color] and Player[due.color].seated
     if not seated then
-        if not turnsSet or turnsSet.on then
+        if turnsSet and turnsSet.on then
             Turns.enable = false
             turnsSet = { on = false }
         end

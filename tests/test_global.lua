@@ -1533,6 +1533,24 @@ function T.the_turn_is_handed_to_tts_once_however_it_reads_back()
     eq(Turns.turn_color, first)
 end
 
+function T.turns_already_on_are_left_alone_before_the_start()
+    local S = twoCars()
+    local saved = onSave()
+    -- On already, as hotseat has them: switching them off makes TTS hand the
+    -- turn round every seat, announcing each.
+    local real, writes = Turns, {}
+    Turns = setmetatable({}, {
+        __index = function(_, k) if k == "enable" then return true end end,
+        __newindex = function(_, k, v) writes[#writes + 1] = k .. "=" .. tostring(v) end,
+    })
+    onLoad(saved)
+    refresh()
+    onPlayerChangeColor("Red")
+    Turns = real
+    eq(table.concat(writes, " "), "", "Turns untouched")
+    assert(state().cars.Red and state().cars.Blue, "the drivers are still in")
+end
+
 function T.only_the_host_can_use_the_race_controls()
     local S = redRacing()
     -- Shown only to the host and promoted players.
