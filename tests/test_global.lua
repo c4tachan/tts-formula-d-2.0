@@ -157,6 +157,32 @@ function T.players_seated_at_load_are_dealt_in()
     eq(state().cars.Blue.tts.dash, S.advanced.guid)
 end
 
+function T.deleting_a_dashboard_before_the_start_takes_its_driver_out()
+    local S = world()
+    S.beginner.click("fdDashJoin", "Red")
+    S.beginner.destruct()
+    eq(state().cars.Red, nil, "Red has left")
+    eq(S.count("Gear Stick"), 0, "and their gear stick went with them")
+end
+
+function T.a_save_whose_dashboard_was_deleted_deals_the_seat_in_again()
+    local S = world()
+    S.object("Beginner Dashboard Bag", { guid = "edfadc", spawns = "Beginner Dashboard" })
+    S.beginner.click("fdDashJoin", "Red")
+    local saved = onSave()
+    -- Deleted without the script hearing of it, as when cleaning up a save.
+    local hook = onObjectDestroy
+    onObjectDestroy = nil
+    S.beginner.destruct()
+    onObjectDestroy = hook
+
+    onLoad(saved)
+    local red = state().cars.Red
+    assert(red, "Red is dealt in again")
+    local dash = getObjectFromGUID(red.tts.dash)
+    assert(dash and dash ~= S.beginner, "at a fresh dashboard")
+end
+
 --- Every one of the seven dice off the table, as packed away.
 local function packDice(S)
     local gone = {}

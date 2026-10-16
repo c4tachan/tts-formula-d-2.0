@@ -835,8 +835,22 @@ deliver = function(color)
     })
 end
 
+--- Before the start, a car whose dashboard is gone -- deleted, or put away
+-- in a bag -- leaves the race, so its seat can be dealt in afresh.
+local function dropDashless()
+    if race.state.phase ~= "setup" then
+        return
+    end
+    for _, car in ipairs(race:cars()) do
+        if not (car.tts and car.tts.dash and getObjectFromGUID(car.tts.dash)) then
+            act(function() ACTIONS.leave(car) end)
+        end
+    end
+end
+
 --- Deal in everybody seated: at load, for those already sat down.
 deliverAll = function()
+    dropDashless()
     for _, color in ipairs(getSeatedPlayers()) do
         deliver(color)
     end
@@ -1337,6 +1351,11 @@ end
 
 function onObjectDestroy(obj)
     Dashboard.forget(obj)
+    -- A driver's dashboard deleted before the start takes them out of the race.
+    local driver = race.state.phase == "setup" and carOnDash(obj.getGUID())
+    if driver then
+        runAction(driver, "leave")
+    end
     -- A car's gear stick or wear marker gone: the next update brings a new one.
     local car = markerOwner(obj.getGUID())
     if car then
