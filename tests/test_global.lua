@@ -1511,6 +1511,28 @@ function T.the_car_to_play_is_lit_and_its_driver_told()
     end
 end
 
+function T.the_turn_is_handed_to_tts_once_however_it_reads_back()
+    local S = twoCars()
+    gridRoll(S, { Red = 4, Blue = 15 })
+    fdStart(Player.Red)
+    local first = state().order[1]
+
+    -- TTS reads back other than it was given (here: nothing), and announces
+    -- every turn_color it is handed.
+    local real, writes = Turns, {}
+    Turns = setmetatable({}, {
+        __index = function() return nil end,
+        __newindex = function(_, k, v) writes[#writes + 1] = k .. "=" .. tostring(v) end,
+    })
+    for _ = 1, 5 do
+        refresh()
+        onPlayerConnect()
+    end
+    Turns = real
+    eq(table.concat(writes, " "), "", "nothing is written again")
+    eq(Turns.turn_color, first)
+end
+
 function T.only_the_host_can_use_the_race_controls()
     local S = redRacing()
     -- Shown only to the host and promoted players.

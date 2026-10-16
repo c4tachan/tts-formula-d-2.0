@@ -37,6 +37,9 @@ local clearReach -- likewise
 local useBoardTrack -- likewise
 local joinAt -- with the dashboard buttons, below
 local deliver, deliverAll -- likewise
+-- What syncTurns last told TTS's Turns, as { on, order, color }; nil until
+-- it has, so the first sync after a load sets every part.
+local turnsSet = nil
 local undo = {}
 local UNDO_LIMIT = 30
 
@@ -106,6 +109,7 @@ function onLoad(saved_data)
 
     race = Race.new(Rules, saved.race)
     race.autoRolls = true
+    turnsSet = nil
     Dice.prepareAll()
     Dashboard.scan()
     Mini.registerAsset()
@@ -294,10 +298,17 @@ local litCar = nil
 --- Hand TTS's own turn marker to `due`, in the race's order of play, which
 -- changes every round. Nobody can pass a turn from TTS's menu: the race
 -- says when a turn is over. Off outside a race.
+--
+-- Each part is written only when it changes from what was last written, not
+-- from what Turns reads back: TTS does not always read back what it was
+-- given, and every turn_color it is given is announced to the table.
 local function syncTurns(due)
     local seated = due and Player[due.color] and Player[due.color].seated
     if not seated then
-        if Turns.enable then Turns.enable = false end
+        if not turnsSet or turnsSet.on then
+            Turns.enable = false
+            turnsSet = { on = false }
+        end
         return
     end
     local order = {}
@@ -306,17 +317,20 @@ local function syncTurns(due)
             order[#order + 1] = car.color
         end
     end
-    if not Turns.enable then
+    local key = table.concat(order, " ")
+    local was = turnsSet or {}
+    if not was.on then
         Turns.type = 2 -- custom order
         Turns.pass_turns = false
         Turns.enable = true
     end
-    if table.concat(Turns.order or {}, " ") ~= table.concat(order, " ") then
+    if was.order ~= key then
         Turns.order = order
     end
-    if Turns.turn_color ~= due.color then
+    if was.color ~= due.color then
         Turns.turn_color = due.color
     end
+    turnsSet = { on = true, order = key, color = due.color }
 end
 
 --- Point everyone at the car to play: TTS's turn marker and a highlight on
