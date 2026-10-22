@@ -30,6 +30,21 @@ local function started(...)
     return r
 end
 
+--- A gear die rolled for `color`, shifted into its gear first, as a player
+-- has to: a die from another gear is not counted.
+local function rollDie(r, color, gear, value)
+    local car = r:car(color)
+    if car and car.gear ~= gear then r:shift(color, gear) end
+    r:rolled(color, gear, value)
+end
+
+--- `color`'s car put down by hand on space `id` of `track`: judged, and
+-- after a roll, the end of its move -- as the Global script does on a drop.
+local function putDown(r, color, id, track)
+    r:placed(color, id, track)
+    r:putDown(color)
+end
+
 local T = {}
 
 function T.cars_start_with_full_wear()
@@ -41,16 +56,16 @@ end
 function T.shifting_up_one_gear_is_free()
     local r = started("Red")
     r:shift("Red", 1)
-    r:rolled("Red", 1, 2)
+    rollDie(r, "Red", 1, 2)
     r:shift("Red", 2)
     assert(hasEvent(r, "info", "selects 2nd"))
-    r:rolled("Red", 2, 3)
+    rollDie(r, "Red", 2, 3)
     eq(r:car("Red").wear.wp, 18)
 end
 
 function T.skipping_up_warns_but_is_applied()
     local r = started("Red")
-    r:rolled("Red", 1, 2)
+    rollDie(r, "Red", 1, 2)
     r:drain()
     r:shift("Red", 3)
     assert(hasEvent(r, "warn", "no skipping"))
@@ -71,7 +86,7 @@ function T.downshift_wear_is_charged_on_the_roll()
     eq(r:car("Red").wear.wp, 18, "not charged when selecting")
     r:shift("Red", 5)
     r:shift("Red", 3)
-    r:rolled("Red", 3, 6)
+    rollDie(r, "Red", 3, 6)
     eq(r:car("Red").wear.wp, 16)
 end
 
@@ -82,15 +97,15 @@ function T.dropping_four_gears_is_flagged()
     assert(hasEvent(r, "warn", "at most 3"))
 end
 
-function T.die_overrides_selected_gear()
+function T.a_die_from_another_gear_is_not_counted()
     local r = started("Red")
-    r:shift("Red", 1)
-    r:car("Red").rolledGear = 3
     r:shift("Red", 4)
     r:drain()
-    r:rolled("Red", 3, 5)
-    assert(hasEvent(r, "warn", "going with 3rd"))
-    eq(r:car("Red").gear, 3)
+    r:rolled("Red", 3, 5) -- knocked, or picked up by mistake
+    assert(hasEvent(r, "warn", "3rd gear die shows 5, but Red is in 4th gear %-%- not counted"))
+    eq(r:car("Red").gear, 4, "still in the gear selected")
+    eq(r:car("Red").lastRoll, nil)
+    eq(r:serialize().round, 1, "the turn is still Red's")
 end
 
 function T.car_is_out_at_zero_and_back_after_a_correction()
@@ -126,7 +141,7 @@ function T.top_face_in_fifth_strains_all_fast_cars()
     r:car("Red").rolledGear = 4
     r:car("Blue").rolledGear = 6
     r:car("Green").rolledGear = 3
-    r:rolled("Red", 5, 20)
+    rollDie(r, "Red", 5, 20)
     local checks = r:pendingChecks()
     eq(#checks, 2)
     eq(checks[1].color, "Red", "roller checks first")
@@ -139,7 +154,7 @@ end
 
 function T.nineteen_in_fifth_is_not_strain()
     local r = started("Red")
-    r:rolled("Red", 5, 19)
+    rollDie(r, "Red", 5, 19)
     eq(#r:pendingChecks(), 0)
 end
 
@@ -163,6 +178,18 @@ function T.black_die_resolves_the_rollers_check_first()
     eq(r:car("Red").wear.wp, 17, "spectator roll takes the oldest check")
 end
 
+function T.black_die_thrown_by_another_does_not_decide_a_start()
+    local r = newRace("Red", "Blue")
+    r:startRace()
+    r:drain()
+    r:blackDie(1, "Grey")
+    eq(#r:pendingChecks(), 2, "both starts still wait")
+    assert(hasEvent(r, "roll", "Black die: 1"))
+    r:blackDie(1, "Blue")
+    eq(#r:pendingChecks(), 1, "Blue's own start is Blue's to roll")
+    eq(r:pendingChecks()[1].color, "Red")
+end
+
 function T.stalled_start_sits_out_a_round()
     local r = newRace("Red", "Blue")
     r:startRace()
@@ -171,10 +198,26 @@ function T.stalled_start_sits_out_a_round()
     r:drain()
     r:shift("Red", 1)
     assert(hasEvent(r, "warn", "stalled"))
-    r:rolled("Blue", 1, 2)
+    rollDie(r, "Blue", 1, 2)
     eq(r:serialize().round, 2, "round ends without the stalled car")
     r:shift("Red", 1)
     assert(hasEvent(r, "info", "selects 1st"))
+end
+
+function T.roll_checks_rolls_only_the_start_whose_turn_it_is()
+    local r = newRace("Red", "Blue")
+    r.autoRolls = true
+    r:startRace()
+    assert(not hasEvent(r, "info", "roll the black die"), "nobody is asked to roll")
+    r:rollChecks(function() return 10 end)
+    local checks = r:pendingChecks()
+    eq(#checks, 1, "Blue's start waits for Blue's turn")
+    eq(checks[1].color, "Blue")
+    -- A roll made for a check settles that check, not the car's oldest.
+    r:queueCheck(r:car("Blue"), "collision", "Red")
+    r:rollChecks(function() return 10 end)
+    eq(#r:pendingChecks(), 1)
+    eq(r:pendingChecks()[1].kind, "start", "the collision was rolled, the start still waits")
 end
 
 function T.great_start_moves_and_allows_second()
@@ -190,9 +233,9 @@ end
 function T.rounds_advance_once_everyone_has_moved()
     local r = started("Red", "Blue")
     eq(r:serialize().round, 1)
-    r:rolled("Red", 1, 1)
+    rollDie(r, "Red", 1, 1)
     eq(r:serialize().round, 1)
-    r:rolled("Blue", 1, 2)
+    rollDie(r, "Blue", 1, 2)
     eq(r:serialize().round, 2)
 end
 
@@ -206,7 +249,7 @@ function T.pit_stop_restores_and_caps_gear()
     r:shift("Red", 5)
     assert(hasEvent(r, "warn", "4th gear is the limit"))
     r:shift("Red", 4)
-    r:rolled("Red", 4, 9)
+    rollDie(r, "Red", 4, 9)
     eq(r:car("Red").maxGear, nil, "cap lifts after the first move")
 end
 
@@ -226,6 +269,40 @@ function T.grid_orders_by_roll_and_rerolls_ties()
     eq(order[1], "Green")
     eq(order[2], "Blue")
     eq(order[3], "Red")
+end
+
+--- A die that comes up with each of `values` in turn.
+local function loaded(values)
+    local i = 0
+    return function()
+        i = i + 1
+        return values[i]
+    end
+end
+
+function T.the_grid_can_be_rolled_for_everybody()
+    local r = newRace("Red", "Blue", "Green")
+    r:rollForGrid(loaded({ 5, 12, 12, 3, 9 }))
+    assert(r.gridSettled, "settled in one go, the tie rolled again")
+    eq(#r:pendingChecks(), 0)
+    eq(r:serialize().phase, "setup")
+    eq(r:serialize().order[3], "Red")
+    eq(#r:car("Red").gridRolls, 1, "only the tied cars rolled again")
+    eq(#r:car(r:serialize().order[1]).gridRolls, 2)
+    assert(hasEvent(r, "warn", "Tie"))
+    assert(not hasEvent(r, "info", "roll the black die"), "nobody is asked to roll")
+end
+
+function T.a_grid_that_will_not_settle_is_left_to_the_drivers()
+    local r = newRace("Red", "Blue")
+    r:rollForGrid(function() return 7 end)
+    eq(r.gridSettled, nil)
+    eq(#r:pendingChecks(), 2, "the tie is theirs to break")
+    r:drain()
+    r:blackDie(8, "Red")
+    r:blackDie(2, "Blue")
+    assert(r.gridSettled)
+    eq(r:serialize().order[1], "Red")
 end
 
 function T.leaving_drops_pending_checks()
@@ -249,14 +326,15 @@ function T.a_move_starts_from_the_space_the_car_was_on()
     r:startRace()
     eq(r:car("Red").space, "m.s1.3", "starting the race does not move the car")
     r:blackDie(10, "Red")
-    r:rolled("Red", 1, 2)
+    rollDie(r, "Red", 1, 2)
     eq(r:car("Red").move.from, "m.s1.3")
     r:drain()
     r:placed("Red", "m.s1.5")
     eq(#r:drain(), 0, "placing a car says nothing")
+    r:putDown("Red")
     eq(r:car("Red").space, "m.s1.5")
     eq(r:car("Red").move.from, "m.s1.3", "moving the car does not start a new move")
-    r:rolled("Red", 2, 3)
+    rollDie(r, "Red", 2, 3)
     eq(r:car("Red").move.from, "m.s1.5")
     local copy = Race.new(Rules, r:serialize())
     eq(copy:car("Red").space, "m.s1.5")
@@ -275,7 +353,7 @@ function T.off_the_track_is_no_space()
     r:placed("Red", "m.s1.3")
     r:placed("Red", nil)
     eq(r:car("Red").space, nil)
-    r:rolled("Red", 1, 2)
+    rollDie(r, "Red", 1, 2)
     eq(r:car("Red").move, nil)
 end
 
@@ -295,8 +373,8 @@ end
 
 --- Red rolls `roll` in `gear` from where the car is, and is put down on `to`.
 local function move(r, track, gear, roll, to)
-    r:rolled("Red", gear, roll)
-    r:placed("Red", to, track)
+    rollDie(r, "Red", gear, roll)
+    putDown(r, "Red", to, track)
 end
 
 function T.braking_is_charged_and_rejudged()
@@ -306,9 +384,9 @@ function T.braking_is_charged_and_rejudged()
     move(r, track, 1, 2, "c1")
     eq(r:car("Red").wear.wp, 17)
     assert(hasEvent(r, "wear", "braked 1 short"))
-    r:placed("Red", "c2", track)
+    putDown(r, "Red", "c2", track)
     eq(r:car("Red").wear.wp, 18)
-    r:placed("Red", "c0", track)
+    putDown(r, "Red", "c0", track)
     eq(r:car("Red").wear.wp, 16, "not moving at all brakes the whole roll")
 end
 
@@ -318,7 +396,7 @@ function T.an_unreachable_space_warns_and_charges_nothing()
     r:placed("Red", "c0")
     move(r, track, 1, 2, "c1")
     r:drain()
-    r:placed("Red", "c9", track)
+    putDown(r, "Red", "c9", track)
     assert(hasEvent(r, "warn", "not a legal 2 from c0"))
     eq(r:car("Red").wear.wp, 18, "the brake charged before is given back")
 end
@@ -352,7 +430,7 @@ function T.missing_two_stops_is_out_and_a_correction_brings_it_back()
     move(r, track, 3, 8, "c8")
     assert(r:car("Red").eliminated)
     assert(hasEvent(r, "out", "corner 1 without its stops"))
-    r:placed("Red", "c6", track)
+    putDown(r, "Red", "c6", track)
     assert(not r:car("Red").eliminated)
     eq(r:car("Red").wear.wp, 16, "braked 2, stopped in the corner")
 end
@@ -362,7 +440,7 @@ function T.reachable_is_what_the_move_will_be_judged_by()
     local r = started("Red")
     eq(r:reachable("Red", track), nil, "no move open")
     r:placed("Red", "c0")
-    r:rolled("Red", 3, 8)
+    rollDie(r, "Red", 3, 8)
     eq(r.opened, "Red", "the Global script is told a move opened")
     local reach = r:reachable("Red", track)
     eq(reach.c8.missed, 2)
@@ -381,9 +459,9 @@ function T.cars_in_the_way_are_where_they_were_at_the_roll()
     local r = started("Red", "Blue")
     r:placed("Red", "i0")
     r:placed("Blue", "i2")
-    r:rolled("Red", 1, 2)
+    rollDie(r, "Red", 1, 2)
     r:placed("Blue", "o7") -- Blue moves on after Red rolled
-    r:placed("Red", "i2", track)
+    putDown(r, "Red", "i2", track)
     assert(hasEvent(r, "warn", "not a legal"), "Blue was there")
 end
 
@@ -440,8 +518,8 @@ function T.ending_beside_cars_rolls_once_for_each()
     r:placed("Blue", "o3")  -- beside where Red ends
     r:placed("Grey", "i3")  -- directly ahead
     r:placed("Green", "o6") -- nowhere near
-    r:rolled("Red", 1, 2)
-    r:placed("Red", "i2", track)
+    rollDie(r, "Red", 1, 2)
+    putDown(r, "Red", "i2", track)
     eq(collisionChecks(r, "Red"), "Blue,Grey")
     assert(hasEvent(r, "info", "Red: roll the black die %(collision with Blue check%)"))
     r:blackDie(3, "Red")
@@ -460,8 +538,8 @@ function T.a_collision_roll_spreads_until_each_pair_has_rolled_twice()
     r:placed("Grey", "i4")
     r:placed("Green", "o5")
     r:placed("Purple", "i9")
-    r:rolled("Red", 1, 2)
-    r:placed("Red", "i2", track)
+    rollDie(r, "Red", 1, 2)
+    putDown(r, "Red", "i2", track)
     eq(collisionChecks(r, "Red"), "Blue", "the mover only rolls for cars it touches")
     eq(collisionChecks(r, "Blue"), "", "nobody else rolls until the mover has")
     r:blackDie(10, "Red")
@@ -483,13 +561,13 @@ function T.rolls_owed_survive_the_mover_moving_on()
     local r = started("Red", "Blue")
     r:placed("Red", "i0")
     r:placed("Blue", "o3")
-    r:rolled("Red", 1, 2)
-    r:placed("Red", "i2", track)
+    rollDie(r, "Red", 1, 2)
+    putDown(r, "Red", "i2", track)
     r:blackDie(10, "Red")
     eq(collisionChecks(r, "Blue"), "Red")
     -- Red is off on its next move, clear of everyone, before Blue rolls back.
-    r:rolled("Red", 2, 4)
-    r:placed("Red", "i6", track)
+    rollDie(r, "Red", 2, 4)
+    putDown(r, "Red", "i6", track)
     r:blackDie(10, "Blue")
     eq(collisionChecks(r, "Red"), "", "Red already rolled against Blue")
     eq(#r:pendingChecks(), 0)
@@ -503,8 +581,8 @@ function T.collision_state_survives_a_round_trip()
     local r = started("Red", "Blue")
     r:placed("Red", "i0")
     r:placed("Blue", "o3")
-    r:rolled("Red", 1, 2)
-    r:placed("Red", "i2", track)
+    rollDie(r, "Red", 1, 2)
+    putDown(r, "Red", "i2", track)
     r = Race.new(Rules, r:serialize())
     r:blackDie(10, "Red")
     eq(collisionChecks(r, "Blue"), "Red", "the roll back still comes after a reload")
@@ -516,8 +594,8 @@ function T.every_car_in_the_pack_pays_for_its_own_rolls()
     r:placed("Red", "i0")
     r:placed("Blue", "o3")
     r:placed("Grey", "i3")
-    r:rolled("Red", 1, 2)
-    r:placed("Red", "i2", track)
+    rollDie(r, "Red", 1, 2)
+    putDown(r, "Red", "i2", track)
     rollAll(r, 1)
     -- All three touch each other: two rolls each, both lost.
     eq(r:car("Red").wear.wp, 16)
@@ -531,15 +609,15 @@ function T.moving_away_drops_the_checks_not_yet_rolled()
     r:placed("Red", "i0")
     r:placed("Blue", "o3")
     r:placed("Grey", "i3")
-    r:rolled("Red", 2, 3)
-    r:placed("Red", "i2", track)
+    rollDie(r, "Red", 2, 3)
+    putDown(r, "Red", "i2", track)
     eq(collisionChecks(r, "Red"), "Blue,Grey")
     r:blackDie(10, "Red") -- Blue's, rolled
     r:drain()
-    r:placed("Red", "o1", track)
+    putDown(r, "Red", "o1", track)
     eq(collisionChecks(r, "Red"), "", "Grey's dropped; Blue's already rolled")
     assert(hasEvent(r, "info", "no longer next to Grey"))
-    r:placed("Red", "i2", track)
+    putDown(r, "Red", "i2", track)
     eq(collisionChecks(r, "Red"), "Grey", "back beside Grey; Blue is not rolled for twice")
 end
 
@@ -551,8 +629,8 @@ function T.cars_out_or_finished_are_not_hit()
     r:placed("Grey", "i3")
     r:car("Blue").eliminated = true
     r:car("Grey").place = 1
-    r:rolled("Red", 1, 2)
-    r:placed("Red", "i2", track)
+    rollDie(r, "Red", 1, 2)
+    putDown(r, "Red", "i2", track)
     eq(collisionChecks(r, "Red"), "")
 end
 
@@ -562,8 +640,8 @@ function T.no_neighbour_data_means_no_automatic_checks()
     local r = started("Red", "Blue")
     r:placed("Red", "i0")
     r:placed("Blue", "o2")
-    r:rolled("Red", 1, 2)
-    r:placed("Red", "i2", track)
+    rollDie(r, "Red", 1, 2)
+    putDown(r, "Red", "i2", track)
     eq(collisionChecks(r, "Red"), "")
     r:requestCheck("Red", "collision")
     eq(collisionChecks(r, "Red"), "manual", "the button still works")
@@ -582,8 +660,8 @@ end
 
 --- `color` rolls `roll` in 5th and is put down on `to`.
 local function drive(r, track, color, roll, to)
-    r:rolled(color, 5, roll)
-    r:placed(color, to, track)
+    rollDie(r, color, 5, roll)
+    putDown(r, color, to, track)
 end
 
 function T.the_first_crossing_starts_the_lap_and_the_next_one_finishes()
@@ -598,6 +676,20 @@ function T.the_first_crossing_starts_the_lap_and_the_next_one_finishes()
     eq(r:car("Red").place, 1)
     assert(hasEvent(r, "finish", "Red wins the race"))
     eq(r:serialize().phase, "finished", "the only car is home")
+end
+
+function T.moving_on_from_the_line_does_not_finish_a_one_lap_race()
+    -- Game night (#21): pole stopped just over the line, then moved on
+    -- across the staggered line spaces and took the flag on lap 1.
+    local Monaco = require("fd.data.tracks.FDMonaco")
+    local r = started("Red")
+    r:placed("Red", Monaco.start[1])
+    drive(r, Monaco, "Red", 1, "o.s1.0")
+    eq(r:car("Red").lap, 1, "over the line")
+    drive(r, Monaco, "Red", 2, "i.s1.1")
+    eq(r:car("Red").lap, 1, "on along it")
+    eq(r:car("Red").place, nil)
+    assert(not hasEvent(r, "finish", "wins"))
 end
 
 function T.the_race_runs_until_every_car_is_home()
@@ -631,11 +723,11 @@ function T.putting_a_car_back_short_of_the_line_takes_the_finish_back()
     r:car("Blue").lap = 1
     drive(r, track, "Red", 4, "c2")
     eq(r:car("Red").place, 1)
-    r:placed("Red", "c19", track)
+    putDown(r, "Red", "c19", track)
     eq(r:car("Red").place, nil)
     eq(r:car("Red").lap, 1)
     eq(#r:serialize().finishers, 0)
-    r:placed("Red", "c1", track)
+    putDown(r, "Red", "c1", track)
     eq(r:car("Red").place, 1, "and over it again")
     eq(r:car("Red").lap, 2, "counted once for the move")
 end
@@ -656,7 +748,7 @@ function T.two_laps_need_two_trips_round()
     r:placed("Red", "c18")
     drive(r, track, "Red", 4, "c2")
     drive(r, track, "Red", 18, "c0")
-    assert(hasEvent(r, "info", "starts lap 2 of 2 %-%- last lap"))
+    assert(hasEvent(r, "lap", "starts lap 2 of 2 %-%- last lap"))
     eq(r:progress(r:car("Red")), "lap 2/2")
     eq(r:car("Red").place, nil)
     drive(r, track, "Red", 19, "c19")
@@ -728,27 +820,68 @@ function T.the_leader_on_the_track_plays_first()
     r:placed("Red", "i.s2.3")
     r:placed("Blue", "m.s2.8")
     eq(order(r), "Blue Red")
-    assert(hasEvent(r, "info", "Order of play for round 1: 1%. Blue  2%. Red"))
+    assert(hasEvent(r, "order", "Order of play for round 1: 1%. Blue  2%. Red"))
     eq(r:turn().color, "Blue")
 end
 
-function T.the_last_car_put_down_still_counts_for_the_next_round()
+function T.the_round_moves_on_when_the_last_car_is_put_down()
     local r = started("Red", "Blue")
     r:useTrack(FDMonaco)
     r:placed("Red", "i.s2.10")
     r:placed("Blue", "i.s2.3")
-    r:rolled("Red", 1, 2)
-    r:placed("Red", "i.s2.12", FDMonaco)
-    r:rolled("Blue", 1, 2) -- the round moves on here, Blue still behind
-    eq(r:serialize().round, 2)
-    eq(order(r), "Red Blue")
+    rollDie(r, "Red", 1, 2)
+    eq(r:turn().color, "Red", "rolled, but the car is still to move")
+    putDown(r, "Red", "i.s2.12", FDMonaco)
+    eq(r:turn().color, "Blue")
+    rollDie(r, "Blue", 1, 2)
+    eq(r:serialize().round, 1, "not until Blue's car is down")
     r:drain()
-    r:placed("Blue", "m.s2.15", FDMonaco)
-    eq(order(r), "Blue Red", "put down ahead before anyone has moved")
-    assert(hasEvent(r, "info", "Order of play for round 2"))
-    r:rolled("Blue", 2, 4)
-    r:placed("Red", "m.s2.17", FDMonaco)
+    putDown(r, "Blue", "m.s2.15", FDMonaco)
+    eq(r:serialize().round, 2)
+    eq(order(r), "Blue Red", "the new round's order, from where the cars ended")
+    assert(hasEvent(r, "order", "Round 2 %-%- 1%. Blue"))
+    rollDie(r, "Blue", 2, 4)
+    putDown(r, "Red", "m.s2.17", FDMonaco)
     eq(order(r), "Blue Red", "fixed once the round is under way")
+end
+
+function T.a_stray_die_does_not_play_anybody_s_turn()
+    local r = started("Red", "Blue")
+    r:useTrack(FDMonaco)
+    r:placed("Red", "i.s2.10")
+    r:placed("Blue", "i.s2.3")
+    rollDie(r, "Red", 1, 2)
+    putDown(r, "Red", "i.s2.12", FDMonaco)
+    rollDie(r, "Blue", 1, 2)
+    r:drain()
+    -- Red, done for the round, knocks their die while Blue moves.
+    r:rolled("Red", 1, 1)
+    assert(hasEvent(r, "warn", "Blue is still moving %-%- Red's roll of 1 not counted"))
+    eq(r:car("Red").lastRoll, 2)
+    eq(r:serialize().round, 1)
+    eq(r:turn().color, "Blue", "Blue is still moving")
+    eq(r:car("Blue").move.roll, 2)
+end
+
+function T.rolling_on_ends_a_move_whose_car_was_never_put_down()
+    local r = started("Red", "Blue")
+    r:useTrack(FDMonaco)
+    r:placed("Red", "i.s2.10")
+    r:placed("Blue", "i.s2.3")
+    rollDie(r, "Red", 1, 2)
+    rollDie(r, "Blue", 1, 2) -- Red's car never put down
+    eq(r:car("Blue").lastRoll, nil, "the first roll waits for Red")
+    rollDie(r, "Blue", 1, 2) -- and the second goes on without them
+    eq(r:car("Red").movedRound, 1)
+    eq(r:car("Blue").lastRoll, 2)
+    eq(r:turn().color, "Blue")
+    -- And the last car of the round, never put down either: the next
+    -- round's first roll, made twice, ends it.
+    rollDie(r, "Red", 2, 3)
+    eq(r:serialize().round, 1)
+    rollDie(r, "Red", 2, 3)
+    eq(r:serialize().round, 2)
+    eq(r:car("Red").lastRoll, 3, "counted, in the new round")
 end
 
 function T.level_cars_go_by_gear_then_the_inside()
@@ -783,11 +916,11 @@ end
 
 function T.rolling_out_of_turn_warns_and_is_played()
     local r = started("Red", "Blue")
-    r:rolled("Blue", 1, 3)
+    rollDie(r, "Blue", 1, 3)
     assert(hasEvent(r, "warn", "Blue rolls out of turn %-%- Red plays first"))
     eq(r:car("Blue").lastRoll, 3)
     eq(r:turn().color, "Red")
-    r:rolled("Red", 1, 3)
+    rollDie(r, "Red", 1, 3)
     assert(not hasEvent(r, "warn", "out of turn"))
     eq(r:serialize().round, 2)
 end

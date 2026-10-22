@@ -32,7 +32,7 @@ local function world()
     S.dashes = {}
     for i, c in ipairs({ "Red", "Blue", "Green", "Yellow" }) do
         S.dashes[c] = S.object("Beginner Dashboard", { pos = S.vec(i * 12, 1, -30), up = S.vec(0, -1, 0) })
-        S.player(c, S.vec(i * 12, 1, -38))
+        S.player(c, S.vec(i * 12, 1, -38), i == 1) -- the first is the host
     end
     assert(loadfile(ROOT .. "/src/entry/Global.-1.lua"))()
     onLoad("")
@@ -51,11 +51,24 @@ local function measure(label, S, fn)
         label, c.ui, c.object, c.getObjects, ms)
 end
 
-local S = world()
-for _, c in ipairs({ "Red", "Blue", "Green", "Yellow" }) do
-    S.dashes[c].click("fdDashJoin", c)
+-- The script's black die always rolls a 10: normal starts, no contact.
+do
+    local random = math.random
+    math.random = function(m, n)
+        if m == 20 and n == nil then return 10 end
+        return random(m, n)
+    end
 end
+local S = world() -- seated at load, so each is dealt in at their dashboard
 fdStart({ steam_name = "host", color = "Red" })
+-- The leader's start is rolled by the script; the others throw the die on
+-- the table for theirs now, so every gear roll below counts.
+do
+    local black = nil
+    for _, o in ipairs(S.objects) do if o.name == "Damage Dice" then black = o end end
+    black.value = 10
+    for _, c in ipairs({ "Red", "Blue", "Green", "Yellow" }) do onObjectRandomize(black, c) end
+end
 
 measure("WP -1 (one race action)", S, function() S.dashes.Red.click("fdDashWear", "Red") end)
 measure("shift gear (drop the gear stick)", S, function()

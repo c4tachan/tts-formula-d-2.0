@@ -156,6 +156,53 @@ function T.the_cheaper_of_two_equal_ways_is_kept()
     eq(table.concat(r.e.path, " "), "s a1 a2 e")
 end
 
+--- A corner with two ways along its arrows from `s` to `e`: one step
+-- through a1, or three through b1, b2, b3. It needs no stop, so the car
+-- may drive straight through; a straight follows it.
+local function forkedCorner()
+    return {
+        corners = { { id = 1, stops = 0 } },
+        spaces = {
+            { id = "s", lane = 1, next = { "a1", "b1" } },
+            { id = "a1", lane = 1, corner = 1, next = { "e" } },
+            { id = "b1", lane = 2, corner = 1, next = { "b2" } },
+            { id = "b2", lane = 2, corner = 1, next = { "b3" } },
+            { id = "b3", lane = 2, corner = 1, next = { "e" } },
+            { id = "e", lane = 1, corner = 1, next = { "i0", "o0" } },
+            { id = "i0", lane = 1, next = { "i1", "o0" } },
+            { id = "o0", lane = 2, next = { "o1", "i1" } },
+            { id = "i1", lane = 1, next = { "i2", "o1" } },
+            { id = "o1", lane = 2, next = { "o2", "i2" } },
+            { id = "i2", lane = 1, next = {} },
+            { id = "o2", lane = 2, next = {} },
+        },
+    }
+end
+
+function T.the_long_way_round_a_corner_uses_the_roll()
+    local r = Moves.reach(forkedCorner(), "s", 4)
+    eq(r.e.moved, 4, "through b1, b2, b3")
+    eq(r.e.brake, 0)
+    eq(table.concat(r.e.path, " "), "s b1 b2 b3 e")
+    -- Rolled 2, the short way is the one that gets there.
+    r = Moves.reach(forkedCorner(), "s", 2)
+    eq(r.e.moved, 2)
+    eq(table.concat(r.e.path, " "), "s a1 e")
+end
+
+function T.out_of_a_corner_the_straight_is_still_no_place_to_weave()
+    -- e -> i0 -> o0 -> i1 is three steps to go two: from 3 it is
+    -- e -> i0 -> i1, braking the rest.
+    local r = Moves.reach(forkedCorner(), "e", 3, { stops = 1 })
+    eq(r.i1.moved, 2)
+    eq(r.i1.brake, 1)
+    -- After the long way round, the straight is measured from the corner's end.
+    r = Moves.reach(forkedCorner(), "s", 6)
+    eq(r.i1.moved, 6)
+    eq(r.i1.path[2], "b1")
+    eq(r.o1.moved, 6)
+end
+
 function T.unknown_start_space()
     eq(Moves.reach(road(4), "nowhere", 3), nil)
 end
@@ -213,6 +260,14 @@ function T.monaco_finish_line()
     for id, o in pairs(r) do
         eq(o.crossed, false, id)
     end
+    -- The lanes are staggered: i.s1.0 and o.s1.0 lead on to m.s1.0, which is
+    -- on the line too. Moving on from the line is not crossing it again.
+    for _, from in ipairs(FDMonaco.finish.line) do
+        for id, o in pairs(Moves.reach(FDMonaco, from, 6)) do
+            eq(o.crossed, false, from .. " -> " .. id)
+        end
+    end
+    eq(Moves.reach(FDMonaco, FDMonaco.start[1], 2)["m.s1.0"].crossed, true, "over it and along it")
 end
 
 return T

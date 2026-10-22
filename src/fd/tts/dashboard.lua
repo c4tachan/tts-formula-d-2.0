@@ -33,6 +33,19 @@ function Dashboard.fits(dash, rules)
     return true
 end
 
+--- The printed face ("beginner" or "advanced") that carries every wear zone
+-- of `rules`.
+function Dashboard.faceFor(rules)
+    for name, f in pairs(Layout.faces) do
+        local fits = true
+        for _, z in ipairs(rules.zones) do
+            if not f.zones[z.id] then fits = false end
+        end
+        if fits then return name end
+    end
+    return "beginner"
+end
+
 function Dashboard.worldSlot(dash, slot, n)
     local p = Layout.localPosition(Dashboard.face(dash), slot, n)
     if not p then

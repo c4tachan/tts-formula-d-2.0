@@ -10,6 +10,7 @@
 -- onto the texture, so the two can never drift apart.
 
 local Layout = require("fd.data.dashboard")
+local Dashboard = require("fd.tts.dashboard")
 local Race = require("fd.core.race")
 local Ui = require("fd.tts.ui")
 
@@ -36,6 +37,7 @@ local MARKER = 18      -- square marker, about the size of a printed hole
 local HIT = 30         -- invisible click target over a slot
 
 local ACTIONS = {
+    { fn = "fdUiRoll", label = "Roll", tip = "Roll the gear die for the gear you are in" },
     { fn = "fdUiCar", label = "Car", tip = "Claim the nearest car, or take one from the bag" },
     { fn = "fdUiCollision", label = "Collision?", tip = "Ended next to or behind a car: roll the black die" },
     { fn = "fdUiPit", label = "Pit stop", tip = "Restore WP; leave in 4th gear or lower" },
@@ -158,13 +160,7 @@ end
 --- Panels for every seat colour, to append to the Global UI.
 function Mini.panels(rules)
     -- Show whichever printed face carries this ruleset's wear zones.
-    for name, f in pairs(Layout.faces) do
-        local fits = true
-        for _, z in ipairs(rules.zones) do
-            if not f.zones[z.id] then fits = false end
-        end
-        if fits then face = name end
-    end
+    face = Dashboard.faceFor(rules)
     local out = {}
     for _, c in ipairs(COLORS) do
         out[#out + 1] = panel(c)
@@ -229,7 +225,7 @@ function Mini.refresh(race)
                 bits[#bits + 1] = "your turn"
             end
             for _, c in ipairs(race:pendingChecks()) do
-                if c.color == color then
+                if c.color == color and c.kind ~= "start" then
                     bits[#bits + 1] = "roll the black die"
                     break
                 end

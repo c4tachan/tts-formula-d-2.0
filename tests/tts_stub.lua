@@ -61,10 +61,19 @@ for k, fn in pairs(UI) do
     end
 end
 
+-- TTS's turn marker: plain fields, as the game's own are.
+Turns = { enable = false, order = {} }
+
 Color = { fromString = function(s) return { name = s } end }
 
+-- Stub.said keeps the colour each message was sent in, by its text.
+Stub.said = {}
 local function say(kind)
-    return function(msg) Stub.log[#Stub.log + 1] = kind .. ": " .. msg end
+    return function(msg, a, b)
+        Stub.log[#Stub.log + 1] = kind .. ": " .. msg
+        -- broadcastToColor(msg, color, rgb); the others (msg, rgb).
+        Stub.said[msg] = kind == "broadcast" and type(a) == "string" and b or a
+    end
 end
 printToAll = say("print")
 broadcastToAll = say("broadcast")
@@ -118,10 +127,18 @@ function Stub.object(name, props)
         if not fn then error("no menu item " .. label .. " on " .. o.name) end
         return fn(color or "Red", pos or o.pos, o)
     end
+    -- Functions called on the object's own script, by name, in order.
+    o.calls = {}
+    o.call = function(fn) o.calls[#o.calls + 1] = fn end
     o.setLock = function(l) o.locked = l end
     o.setPositionSmooth = function(p) o.pos = vec(p.x, p.y, p.z) end
     o.setRotationSmooth = function(r) o.rot = r end
-    o.highlightOn = function() end
+    o.isSmoothMoving = function() return false end
+    -- A roll leaves `value` as the test set it; it only counts the throws.
+    o.roll = function() o.rolls = (o.rolls or 0) + 1 end
+    -- The highlight left on: { color, duration }, duration nil if it stays.
+    o.highlightOn = function(c, d) o.highlight = { c, d } end
+    o.highlightOff = function() o.highlight = nil end
     o.setColorTint = function(c) o.tint = c end
     o.setRotationValues = function(v) o.rotationValues = v end
     -- `value` is what the face that is up shows. As in TTS, getValue() on an
@@ -154,8 +171,34 @@ function Stub.object(name, props)
         end
         error("no button " .. fn .. " on " .. o.name)
     end
+    -- A container: `contents` is what is inside ({ name, guid }), else it is
+    -- an infinite bag of `spawns`, each holding `spawnContents` if given.
+    o.contents = o.contents or {}
+    o.getObjects = function()
+        local out = {}
+        for i, c in ipairs(o.contents) do out[i] = { name = c.name, guid = c.guid, index = i - 1 } end
+        return out
+    end
     o.takeObject = function(params)
-        local spawned = Stub.object(o.spawns, { pos = params.position })
+        local r = params.rotation or vec(0, 0, 0)
+        local name, props = o.spawns, {}
+        if params.guid then
+            for i, c in ipairs(o.contents) do
+                if c.guid == params.guid then
+                    name, props.guid = c.name, c.guid
+                    table.remove(o.contents, i)
+                    break
+                end
+            end
+        elseif o.spawnContents then
+            props.contents = deepcopy(o.spawnContents)
+        end
+        props.pos = params.position
+        props.rot = vec(r.x or 0, r.y or 0, r.z or 0)
+        -- Taken out face down, as the beginner dashboard bag does.
+        props.up = vec(0, math.abs(r.z or 0) == 180 and -1 or 1, 0)
+        local spawned = Stub.object(name, props)
+        if params.callback_function then params.callback_function(spawned) end
         return spawned
     end
     for k, fn in pairs(o) do
@@ -225,13 +268,27 @@ function getObjectFromGUID(guid)
 end
 
 Player = {}
-function Stub.player(color, handPos)
+--- A seated player. `admin` makes them the host (or a promoted player).
+function Stub.player(color, handPos, admin)
     local p = {
-        color = color, steam_name = color .. "Player", seated = true,
-        getHandTransform = function() return { position = handPos } end,
+        color = color, steam_name = color .. "Player", seated = true, admin = admin or false,
+        -- The hand zone faces into the table, square to its nearest edge.
+        getHandTransform = function()
+            local yaw = math.deg(math.atan2(-handPos.x, -handPos.z))
+            return { position = handPos, rotation = vec(0, (math.floor(yaw / 90 + 0.5) * 90) % 360, 0) }
+        end,
     }
     Player[color] = p
     return p
+end
+
+function getSeatedPlayers()
+    local out = {}
+    for color, p in pairs(Player) do
+        if p.seated then out[#out + 1] = color end
+    end
+    table.sort(out)
+    return out
 end
 
 function Stub.find(name)

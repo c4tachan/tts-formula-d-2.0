@@ -60,7 +60,8 @@ end
 
 -- Events --------------------------------------------------------------------
 
--- level: info | warn | wear | out | finish
+-- level: info | warn | wear | out | finish, or for what is only coloured
+-- apart: order (grid, order of play, rounds) | lap | roll (die results)
 function Race:emit(level, text, color)
     self.events[#self.events + 1] = { level = level, text = text, color = color }
 end
@@ -100,7 +101,8 @@ local function resetCar(rules, car)
     car.eliminated = false
     car.lastRoll = nil
     car.maxGear = nil
-    car.movedRound = nil
+    car.rolledRound = nil -- round it last rolled in: its move is open until put down
+    car.movedRound = nil  -- round its move was over in: rolled and put down
     car.stalledRound = nil
     car.move = nil       -- the move since the last roll; see startMove
     car.stops = nil      -- stops made in the corner `space` is in
@@ -167,10 +169,9 @@ function Race:placed(color, spaceId, track)
     if track and spaceId and car.move then
         self:judgeMove(car, track)
     end
-    -- The round moves on at the last car's roll, before it is put down:
-    -- until somebody moves in the new round, its order can still change.
+    -- Until somebody rolls in a new round, its order can still change.
     if self.state.phase == "race" and not self:anyMoved() and self:reorder() then
-        self:emit("info", "Order of play for round " .. self.state.round .. ": " .. self:orderText())
+        self:emit("order", "Order of play for round " .. self.state.round .. ": " .. self:orderText())
     end
 end
 
@@ -420,7 +421,7 @@ function Race:crossLine(car, crossed)
     local laps = self.state.laps
     car.lap = car.lap + (crossed and 1 or -1)
     if crossed and car.lap > 1 and car.lap <= laps then
-        self:emit("info", string.format("%s starts lap %d of %d%s", self:label(car), car.lap, laps,
+        self:emit("lap", string.format("%s starts lap %d of %d%s", self:label(car), car.lap, laps,
             car.lap == laps and " -- last lap" or ""), car.color)
     end
     self:settleFinish(car)
@@ -528,7 +529,7 @@ end
 function Race:setLaps(laps)
     local s = self.state
     s.laps = laps
-    self:emit("info", string.format("The race is %d lap%s", laps, laps == 1 and "" or "s"))
+    self:emit("lap", string.format("The race is %d lap%s", laps, laps == 1 and "" or "s"))
     -- Those taken out of the order first, so the ones kept close up.
     for _, car in ipairs(self:standings()) do
         if car.place and car.lap <= laps then
@@ -709,12 +710,16 @@ function Race:rolled(color, gear, value)
         return
     end
     local who = self:label(car)
+    if self.state.phase == "race" and not car.eliminated and not car.place
+        and not self:countRoll(car, gear, value) then
+        return
+    end
     local due = self:turn()
     if car.eliminated then
         self:emit("warn", who .. " is out of the race but rolled anyway", color)
     elseif car.place then
         self:emit("warn", who .. " has already finished but rolled anyway", color)
-    elseif due and due ~= car and car.movedRound ~= self.state.round then
+    elseif due and due ~= car then
         self:emit("warn", string.format("%s rolls out of turn -- %s plays first this round",
             who, self:label(due)), color)
     end
@@ -743,9 +748,15 @@ function Race:rolled(color, gear, value)
     car.rolledGear = gear
     car.lastRoll = value
     car.maxGear = nil
-    car.movedRound = self.state.round
+    car.rolledRound = self.state.round
     self:startMove(car, value)
-    self:emit("info", string.format("%s rolls %s in %s gear", who, tostring(value), gearName(gear)), color)
+    -- The move is over when the car is put down (see putDown). With no
+    -- move to judge -- no track data, or the car not on it -- there is
+    -- nothing to wait for, and the turn passes now.
+    if not car.move then
+        car.movedRound = self.state.round
+    end
+    self:emit("roll", string.format("%s rolls %s in %s gear", who, tostring(value), gearName(gear)), color)
 
     if self.rules.engineStrain[gear] == value then
         self:emit("warn", "Engine strain! Every car in top gears rolls the black die", color)
@@ -757,6 +768,96 @@ function Race:rolled(color, gear, value)
         end
     end
     self:advanceRound()
+end
+
+--- Whether a gear die settling at `value` is `car`'s roll. In a race only
+-- one a round is: in the gear it has selected (the stick starts on 1st),
+-- and not after it has rolled already -- unless that roll starts the next
+-- round. Anything else, a die knocked or picked up by mistake, is reported
+-- and left out.
+--
+-- While another car's move is open (rolled, its car not yet put down) a
+-- roll waits for it: the first is not counted, in case it was knocked, and
+-- the same player rolling again goes ahead, ending that move -- so a car
+-- that is never put down cannot hold up the game.
+function Race:countRoll(car, gear, value)
+    local who = self:label(car)
+    local selected = car.gear > 0 and car.gear or 1
+    if gear ~= selected then
+        self:emit("warn", string.format("%s gear die shows %s, but %s is in %s gear -- not counted "
+            .. "(shift first to roll another gear)", gearName(gear), tostring(value), who, gearName(selected)), car.color)
+        return false
+    end
+    for _, c in ipairs(self.state.checks) do
+        if c.kind == "start" and c.color == car.color then
+            self:emit("warn", string.format("%s gear die shows %s, but %s has to roll the black die for "
+                .. "the start first -- not counted", gearName(gear), tostring(value), who), car.color)
+            return false
+        end
+    end
+    local round = self.state.round
+    if (car.rolledRound == round or car.movedRound == round) and not self:onlyOpenMovesLeft(car) then
+        self:emit("warn", string.format("%s gear die shows %s, but %s has rolled already this round -- not counted "
+            .. "(Undo first to roll again)", gearName(gear), tostring(value), who), car.color)
+        return false
+    end
+    local waits = {}
+    for _, other in ipairs(self:cars()) do
+        if other ~= car and other.rolledRound == round and other.movedRound ~= round then
+            waits[#waits + 1] = self:label(other) .. " is still moving"
+        end
+    end
+    if #waits > 0 then
+        local key = car.color .. ":" .. round
+        if self.held ~= key then
+            self.held = key
+            self:emit("warn", string.format("%s -- %s's roll of %s not counted. "
+                .. "Roll again to go on without waiting.", table.concat(waits, "; "), who, tostring(value)), car.color)
+            return false
+        end
+        self.held = nil
+        self:closeOpenMoves(car)
+    end
+    return true
+end
+
+--- Whether all that keeps the round from ending, besides `car`, is cars
+-- that have rolled but not been put down.
+function Race:onlyOpenMovesLeft(car)
+    local round = self.state.round
+    if car.movedRound ~= round then
+        return false
+    end
+    for _, other in ipairs(self:cars()) do
+        if other ~= car and not other.eliminated and not other.place
+            and other.movedRound ~= round and other.stalledRound ~= round and other.rolledRound ~= round then
+            return false
+        end
+    end
+    return true
+end
+
+--- Every car but `car` still on a move it rolled for is done with it. Then
+-- the round moves on, if that was all it was waiting for.
+function Race:closeOpenMoves(car)
+    local round = self.state.round
+    for _, other in ipairs(self:cars()) do
+        if other ~= car and other.rolledRound == round and other.movedRound ~= round then
+            other.movedRound = round
+        end
+    end
+    self:advanceRound()
+end
+
+--- The car of `color` was put down by hand. After its roll, that is the end
+-- of its move: the turn passes.
+function Race:putDown(color)
+    local car = self:car(color)
+    local round = self.state.round
+    if car and self.state.phase == "race" and car.rolledRound == round and car.movedRound ~= round then
+        car.movedRound = round
+        self:advanceRound()
+    end
 end
 
 -- Black die checks ------------------------------------------------------------
@@ -782,8 +883,12 @@ function Race:queueCheck(car, kind, with, pack)
     end
     local c = { color = car.color, kind = kind, with = with, pack = pack }
     self.state.checks[#self.state.checks + 1] = c
-    self:emit("info", string.format("%s: roll the black die (%s check)",
-        self:label(car), self:checkName(c)), car.color)
+    -- Nobody is asked to roll what is being rolled for them (see rollForGrid
+    -- and rollChecks).
+    if not self.rolling and not self.autoRolls then
+        self:emit("info", string.format("%s: roll the black die (%s check)",
+            self:label(car), self:checkName(c)), car.color)
+    end
     return true
 end
 
@@ -806,25 +911,66 @@ function Race:pendingChecks()
     return self.state.checks
 end
 
+--- The next check play waits on: a collision or engine strain, oldest
+-- first, or else the start of the car whose turn it is. Other cars' starts
+-- wait for their turns.
+function Race:checkWaiting()
+    for _, c in ipairs(self.state.checks) do
+        if c.kind ~= "start" and c.kind ~= "grid" and self:car(c.color) then
+            return c
+        end
+    end
+    local due = self:turn()
+    for _, c in ipairs(self.state.checks) do
+        if due and c.kind == "start" and c.color == due.color then
+            return c
+        end
+    end
+    return nil
+end
+
+-- The most black die rolls made in one go: far more than any pack needs.
+local AUTO_ROLLS = 100
+
+--- Roll the black die, with `die` (a function returning one roll of it),
+-- for every check play waits on: collisions and engine strain as soon as
+-- they come up, the rolls they pass on included, and each car's start as
+-- its first turn comes round.
+function Race:rollChecks(die)
+    for _ = 1, AUTO_ROLLS do
+        local c = self:checkWaiting()
+        if not c then
+            return
+        end
+        self:blackDie(die(), c.color, c)
+    end
+end
+
 --- The black die came to rest. Resolves the roller's oldest check, or the
--- oldest check overall if the roller has none (someone rolling for a friend).
-function Race:blackDie(value, roller)
+-- oldest check overall if the roller has none (someone rolling for a friend)
+-- -- but never another driver's start: that waits for their turn, and a die
+-- thrown by somebody else must not decide it.
+function Race:blackDie(value, roller, which)
     local checks = self.state.checks
     local idx = nil
     for i, c in ipairs(checks) do
-        if c.color == roller then idx = i break end
+        if (which and c == which) or (not which and c.color == roller) then idx = i break end
     end
-    idx = idx or (#checks > 0 and 1 or nil)
+    if not idx and not which then
+        for i, c in ipairs(checks) do
+            if c.kind ~= "start" then idx = i break end
+        end
+    end
     if not idx then
-        self:emit("info", "Black die: " .. tostring(value), roller)
+        self:emit("roll", "Black die: " .. tostring(value), roller)
         return
     end
     local check = table.remove(checks, idx)
     local car = self:car(check.color)
     if not car then return end
     local outcome = self.rules.checks[check.kind].resolve(value)
-    self:emit(outcome.wear and "warn" or "info", string.format("%s rolls %s on the black die: %s",
-        self:label(car), tostring(value), outcome.text), car.color)
+    self:emit(outcome.wear and "warn" or "info", string.format("%s rolls %s on the black die (%s): %s",
+        self:label(car), tostring(value), self:checkName(check), outcome.text), car.color)
     if check.kind == "collision" and check.with and check.pack then
         self:collided(check)
     end
@@ -835,8 +981,11 @@ function Race:blackDie(value, roller)
         elseif outcome.bonus then
             car.gear = 1
             car.rolledGear = 1
-            car.movedRound = self.state.round
+            car.rolledRound = self.state.round
             self:startMove(car, outcome.bonus)
+            if not car.move then
+                car.movedRound = self.state.round
+            end
         end
     elseif check.kind == "grid" then
         car.gridRolls = car.gridRolls or {}
@@ -851,12 +1000,29 @@ end
 
 -- Grid and rounds -----------------------------------------------------------
 
-function Race:rollForGrid()
+-- The most rolls made for the drivers in one grid roll: far more than any
+-- run of ties needs. Past it, whoever is still tied rolls by hand.
+local GRID_ROLLS = 200
+
+--- Everyone rolls the black die for grid position. With `die`, a function
+-- returning one roll of it, the rolls are made for them, ties and all, and
+-- the grid is settled when this returns; without, each driver rolls.
+function Race:rollForGrid(die)
     self.state.phase = "grid"
+    self.rolling = die ~= nil
     for _, car in ipairs(self:cars()) do
         car.gridRolls = {}
         self:queueCheck(car, "grid")
     end
+    for _ = 1, die and GRID_ROLLS or 0 do
+        local check = nil
+        for _, c in ipairs(self.state.checks) do
+            if c.kind == "grid" then check = c break end
+        end
+        if not check then break end
+        self:blackDie(die(), check.color)
+    end
+    self.rolling = nil
 end
 
 local function compareRolls(a, b)
@@ -904,7 +1070,7 @@ function Race:settleGrid()
     self.state.phase = "setup"
     -- Not state: lets the Global script put the cars on the grid.
     self.gridSettled = true
-    self:emit("info", "Starting grid: " .. table.concat(names, "  "))
+    self:emit("order", "Starting grid: " .. table.concat(names, "  "))
 end
 
 --- The track the cars are on, for turn order. Not state: the Global script
@@ -963,10 +1129,10 @@ function Race:reorder()
     return table.concat(s.order, " ") ~= before
 end
 
---- Whether any car has moved yet this round.
+--- Whether any car has rolled yet this round: from then its order stands.
 function Race:anyMoved()
     for _, car in pairs(self.state.cars) do
-        if car.movedRound == self.state.round then
+        if car.rolledRound == self.state.round or car.movedRound == self.state.round then
             return true
         end
     end
@@ -1010,11 +1176,14 @@ function Race:startRace()
         resetCar(self.rules, car)
     end
     self:reorder()
-    self:emit("info", "Lights out! Everyone rolls the black die for their start")
-    self:emit("info", "Order of play: " .. self:orderText())
+    self:emit("order", "Lights out! Each driver rolls the black die for their start on their first turn")
+    self:emit("order", "Order of play: " .. self:orderText())
+    -- Not announced now: each driver is told on their first turn.
+    self.rolling = true
     for _, car in ipairs(self:cars()) do
         self:queueCheck(car, "start")
     end
+    self.rolling = nil
 end
 
 --- Move to the next round once every running car has moved or sat out.
@@ -1036,7 +1205,7 @@ function Race:advanceRound()
     end
     s.round = s.round + 1
     self:reorder()
-    self:emit("info", "Round " .. s.round .. " -- " .. self:orderText())
+    self:emit("order", "Round " .. s.round .. " -- " .. self:orderText())
 end
 
 function Race:reset()
