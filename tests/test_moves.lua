@@ -270,4 +270,55 @@ function T.monaco_finish_line()
     eq(Moves.reach(FDMonaco, FDMonaco.start[1], 2)["m.s1.0"].crossed, true, "over it and along it")
 end
 
+-- The corner ahead -----------------------------------------------------------
+
+function T.the_next_corner_is_the_shortest_way_in_and_the_longest_way_through()
+    local a = Moves.ahead(road(12, { { 5, 4, 6, 1 } }), "i0")
+    eq(a.corner, 5)
+    eq(a.inside, false)
+    eq(a.made, 0)
+    eq(a.entry, 4, "straight down the lane to i4")
+    -- Through the corner any way counts: the shortest way to o3, then
+    -- weaving i4 o4 i5 o5 i6 o6, is the furthest a car can still stop in it.
+    eq(a.exit, 10)
+end
+
+function T.a_corner_owing_stops_is_the_one_that_matters()
+    local track = road(16, { { 1, 4, 6, 1 }, { 2, 10, 11, 2 } })
+    local a = Moves.ahead(track, "i5", 0)
+    eq(a.corner, 1, "no stop made here yet")
+    eq(a.inside, true)
+    eq(a.entry, 0)
+    eq(a.exit, 3, "i5 o5 i6 o6")
+    local b = Moves.ahead(track, "i5", 1)
+    eq(b.corner, 2, "its stop made, the next corner")
+    eq(b.inside, false)
+    eq(b.need, 2)
+    eq(b.entry, 5)
+end
+
+function T.no_corner_ahead()
+    eq(Moves.ahead(road(12), "i0"), nil)
+    eq(Moves.ahead(road(12, { { 5, 4, 6, 1 } }), "nowhere"), nil)
+end
+
+function T.the_corner_ahead_matches_what_a_roll_can_reach_on_monaco()
+    local Monaco = require("fd.data.tracks.FDMonaco")
+    local function inCorner(r, corner)
+        for id, o in pairs(r) do
+            if o.brake == 0 and o.overshoot == 0 and Monaco.byId[id].corner == corner then return true end
+        end
+        return false
+    end
+    for _, id in ipairs({ "o.s11.15", "i.s1.3", "m.s2.12", "i.c2.0", "m.c2.3" }) do
+        local a = Moves.ahead(Monaco, id, 0)
+        assert(inCorner(Moves.reach(Monaco, id, a.exit, { stops = 0 }), a.corner), id .. ": a roll of exit stops in it")
+        assert(not inCorner(Moves.reach(Monaco, id, a.exit + 1, { stops = 0 }), a.corner), id .. ": one more does not")
+        if not a.inside then
+            assert(inCorner(Moves.reach(Monaco, id, a.entry, { stops = 0 }), a.corner), id .. ": a roll of entry gets in")
+            assert(not inCorner(Moves.reach(Monaco, id, a.entry - 1, { stops = 0 }), a.corner), id .. ": one less does not")
+        end
+    end
+end
+
 return T

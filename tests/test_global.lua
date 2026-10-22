@@ -851,6 +851,14 @@ function T.the_grid_roll_puts_the_cars_on_the_grid()
     eq(state().cars.Red.space, second.id)
 end
 
+function T.the_screen_dashboard_shows_the_corner_ahead()
+    local S = twoCars()
+    eq(S.ui["fdm_Red_corner"].value, "", "nothing before the car is on the track")
+    gridRoll(S, { Red = 4, Blue = 15 })
+    eq(S.ui["fdm_Blue_corner"].value, "Corner 1 (1 stop)  -  entry 6  -  exit 12")
+    eq(S.ui["fdm_Red_corner"].value, "Corner 1 (1 stop)  -  entry 8  -  exit 14", "from the row behind")
+end
+
 function T.the_grid_roll_breaks_its_own_ties()
     local S = twoCars()
     local FDMonaco = require("fd.data.tracks.FDMonaco")

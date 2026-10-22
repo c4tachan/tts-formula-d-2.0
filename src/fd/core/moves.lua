@@ -198,4 +198,89 @@ function Moves.reach(track, fromId, roll, opts)
     return results
 end
 
+-- Moves.ahead answers, keyed by the track's spaces like fd.core.position.
+local aheadCache = setmetatable({}, { __mode = "k" })
+
+--- The corner that matters to a car on `fromId`, and how far away it is:
+-- the corner it is in while it still owes stops there, or else the next one
+-- along. `stops` is as for Moves.reach. Other cars are left out: this is
+-- about the track, not who is on it this turn.
+--
+-- Returns nil off the track or with no corner ahead, or a table:
+--   corner  the corner's id
+--   need    stops it takes
+--   made    stops made in it so far (0 for the next corner)
+--   inside  true for the corner the car is in
+--   entry   fewest spaces to reach it (0 inside it)
+--   exit    most spaces the car can move and still stop in it: the long
+--           way round, by the same rules as Moves.reach
+function Moves.ahead(track, fromId, stops)
+    local cache = aheadCache[track.spaces]
+    if not cache then
+        cache = {}
+        aheadCache[track.spaces] = cache
+    end
+    local key = tostring(fromId) .. "/" .. tostring(stops)
+    if cache[key] ~= nil then
+        return cache[key] or nil
+    end
+    local byId, need = index(track)
+    local from = byId[fromId]
+    if not from then
+        cache[key] = false
+        return nil
+    end
+    local made = stops
+    if made == nil then
+        made = from.corner and 1 or 0
+    end
+
+    local corner, entry = nil, 0
+    if from.corner and made < (need[from.corner] or 0) then
+        corner = from.corner
+    else
+        -- Fewest steps to the first space of another corner.
+        local seen, ring, k = { [from.id] = true }, { from }, 0
+        while #ring > 0 and not corner do
+            k = k + 1
+            local nxt = {}
+            for _, s in ipairs(ring) do
+                for _, nid in ipairs(s.next or {}) do
+                    local t = byId[nid]
+                    if t and not seen[nid] then
+                        seen[nid] = true
+                        if t.corner and t.corner ~= from.corner then
+                            corner, entry = t.corner, k
+                        end
+                        nxt[#nxt + 1] = t
+                    end
+                end
+            end
+            ring = nxt
+        end
+    end
+    if not corner then
+        cache[key] = false
+        return nil
+    end
+
+    -- Far enough to cross the corner by any way through it, from any lane.
+    local size = 0
+    for _, s in ipairs(track.spaces) do
+        if s.corner == corner then size = size + 1 end
+    end
+    local exit = entry
+    for _, o in pairs(Moves.reach(track, fromId, entry + size + 4, { stops = made })) do
+        if byId[o.space].corner == corner and o.overshoot == 0 and o.moved > exit then
+            exit = o.moved
+        end
+    end
+    local out = {
+        corner = corner, need = need[corner] or 0, made = corner == from.corner and made or 0,
+        inside = corner == from.corner, entry = entry, exit = exit,
+    }
+    cache[key] = out
+    return out
+end
+
 return Moves
