@@ -177,6 +177,36 @@ function T.a_newcomer_is_moved_to_the_spectators_to_pick_a_colour()
     assert(getObjectFromGUID(state().cars.Green.tts.car), "with a car")
 end
 
+function T.a_newcomer_who_leaves_at_once_is_left_alone()
+    local S = world()
+    local green = S.player("Green", S.vec(-24, 1, -38))
+    local moved = false
+    green.changeColor = function() moved = true end
+    local wait = Wait.time
+    local later = nil
+    Wait.time = function(fn) later = fn end
+    onPlayerConnect(green)
+    Wait.time = wait
+    Player.Green = nil -- gone before the moment is up
+    later()
+    eq(moved, false, "not moved, and nothing thrown")
+end
+
+function T.players_seated_at_load_are_told_how_to_join()
+    local S = world()
+    onLoad("")
+    assert(S.logged("To race, press Join race"), "told what to do")
+    S.beginner.click("fdDashJoin", "Red")
+    S.log = {}
+    onLoad(onSave())
+    -- Red is racing; only Blue is told.
+    local told = 0
+    for _, line in ipairs(S.log) do
+        if line:find("To race, press Join race") then told = told + 1 end
+    end
+    eq(told, 1)
+end
+
 function T.a_driver_reconnecting_keeps_their_seat()
     local S = world()
     S.beginner.click("fdDashJoin", "Red")
