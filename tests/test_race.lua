@@ -552,6 +552,34 @@ function T.a_shut_pit_lane_is_no_way_round_for_the_crosses()
     eq(table.concat(blocked, ","), "p0", "the pit lane, but not c6 the far side of it")
 end
 
+function T.no_pit_stop_for_an_illegal_move_into_the_box()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local box = brownsBox(FDMonaco)
+    -- The last lap: the pits are shut to a car on the circuit.
+    local r = onMonaco(2, "Brown", 2, FDMonaco.pit.entry[1])
+    r:adjust("Brown", nil, -6)
+    rollDie(r, "Brown", 4, 9)
+    r:drain()
+    putDown(r, "Brown", box, FDMonaco)
+    assert(hasEvent(r, "warn", "no pit stop made"))
+    eq(r:car("Brown").wear.wp, 12)
+    eq(r:car("Brown").maxGear, nil)
+end
+
+function T.off_the_track_out_of_the_box_takes_the_stop_back()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local box, _, before = brownsBox(FDMonaco)
+    local r = onMonaco(2, "Brown", 1, before)
+    r:adjust("Brown", nil, -6)
+    rollDie(r, "Brown", 2, 4)
+    putDown(r, "Brown", box, FDMonaco)
+    eq(r:car("Brown").wear.wp, 18)
+    -- Picked up and put down off the track data.
+    r:placed("Brown", nil)
+    eq(r:car("Brown").wear.wp, 12)
+    eq(r:car("Brown").maxGear, nil)
+end
+
 function T.taking_a_pit_stop_back_keeps_a_correction_made_since()
     local FDMonaco = require("fd.data.tracks.FDMonaco")
     local box, _, before = brownsBox(FDMonaco)
@@ -581,20 +609,13 @@ function T.the_race_finds_spaces_on_a_track_the_editor_changes()
     eq(r:space("i.s1.0+1").id, "i.s1.0+1")
 end
 
-function T.changing_the_distance_reopens_a_move_to_show_it_again()
+function T.changing_the_distance_changes_where_an_open_move_can_go()
     local FDMonaco = require("fd.data.tracks.FDMonaco")
     local r = onMonaco(2, "White", 1, FDMonaco.pit.entry[1])
     rollDie(r, "White", 1, 2)
     assert(r:reachable("White", FDMonaco)[FDMonaco.pit.spaces[2]], "the pits, on the first of two laps")
-    r.opened = nil
     r:setLaps(1)
-    eq(r.opened, "White", "the move is shown again")
     eq(r:reachable("White", FDMonaco)[FDMonaco.pit.spaces[2]], nil, "shut in a one-lap race")
-    -- Once the move is over, nothing is.
-    putDown(r, "White", "i.s11.2", FDMonaco)
-    r.opened = nil
-    r:setLaps(2)
-    eq(r.opened, nil)
 end
 
 function T.a_car_over_the_line_in_the_pit_lane_is_still_on_its_way_in()

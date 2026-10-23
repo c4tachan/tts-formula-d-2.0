@@ -178,6 +178,12 @@ function Race:placed(color, spaceId, track)
         car.stops = nil
     end
     car.space = spaceId
+    -- Out of its pit box -- moved on, back to the start, or off the track --
+    -- the stop it made there is taken back first, so what the move costs
+    -- elsewhere is charged on the wear it had.
+    if car.move and car.move.pit and not self:ownBox(car, spaceId) then
+        self:takeBackPitStop(car)
+    end
     if track and spaceId and car.move then
         if spaceId == car.move.from then
             self:backToStart(car)
@@ -243,15 +249,23 @@ function Race:reachable(color, track, alone)
     if done[key] == nil then
         local occupied = {}
         for _, id in ipairs(alone and {} or m.occupied) do occupied[id] = true end
-        local reach = Moves.reach(track, m.from, m.roll, {
-            occupied = occupied, stops = m.stops, pit = self:mayPit(car), color = color,
-            cost = function(o) return self:moveCost(o) end,
-        })
         self:useTrack(track)
         local exempt = self.rules.pitLaneExempt
+        local function free(id)
+            local s = exempt and exempt.braking and self:space(id)
+            return s and s.pit
+        end
+        local reach = Moves.reach(track, m.from, m.roll, {
+            occupied = occupied, stops = m.stops, pit = self:mayPit(car), color = color,
+            cost = function(o)
+                if free(o.space) then
+                    return self:moveCost({ brake = 0, overshoot = o.overshoot, missed = o.missed })
+                end
+                return self:moveCost(o)
+            end,
+        })
         for id, o in pairs(reach or {}) do
-            local s = self:space(id)
-            if exempt and exempt.braking and s and s.pit then o.brake = 0 end
+            if free(id) then o.brake = 0 end
         end
         done[key] = reach or false
     end
@@ -310,12 +324,6 @@ function Race:judgeMove(car, track)
     local m = car.move
     local reach = self:reachable(car.color, track)
     local o = reach and reach[car.space]
-    local box = self:pitBox(car)
-    -- Out of its pit box again, the stop it made there is taken back first,
-    -- so what the move costs elsewhere is charged on the wear it had.
-    if m.pit and car.space ~= box then
-        self:takeBackPitStop(car)
-    end
     if o then
         car.stops = o.stops
         self:chargeMove(car, "brake", o.brake, string.format("braked %d short", o.brake))
@@ -327,10 +335,17 @@ function Race:judgeMove(car, track)
         self:chargeMove(car, "brake", 0)
         self:chargeMove(car, "overshoot", 0)
     end
-    -- In its own pit box, it makes its stop -- before it is judged out, as
-    -- the stop gives back what it has lost.
-    if box and car.space == box and not m.pit then
-        self:makePitStop(car)
+    -- In its own pit box by a legal move, it makes its stop -- before it is
+    -- judged out, as the stop gives back what it has lost. Got there any
+    -- other way (the pits shut, say), it makes none: the table can rule, and
+    -- the Pit stop button make one by hand.
+    if self:ownBox(car, car.space) and not m.pit then
+        if o then
+            self:makePitStop(car)
+        else
+            self:emit("warn", self:label(car) .. " is in its pit box, but not by a legal move -- no pit stop made",
+                car.color)
+        end
     end
     car.crashed = o and self:moveOut(o) and o.corner or nil
     self:checkElimination(car)
@@ -366,9 +381,6 @@ end
 -- turn comes back, so long as the car after it has not rolled.
 function Race:backToStart(car)
     local m, s = car.move, self.state
-    if m.pit then
-        self:takeBackPitStop(car)
-    end
     self:chargeMove(car, "brake", 0, "back where it started")
     self:chargeMove(car, "overshoot", 0, "back where it started")
     car.crashed = nil
@@ -644,11 +656,6 @@ function Race:setLaps(laps)
     end
     for _, car in ipairs(self:cars()) do
         self:settleFinish(car)
-        -- Whether the pit lane is open goes by the distance: a move still
-        -- open is shown again (not state, as in startMove).
-        if car.move and car.rolledRound == s.round and car.movedRound ~= s.round then
-            self.opened = car.color
-        end
     end
 end
 
@@ -1251,13 +1258,10 @@ function Race:pitExempt(car, rule)
     return exempt ~= nil and exempt[rule] == true and self:inPit(car)
 end
 
---- The id of `car`'s own pit box on the track in use, or nil.
-function Race:pitBox(car)
-    local pit = self.track and self.track.pit
-    for _, b in ipairs(pit and pit.boxes or {}) do
-        if b.player == car.color then return b.space end
-    end
-    return nil
+--- Whether the space `id` is `car`'s own pit box.
+function Race:ownBox(car, id)
+    local s = self:space(id)
+    return s ~= nil and s.box == car.color
 end
 
 --- Whether `car` may take the way into the pit lane on the move it has
@@ -1320,15 +1324,28 @@ function Race:notePitOvershoot(car)
     end
     local entry = {}
     for _, id in ipairs(pit.entry) do entry[id] = true end
-    local over = nil
-    for id, o in pairs(self:reachable(car.color, self.track) or {}) do
+    local reach = self:reachable(car.color, self.track) or {}
+    for id in pairs(reach) do
         local s = self:space(id)
         if s and s.pit then
             return
         end
-        -- On a way in with a step of the roll left: the pits were in range.
-        for k = 1, math.min(#o.path, m.roll) do
-            if o.overshoot > 0 and entry[o.path[k]] then over = over or o.corner end
+    end
+    -- An overshoot to blame: out of its corner, then on a way in with a step
+    -- of the roll left -- the pits were in range. The lowest-numbered such
+    -- corner, so the same roll always names the same one.
+    local over = nil
+    for _, o in pairs(reach) do
+        if o.overshoot > 0 and not (over and over <= o.corner) then
+            local inCorner = false
+            for k = 1, math.min(#o.path, m.roll) do
+                local s = self:space(o.path[k])
+                inCorner = inCorner or (s ~= nil and s.corner == o.corner)
+                if inCorner and entry[o.path[k]] then
+                    over = o.corner
+                    break
+                end
+            end
         end
     end
     if over then

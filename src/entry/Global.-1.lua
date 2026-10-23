@@ -35,6 +35,7 @@ local placeOnGrid -- likewise
 local spaceUnder -- likewise
 local showReach -- likewise
 local clearReach -- likewise
+local reachShown = nil -- whose move the marks on the board are for
 local useBoardTrack -- likewise
 local drawPits -- likewise
 local joinAt -- with the dashboard buttons, below
@@ -1399,6 +1400,11 @@ function fdSetupLaps(player, value)
     end
     printToAll(player.steam_name .. " sets the race distance", LEVEL_RGB.info)
     act(function() race:setLaps(laps) end)
+    -- Whether the pit lane is open goes by the distance: marks still out
+    -- are drawn again.
+    if reachShown then
+        showReach(reachShown)
+    end
 end
 
 --- A new map is on the board. Reloading the tile took the race panel with
@@ -1678,6 +1684,7 @@ showReach = function(color)
         clearReach()
         return
     end
+    reachShown = color
     local from = race:car(color).move.from
     local marks = {}
     for id, o in pairs(reach) do
@@ -1700,6 +1707,7 @@ showReach = function(color)
 end
 
 clearReach = function()
+    reachShown = nil
     Track.setLayer("reach", nil)
 end
 
