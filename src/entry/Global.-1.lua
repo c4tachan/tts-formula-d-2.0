@@ -159,9 +159,10 @@ function onPlayerConnect(player)
     -- TTS seats a newcomer in a free colour of its choosing. Before the
     -- start they are moved to the spectators instead, to pick their own:
     -- picking a seat is what deals them in.
-    if player and player.steam_id then
-        joining[player.steam_id] = true
-        Wait.time(function() bench(player) end, 0.5)
+    local id = player and player.steam_id
+    if id then
+        joining[id] = true
+        Wait.time(function() bench(id) end, 0.5)
     end
 end
 
@@ -882,16 +883,33 @@ local function dropDashless()
 end
 
 --- At load. Nobody is dealt in for the seat they happen to be in: they
--- pick a colour, or press Join race on a dashboard.
+-- pick a colour, or press Join race on a dashboard, and are told so.
 deliverAll = function()
     dropDashless()
+    if race.state.phase ~= "setup" then
+        return
+    end
+    for _, color in ipairs(getSeatedPlayers()) do
+        if SEATS[color] and not race:car(color) then
+            broadcastToColor("To race, press Join race on a dashboard, or pick another colour.",
+                color, LEVEL_RGB.info)
+        end
+    end
 end
 
---- Move a player who has just connected to the spectators, if the race has
--- not started and the seat TTS gave them is not one already racing (a
--- driver back from a dropped connection keeps theirs).
-bench = function(player)
-    joining[player.steam_id] = nil
+--- Move the player with steam id `id`, who has just connected, to the
+-- spectators, if the race has not started and the seat TTS gave them is not
+-- one already racing (a driver back from a dropped connection keeps theirs).
+-- Looked up afresh: they may have left again already.
+bench = function(id)
+    joining[id] = nil
+    local player = nil
+    for _, p in ipairs(getPlayers()) do
+        if p.steam_id == id then player = p end
+    end
+    if not player then
+        return
+    end
     local color = player.color
     if race.state.phase ~= "setup" or not SEATS[color] or race:car(color) then
         return

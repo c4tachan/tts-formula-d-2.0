@@ -58,6 +58,27 @@ function T.straights_keep_the_stagger_and_corners_line_up()
     assert(math.abs(cells("i.c5.6", "o.c5.1")) < 0.1, "printed level across a corner")
 end
 
+function T.an_edit_in_place_is_seen_once_forgotten()
+    -- A copy of Monaco whose spaces can be changed, as the track editor does.
+    local track = {}
+    for k, v in pairs(FDMonaco) do track[k] = v end
+    track.spaces = {}
+    for i, sp in ipairs(FDMonaco.spaces) do
+        local c = {}
+        for k, v in pairs(sp) do c[k] = v end
+        track.spaces[i] = c
+    end
+    local pole = track.spaces[1]
+    for _, sp in ipairs(track.spaces) do
+        if sp.id == FDMonaco.start[1] then pole = sp end
+    end
+    local before = Position.of(track).along[pole.id]
+    pole.sector = nil
+    eq(Position.of(track).along[pole.id], before, "kept until told")
+    Position.forget()
+    assert(Position.of(track).along[pole.id] < before, "measured afresh")
+end
+
 function T.a_track_without_positions_or_a_line_has_none()
     eq(Position.of({ spaces = { { id = "a", lane = 1, next = {} } } }), nil)
     eq(Position.of({ spaces = { { id = "a", lane = 1, next = { "b" } }, { id = "b", lane = 1, next = {} } },

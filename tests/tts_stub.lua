@@ -292,6 +292,14 @@ function Stub.player(color, handPos, admin)
     return p
 end
 
+--- Everyone connected, seated or not. A player taken out of `Player` has
+-- left.
+function getPlayers()
+    local out = {}
+    for _, p in pairs(Player) do out[#out + 1] = p end
+    return out
+end
+
 function getSeatedPlayers()
     local out = {}
     for color, p in pairs(Player) do

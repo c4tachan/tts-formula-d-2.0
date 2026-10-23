@@ -201,6 +201,11 @@ end
 -- Moves.ahead answers, keyed by the track's spaces like fd.core.position.
 local aheadCache = setmetatable({}, { __mode = "k" })
 
+--- Forget every answer: the track editor changes spaces in place.
+function Moves.forget()
+    aheadCache = setmetatable({}, { __mode = "k" })
+end
+
 --- The corner that matters to a car on `fromId`, and how far away it is:
 -- the corner it is in while it still owes stops there, or else the next one
 -- along. `stops` is as for Moves.reach. Other cars are left out: this is

@@ -11,6 +11,8 @@
 
 local Track = require("fd.tts.track")
 local Graph = require("fd.core.trackgraph")
+local Moves = require("fd.core.moves")
+local Position = require("fd.core.position")
 local Ghosts = require("fd.tts.ghosts")
 
 local Editor = {}
@@ -34,6 +36,10 @@ local linkFrom = nil     -- space id a hand-made link starts from
 local problemCache = nil
 local function changed()
     problemCache = nil
+    -- Turn order and the corner line are worked out once per track and
+    -- kept with its spaces, which an edit changes in place.
+    Position.forget()
+    Moves.forget()
 end
 
 --- The sector in a space's code, <lane>.<sector>.<n> (with "+n" on the end
