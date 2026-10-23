@@ -1888,7 +1888,7 @@ function T.start_race_waits_on_an_unsettled_grid()
     -- The script's die always comes up 10: a tie it cannot break.
     fdSetupStart(Player.Red)
     eq(state().phase, "grid")
-    assert(S.logged("press Start race again"))
+    assert(S.logged("press Start race to roll it again"))
     eq(S.ui.fds.active, "true")
 end
 
@@ -2095,6 +2095,25 @@ function T.a_gear_die_is_given_a_convex_collider()
     eq(#die.rotationValues, 4, "and taught its faces once back")
     onObjectSpawn(die)
     eq(die.reloads, 1, "only once")
+end
+
+function T.the_black_die_is_thrown_in_the_tray_for_each_check()
+    local S, red, blue = twoCars()
+    local black = S.find("Damage Dice")
+    -- In join order: Red rolls 4, Blue 15 for the grid; then Blue's start.
+    withRolls({ 4, 15, 12 }, function() fdSetupStart(Player.Red) end)
+    eq(black.rolls, 3, "thrown for each grid roll and the leader's start")
+    eq(state().phase, "race", "and the race under way once the grid settled")
+    assert(S.logged("BluePlayer rolls 12 on the black die %(start%)"))
+    eq(black.locked, true, "parked again once it has settled")
+    assert(not inTray(S, black))
+end
+
+function T.without_the_black_die_the_script_rolls_for_it()
+    local S = twoCars()
+    S.find("Damage Dice").destruct()
+    withRolls({ 4, 15 }, function() fdSetupStart(Player.Red) end)
+    eq(state().phase, "race", "the grid is rolled all the same")
 end
 
 return T

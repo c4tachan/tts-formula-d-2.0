@@ -162,8 +162,13 @@ function Stub.object(name, props)
     o.setPosition = function(p) o.pos = vec(p.x, p.y, p.z) end
     o.setRotationSmooth = function(r) o.rot = r end
     o.isSmoothMoving = function() return false end
-    -- A roll leaves `value` as the test set it; it only counts the throws.
-    o.roll = function() o.rolls = (o.rolls or 0) + 1 end
+    -- A roll counts the throws. A gear die keeps the `value` the test set;
+    -- the black die comes up whatever math.random(20) gives, so a test that
+    -- loads the script's die loads this one too.
+    o.roll = function()
+        o.rolls = (o.rolls or 0) + 1
+        if o.name == "Damage Dice" then o.value = math.random(20) end
+    end
     -- The highlight left on: { color, duration }, duration nil if it stays.
     o.highlightOn = function(c, d) o.highlight = { c, d } end
     o.highlightOff = function() o.highlight = nil end

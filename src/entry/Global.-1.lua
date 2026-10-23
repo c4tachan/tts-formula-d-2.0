@@ -40,6 +40,9 @@ local joinAt -- with the dashboard buttons, below
 local deliver, dealInSeated, dropDashless, bench -- likewise
 local isAdmin -- with the race controls, below
 local layDice, activateDie, restockDice -- with the track, below
+local throwChecks -- with the dice, below
+local startRace -- with the race controls, below
+local pendingStart = nil -- who pressed Start race, while the grid is rolled
 -- What syncTurns last told TTS's Turns, as { on, order, color }; nil until
 -- it has, so the first sync after a load sets every part.
 local turnsSet = nil
@@ -47,9 +50,9 @@ local undo = {}
 local joining = {} -- steam id -> true from connecting until moved to the spectators (see bench)
 local UNDO_LIMIT = 30
 
---- One roll of the black die, made by the script: the grid, starts,
--- collisions and engine strain are all rolled this way, the result told in
--- the chat and shown on the black die in the middle of the board.
+--- One roll of the black die, made by the script: only when the die itself
+-- is not on the table to be thrown (see throwChecks). The result is told in
+-- the chat, and shown on the die if it turns up.
 local function rollBlack()
     local value = math.random(20)
     Dice.showBlack(value)
@@ -453,13 +456,18 @@ function refresh(announce)
 end
 
 --- Run a change to the race: snapshot for undo, apply, then publish.
-local function act(fn)
-    undo[#undo + 1] = JSON.encode(race:serialize())
-    if #undo > UNDO_LIMIT then
-        table.remove(undo, 1)
+-- `followOn` is for a change that finishes the one before -- the black die
+-- thrown for it settling -- which Undo takes back along with it, so it
+-- takes no snapshot of its own.
+local function act(fn, followOn)
+    if not followOn then
+        undo[#undo + 1] = JSON.encode(race:serialize())
+        if #undo > UNDO_LIMIT then
+            table.remove(undo, 1)
+        end
     end
     fn()
-    race:rollChecks(rollBlack)
+    throwChecks()
     if race.gridSettled then
         race.gridSettled = nil
         placeOnGrid()
@@ -471,6 +479,12 @@ local function act(fn)
     refresh(true)
     if opened then
         showReach(opened)
+    end
+    -- Start race waited on the grid roll: once it has settled, the race starts.
+    local starter = pendingStart
+    if starter and race.state.phase == "setup" then
+        pendingStart = nil
+        startRace(starter)
     end
 end
 
@@ -531,21 +545,85 @@ local function ownerOf(color, gear)
     return match or color
 end
 
---- Read gear die `obj` for `gear` once it settles, as rolled by `color`.
-local function watchGearDie(obj, color, gear)
-    Dice.watch(obj, color, function(value, roller)
+--- What to do with a roll of the die for `gear`, once it has settled.
+local function onGearRoll(gear)
+    return function(value, roller)
         if value then
             clearReach()
             act(function() race:rolled(ownerOf(roller, gear), gear, value) end)
         end
+    end
+end
+
+--- Read gear die `obj` for `gear` once it settles, as rolled by `color`.
+local function watchGearDie(obj, color, gear)
+    Dice.watch(obj, color, onGearRoll(gear))
+end
+
+local throwing = nil -- the check the black die is in the air for
+-- Grid rolls thrown since the grid roll was called, and the most before
+-- giving up on a tie that will not break.
+local gridThrows = 0
+local GRID_THROWS = 40
+
+--- The black die check to throw for next: what play waits on (collisions,
+-- engine strain, the start of the car to play), else the next grid roll.
+local function nextCheck()
+    local c = race:checkWaiting()
+    if c then
+        return c
+    end
+    for _, g in ipairs(race.state.checks) do
+        if g.kind == "grid" then
+            return g
+        end
+    end
+    return nil
+end
+
+--- Throw the black die in the tray for the next check, one at a time: each
+-- result is applied when the die settles, through act, which throws for the
+-- one after. Without the die on the table, the script rolls for them at once.
+throwChecks = function()
+    if throwing then
+        return
+    end
+    local c = nextCheck()
+    if not c then
+        return
+    end
+    if c.kind == "grid" then
+        gridThrows = gridThrows + 1
+        if gridThrows > GRID_THROWS then
+            race:emit("warn", "The grid is still tied -- press Start race to roll it again")
+            pendingStart = nil
+            return
+        end
+    end
+    throwing = c
+    local die = Dice.throw(Dice.BLACK, c.color, function(value)
+        throwing = nil
+        act(function() race:blackDie(value or rollBlack(), c.color, c) end, true)
     end)
+    if die then
+        return
+    end
+    throwing = nil
+    for _ = 1, 100 do
+        c = nextCheck()
+        if not c then
+            return
+        end
+        race:blackDie(rollBlack(), c.color, c)
+    end
 end
 
 function onObjectRandomize(obj, color)
     local gear = Dice.gearOf(obj)
     if gear then
         watchGearDie(obj, color, gear)
-    elseif Dice.isBlack(obj) then
+    elseif Dice.isBlack(obj) and not throwing then
+        -- (While the script throws it, it reads the result itself.)
         Dice.watch(obj, color, function(value, roller)
             if value then
                 act(function() race:blackDie(value, roller) end)
@@ -1092,8 +1170,12 @@ function fdUiRoll(player)
         broadcastToColor("Shift into a gear first: click one on your dashboard.", player.color, LEVEL_RGB.warn)
         return
     end
+    if throwing then
+        broadcastToColor("The black die is in the tray -- roll once it has settled.", player.color, LEVEL_RGB.warn)
+        return
+    end
     local gear = car.gear
-    local die = Dice.throw(gear)
+    local die = Dice.throw(gear, player.color, onGearRoll(gear))
     if not die then
         broadcastToColor("The " .. Race.gearName(gear) .. " gear die has gone: another is on its way -- click Roll again in a moment.",
             player.color, LEVEL_RGB.warn)
@@ -1101,7 +1183,6 @@ function fdUiRoll(player)
         return
     end
     die.highlightOn(player.color, 3)
-    watchGearDie(die, player.color, gear)
 end
 
 function fdUiShift(player, value)
@@ -1151,10 +1232,11 @@ end
 function fdGrid(player)
     if not admin(player) then return end
     printToAll(player.steam_name .. " calls the grid roll", LEVEL_RGB.info)
-    act(function() race:rollForGrid(rollBlack) end)
+    gridThrows = 0
+    act(function() race:rollForGrid() end)
 end
 
-local function startRace(player)
+startRace = function(player)
     printToAll(player.steam_name .. " starts the race", LEVEL_RGB.info)
     clearReach()
     act(function() race:startRace() end)
@@ -1208,12 +1290,11 @@ function fdSetupStart(player)
             return
         end
         printToAll(player.steam_name .. " calls the grid roll", LEVEL_RGB.info)
-        act(function() race:rollForGrid(rollBlack) end)
-        if race.state.phase ~= "setup" then
-            broadcastToColor("The grid is not settled yet -- press Start race again.", player.color, LEVEL_RGB.warn)
-            return
-        end
-        startRace(player)
+        -- The black die is thrown for each driver in turn; the race starts
+        -- once the grid has settled (see act).
+        pendingStart = player
+        gridThrows = 0
+        act(function() race:rollForGrid() end)
     end)
 end
 
@@ -1264,6 +1345,7 @@ end
 function fdReset(player)
     if not admin(player) then return end
     printToAll(player.steam_name .. " reset the race (Undo restores it)", LEVEL_RGB.info)
+    pendingStart = nil
     clearReach()
     act(function() race:reset() end)
 end
@@ -1277,6 +1359,7 @@ function fdUndo(player)
     end
     race = Race.new(Rules, JSON.decode(last))
     race.autoRolls = true
+    pendingStart = nil
     useBoardTrack()
     clearReach()
     -- Undo puts the race back, not the pieces: the board still says where
@@ -1288,7 +1371,7 @@ function fdUndo(player)
     race:drain() -- re-reading the board is not news
     printToAll(player.steam_name .. " undid the last change", LEVEL_RGB.info)
     -- In case the state undone to has a roll waiting: it is rolled now.
-    race:rollChecks(rollBlack)
+    throwChecks()
     relay(race:drain())
     syncDashboards(true)
     refresh()
@@ -1410,6 +1493,9 @@ end
 --- The die in play: the gear of the car to play, if it has one; with
 -- none, the tray stays empty. A die that has gone is fetched again.
 activateDie = function()
+    if throwing then
+        return -- the black die has the tray
+    end
     local due = race:turn()
     local gear = due and due.gear or 0
     if not Dice.activate(gear) and gear > 0 and not Dice.find(gear) then

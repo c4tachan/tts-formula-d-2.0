@@ -182,8 +182,12 @@ local function allNames()
     return out
 end
 
+-- The black die's place among the dice: after the six gear dice.
+Dice.BLACK = #DiceData.names + 1
+
+--- Die `i`: a gear die by its gear, or the black die (Dice.BLACK).
 local function dieAt(i)
-    if i <= #DiceData.names then
+    if i < Dice.BLACK then
         return Dice.find(i)
     end
     return findBlack()
@@ -211,33 +215,33 @@ function Dice.layout(center, middle)
     end
 end
 
---- Put the die for `gear` in the tray, parking the one that was there; with
--- no gear (0 or nil), park it and leave the tray empty. Does nothing until
--- the dice have been laid out, or if that die is in already. Returns the
--- die in the tray.
-function Dice.activate(gear)
+--- Put die `i` (a gear, or Dice.BLACK) in the tray, parking the one that
+-- was there; with none (0 or nil), park it and leave the tray empty. Does
+-- nothing until the dice have been laid out, or if that die is in already.
+-- Returns the die in the tray.
+function Dice.activate(i)
     if not place then
         return nil
     end
-    if gear == active then
-        local die = active and Dice.find(active)
+    if i == active then
+        local die = active and dieAt(active)
         if die or not active then
             return die
         end
         active = nil -- it has gone: fall through, to bring in another
     end
-    local was = active and Dice.find(active)
+    local was = active and dieAt(active)
     if was then
         fix(was, parking(active))
     end
     active = nil
-    local die = gear and gear > 0 and Dice.find(gear)
+    local die = i and i > 0 and dieAt(i)
     if not die then
         return nil
     end
     local c = place.center
     fix(die, { x = c.x, y = c.y + DROP, z = c.z }, true)
-    active = gear
+    active = i
     return die
 end
 
@@ -250,13 +254,14 @@ function Dice.highlight(gear, color)
     return die
 end
 
---- Throw the die for `gear` in the tray, bringing it in first if another
--- is there. Returns the die, or nil if it is not out; read it with
--- Dice.watch.
-function Dice.throw(gear)
-    local die = Dice.activate(gear) or Dice.find(gear)
+--- Throw die `i` (a gear, or Dice.BLACK) in the tray, bringing it in
+-- first if another is there, and call onResult(value, color) once it
+-- settles (see Dice.watch). Returns the die, or nil if it is not out.
+function Dice.throw(i, color, onResult)
+    local die = Dice.activate(i) or dieAt(i)
     if die then
         die.roll()
+        Dice.watch(die, color, onResult)
     end
     return die
 end
@@ -353,9 +358,10 @@ end
 
 local watching = {}
 
---- Call onResult(value, color) once a rolled die comes to rest. Rolling fires
--- the randomize event repeatedly while a die is shaken, so a die already being
--- watched just updates who rolled it.
+--- Call onResult(value, color) once a rolled die comes to rest; with no value
+-- if it never does, or is gone first. Rolling fires the randomize event
+-- repeatedly while a die is shaken, so a die already being watched just
+-- updates who rolled it.
 function Dice.watch(obj, color, onResult)
     local guid = obj.getGUID()
     if watching[guid] then
@@ -369,19 +375,27 @@ function Dice.watch(obj, color, onResult)
     local function report()
         local w = watching[guid]
         watching[guid] = nil
-        if obj ~= nil and w then
-            -- getValue() is the index of the face that is up, not what is
-            -- printed on it: on the 1st gear die, face 4 shows a 2.
-            local value = tonumber(obj.getRotationValue())
-            if value == nil then
-                value = tonumber(obj.getValue())
-            end
-            onResult(value, w.color)
+        if not w then
+            return
         end
+        if obj == nil then
+            return onResult(nil, w.color)
+        end
+        -- getValue() is the index of the face that is up, not what is
+        -- printed on it: on the 1st gear die, face 4 shows a 2.
+        local value = tonumber(obj.getRotationValue())
+        if value == nil then
+            value = tonumber(obj.getValue())
+        end
+        onResult(value, w.color)
     end
     -- Give the throw a moment to leave the resting state before waiting on it.
     Wait.time(function()
-        Wait.condition(report, settled, 60, function() watching[guid] = nil end)
+        Wait.condition(report, settled, 60, function()
+            local w = watching[guid]
+            watching[guid] = nil
+            if w then onResult(nil, w.color) end
+        end)
     end, 0.3)
 end
 
