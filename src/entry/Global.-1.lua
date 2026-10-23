@@ -22,6 +22,7 @@ local Mini = require("fd.tts.minidash")
 local Track = require("fd.tts.track")
 local Editor = require("fd.tts.track_editor")
 local Ghosts = require("fd.tts.ghosts")
+local Setup = require("fd.tts.setup")
 local TRACKS = { FDMonaco = require("fd.data.tracks.FDMonaco") }
 
 mod_packed = false
@@ -36,7 +37,8 @@ local showReach -- likewise
 local clearReach -- likewise
 local useBoardTrack -- likewise
 local joinAt -- with the dashboard buttons, below
-local deliver, deliverAll, bench -- likewise
+local deliver, dealInSeated, dropDashless, bench -- likewise
+local isAdmin -- with the race controls, below
 -- What syncTurns last told TTS's Turns, as { on, order, color }; nil until
 -- it has, so the first sync after a load sets every part.
 local turnsSet = nil
@@ -96,6 +98,21 @@ local function packTable()
     mod_packed, setup_packed = true, true
 end
 
+--- The map on the board tile, from Maps.list, or nil if it is none we know.
+local function mapOnBoard()
+    local tile = Track.tile()
+    local custom = tile and tile.getCustomObject()
+    if not custom then
+        return nil
+    end
+    for _, map in ipairs(Maps.list) do
+        if custom.image == map.url then
+            return map
+        end
+    end
+    return nil
+end
+
 function onLoad(saved_data)
     local saved = {}
     if saved_data and saved_data ~= "" then
@@ -118,21 +135,27 @@ function onLoad(saved_data)
     useBoardTrack()
     buildUi()
     -- A moment for every object to have spawned: a dashboard not there yet
-    -- would look deleted, and its driver be taken out.
+    -- would look deleted, and its driver be taken out. Nobody is dealt in
+    -- yet: that waits for Start race (see fdSetupStart).
     Wait.time(function()
         Dashboard.scan()
-        deliverAll()
+        dropDashless()
     end, 1)
 end
 
---- (Re)build the race panel and the screen dashboards, then fill them in.
+--- (Re)build the race panel on the board, the screen dashboards and the
+-- setup menu, then fill them in.
 function buildUi()
     -- Until the new XML has loaded, updates would go to elements on their way
     -- out and then be skipped as repeats once it has (see fd.tts.ui).
     Mini.setReady(false)
-    Hud.build(Rules, Mini.panels(Rules), function()
+    Setup.setReady(false)
+    local panels = Mini.panels(Rules)
+    panels[#panels + 1] = Setup.panel()
+    Hud.build(Rules, panels, Track.tile(), function()
         applyModMenuButton()
         Mini.setReady()
+        Setup.setReady()
         refresh()
     end)
 end
@@ -166,10 +189,15 @@ function onPlayerConnect(player)
     end
 end
 
+-- The rebuild also brings the setup menu's list of who is seated up to date.
 function onPlayerChangeColor(color)
     rebuildUiSoon()
-    -- A moment for the seat to count as taken.
-    Wait.time(function() deliver(color) end, 0.5)
+end
+
+--- A driver who drops out leaves their car where it is, and once the seat
+-- is empty its dashboard offers "Drive this car" (see fdDashTakeOver).
+function onPlayerDisconnect()
+    Wait.time(function() refresh() end, 0.5)
 end
 
 function onSave()
@@ -292,10 +320,16 @@ local function dashLabel(car)
     return table.concat(parts, "  |  ")
 end
 
+--- Whether somebody is sitting in `color`.
+local function seatedIn(color)
+    local p = Player[color]
+    return p ~= nil and p.seated == true
+end
+
 local function renderDashboards()
     for _, obj in ipairs(Dashboard.all()) do
         local car = carOnDash(obj.getGUID())
-        Controls.render(obj, car, car and dashLabel(car))
+        Controls.render(obj, car, car and dashLabel(car), car and not seatedIn(car.color))
     end
 end
 
@@ -375,6 +409,19 @@ function refresh(announce)
     syncCars()
     Hud.refresh(race)
     Mini.refresh(race)
+    -- The map is only looked up while the setup menu shows it.
+    local map, seated = nil, nil
+    if Setup.shows(race.state.phase) then
+        map = mapOnBoard()
+        seated = {}
+        for _, color in ipairs(getSeatedPlayers()) do
+            local car, p = race:car(color), Player[color]
+            if SEATS[color] and not car then
+                seated[#seated + 1] = p and p.steam_name or color
+            end
+        end
+    end
+    Setup.refresh(race, map and { name = map.name, hasTrack = TRACKS[map.id] ~= nil }, seated)
     renderDashboards()
     showTurn(announce)
     applyModMenuButton()
@@ -773,18 +820,14 @@ end
 
 function fdNoop() end
 
-function fdDashJoin(dash, color)
-    if not SEATS[color] then
-        broadcastToColor("Take a coloured seat to join the race.", color, LEVEL_RGB.warn)
-        return
-    end
-    local holder = carOnDash(dash.getGUID())
-    if holder and holder.color ~= color then
-        broadcastToColor(race:label(holder) .. " is already using this dashboard.", color, LEVEL_RGB.warn)
+--- Put `color` in the race at dashboard `dash`, with no car yet: the first
+-- half of dealing them in. On no button -- Start race deals everybody in --
+-- but global, so the tests can seat a driver at a given dashboard.
+function joinRace(color, dash)
+    if not SEATS[color] or race:car(color) or carOnDash(dash.getGUID()) then
         return
     end
     act(function() joinAt(dash, color) end)
-    dash.highlightOn(color, 3)
 end
 
 --- Put `color` in the race at dashboard `dash`. Called inside act.
@@ -793,13 +836,16 @@ joinAt = function(dash, color)
     car.tts = car.tts or {}
     car.tts.dash = dash.getGUID()
     car.tts.faceWarned = nil
+    -- Who drives it, so they can be put back in it if they drop out.
+    car.tts.steam = Player[color] and Player[color].steam_id
     return car
 end
 
 -- Delivery ------------------------------------------------------------------
--- Somebody who sits down before the start is dealt in: a dashboard in front
--- of their seat -- a free one already there, or a fresh one from the bag for
--- the ruleset's face -- and a car beside it. Leave takes them out again.
+-- When the host presses Start race, everybody seated is dealt in: a
+-- dashboard in front of their seat -- a free one already there, or a fresh
+-- one from the bag for the ruleset's face -- and a car beside it. Leave
+-- takes them out again.
 
 local DASHBOARD_BAGS = { beginner = "edfadc", advanced = "4eb678" }
 -- A free dashboard this close to a seat's hand zone is that seat's.
@@ -816,7 +862,7 @@ local function dealIn(color, dash)
     end
     act(function()
         local car = joinAt(dash, color)
-        race:emit("info", race:label(car) .. " sits down and is dealt in", color)
+        race:emit("info", race:label(car) .. " is dealt in", color)
         ACTIONS.car(car)
     end)
 end
@@ -871,7 +917,7 @@ end
 
 --- Before the start, a car whose dashboard is gone -- deleted, or put away
 -- in a bag -- leaves the race, so its seat can be dealt in afresh.
-local function dropDashless()
+dropDashless = function()
     if race.state.phase ~= "setup" then
         return
     end
@@ -882,19 +928,47 @@ local function dropDashless()
     end
 end
 
---- Deal in everybody seated at load: a colour they are sitting in then is
--- one they picked. Only newcomers are made to pick (see bench).
-deliverAll = function()
+--- Whether every car's object is out of its bag and done spawning, so it
+-- can be put on the grid.
+local function carsReady()
+    for _, car in ipairs(race:cars()) do
+        local obj = car.tts and car.tts.car and getObjectFromGUID(car.tts.car)
+        if obj and obj.spawning then
+            return false
+        end
+    end
+    return true
+end
+
+--- Deal in everybody seated who is not racing yet, then call `onDone` once
+-- their dashboards and cars are on the table. A dashboard the bag never hands
+-- over stops holding things up after a while (see deliver).
+dealInSeated = function(onDone)
     dropDashless()
     for _, color in ipairs(getSeatedPlayers()) do
         deliver(color)
     end
+    Wait.condition(function()
+        Wait.condition(onDone, carsReady, 5, onDone)
+    end, function() return next(delivering) == nil end, 12, onDone)
 end
 
---- Move the player with steam id `id`, who has just connected, to the
--- spectators, if the race has not started and the seat TTS gave them is not
--- one already racing (a driver back from a dropped connection keeps theirs).
--- Looked up afresh: they may have left again already.
+--- The car driven by the player with steam id `id`, if any.
+local function carOf(id)
+    for _, car in ipairs(race:cars()) do
+        if car.tts and car.tts.steam == id then
+            return car
+        end
+    end
+    return nil
+end
+
+--- Sort out the seat TTS gave the player with steam id `id`, who has just
+-- connected. A driver back from a dropped connection goes back to their own
+-- car's colour. Anybody else sitting in a colour with a car in the race --
+-- one whose driver is away -- is moved to the spectators, as is anybody in a
+-- coloured seat before the start: they pick their own seat. Looked up
+-- afresh: they may have left again already.
 bench = function(id)
     joining[id] = nil
     local player = nil
@@ -905,11 +979,56 @@ bench = function(id)
         return
     end
     local color = player.color
-    if race.state.phase ~= "setup" or not SEATS[color] or race:car(color) then
+    local mine = carOf(id)
+    if mine then
+        if mine.color == color then
+            return
+        end
+        if seatedIn(mine.color) then
+            player.broadcast("Somebody is sitting in your " .. mine.color
+                .. " seat: once they move, click Drive this car on your dashboard.", LEVEL_RGB.warn)
+            return
+        end
+        player.changeColor(mine.color)
+        printToAll(race:label(mine) .. " is back in the " .. mine.color .. " car", LEVEL_RGB.info)
         return
     end
-    player.changeColor("Grey")
-    player.broadcast("Pick a colour to race in: you get its dashboard and a car.", LEVEL_RGB.info)
+    if not SEATS[color] then
+        return
+    end
+    local there = race:car(color)
+    if there then
+        player.changeColor("Grey")
+        player.broadcast(race:label(there) .. "'s car is waiting for its driver. To drive it instead, click Drive this car on its dashboard.",
+            LEVEL_RGB.info)
+    elseif race.state.phase == "setup" then
+        player.changeColor("Grey")
+        player.broadcast("Pick a colour to race in: you get a dashboard and a car when the race starts.", LEVEL_RGB.info)
+    end
+end
+
+--- "Drive this car", on the dashboard of a car whose driver has left their
+-- seat: seat whoever clicks in its colour. Its driver coming back gets their
+-- car again; anybody else takes it over, and drives it under their name.
+function fdDashTakeOver(dash, color)
+    local car = carOnDash(dash.getGUID())
+    local p = Player[color]
+    if not car or not p or seatedIn(car.color) then
+        return
+    end
+    local driving = race:car(color)
+    if driving then
+        broadcastToColor("You are driving the " .. driving.color .. " car already.", color, LEVEL_RGB.warn)
+        return
+    end
+    local back = car.tts.steam == p.steam_id
+    act(function()
+        car.tts.steam = p.steam_id
+        car.name = p.steam_name
+        race:emit("info", back and (race:label(car) .. " is back in the " .. car.color .. " car")
+            or (race:label(car) .. " takes over the " .. car.color .. " car"), car.color)
+    end)
+    p.changeColor(car.color)
 end
 
 local function onDash(dash, name)
@@ -919,7 +1038,25 @@ end
 function fdDashCar(dash) onDash(dash, "car") end
 function fdDashCollision(dash) onDash(dash, "collision") end
 function fdDashPit(dash) onDash(dash, "pit") end
-function fdDashLeave(dash) onDash(dash, "leave") end
+--- Leave, on a dashboard: its own driver leaves, or the host (or a promoted
+-- player) takes the car out of the race -- a driver who has dropped out and
+-- is not coming back, say.
+function fdDashLeave(dash, color)
+    local car = carOnDash(dash.getGUID())
+    if not car then
+        return
+    end
+    if color ~= car.color then
+        if not isAdmin({ color = color }) then
+            broadcastToColor("Only " .. race:label(car) .. " or the host can take this car out of the race.",
+                color, LEVEL_RGB.warn)
+            return
+        end
+        local p = Player[color]
+        printToAll((p and p.steam_name or color) .. " takes " .. race:label(car) .. " out of the race", LEVEL_RGB.info)
+    end
+    runAction(car, "leave")
+end
 
 function fdDashWear(dash, color, alt)
     onDash(dash, alt and "wearUp" or "wearDown")
@@ -996,7 +1133,7 @@ end
 
 --- Whether `player` may use the race controls. `player` is a TTS Player, or
 -- just a colour as the hotkeys and context menus give it.
-local function isAdmin(player)
+isAdmin = function(player)
     if player.admin ~= nil then
         return player.admin
     end
@@ -1020,8 +1157,7 @@ function fdGrid(player)
     act(function() race:rollForGrid(rollBlack) end)
 end
 
-function fdStart(player)
-    if not admin(player) then return end
+local function startRace(player)
     printToAll(player.steam_name .. " starts the race", LEVEL_RGB.info)
     clearReach()
     packTable()
@@ -1035,6 +1171,74 @@ function fdStart(player)
             end
         end)
     end, 1)
+end
+
+function fdStart(player)
+    if not admin(player) then return end
+    startRace(player)
+end
+
+--- The players in coloured seats.
+local function seatedColors()
+    local out = {}
+    for _, color in ipairs(getSeatedPlayers()) do
+        if SEATS[color] then out[#out + 1] = color end
+    end
+    return out
+end
+
+local starting = false -- Start race is dealing players in
+
+--- Start race, on the setup menu: deal in everybody seated, roll the grid
+-- and start, after a reset if the last race is over. The grid roll settles
+-- its own ties, so the race only waits if it could not. (fdGrid and fdStart
+-- are the last two steps, still callable on their own.)
+function fdSetupStart(player)
+    if not admin(player) or starting then return end
+    if race.state.phase == "race" then
+        return
+    end
+    if #race:cars() == 0 and #seatedColors() == 0 then
+        broadcastToColor("Nobody is seated yet: players join by taking a coloured seat.", player.color, LEVEL_RGB.warn)
+        return
+    end
+    if race.state.phase == "finished" then
+        clearReach()
+        act(function() race:reset() end)
+    end
+    starting = true
+    dealInSeated(function()
+        starting = false
+        if race.state.phase == "race" then
+            return
+        end
+        printToAll(player.steam_name .. " calls the grid roll", LEVEL_RGB.info)
+        act(function() race:rollForGrid(rollBlack) end)
+        if race.state.phase ~= "setup" then
+            broadcastToColor("The grid is not settled yet -- press Start race again.", player.color, LEVEL_RGB.warn)
+            return
+        end
+        startRace(player)
+    end)
+end
+
+--- The race distance buttons on the setup menu.
+function fdSetupLaps(player, value)
+    if not admin(player) then return end
+    local laps = tonumber(value)
+    if not laps or laps == race:serialize().laps then
+        return
+    end
+    printToAll(player.steam_name .. " sets the race distance", LEVEL_RGB.info)
+    act(function() race:setLaps(laps) end)
+end
+
+--- The Big Box menu put a new map on the board. Reloading the tile took
+-- the race panel with it, so it is drawn again; the setup menu says which
+-- map it is, and turn order goes by its track.
+function fdMapChanged()
+    useBoardTrack()
+    buildUi()
 end
 
 function fdReset(player)
@@ -1070,17 +1274,6 @@ function fdUndo(player)
     refresh()
 end
 
---- Switch the race between one lap (the basic rules) and two.
-function fdLaps(player)
-    if not admin(player) then return end
-    local laps = race:serialize().laps == 1 and 2 or 1
-    printToAll(player.steam_name .. " sets the race distance", LEVEL_RGB.info)
-    act(function() race:setLaps(laps) end)
-end
-
-function fdToggleRace()
-    Hud.toggleRace()
-end
 
 -- Track overlay and editor -------------------------------------------------------
 
@@ -1088,25 +1281,18 @@ local trackShown = nil
 
 --- The track data for the map on the board, if there is any.
 local function trackOnBoard()
-    local tile = Track.tile()
-    local custom = tile and tile.getCustomObject()
-    for id, track in pairs(TRACKS) do
-        local map = Maps and Maps.byId and Maps.byId[id]
-        if custom and map and custom.image == map.url then
-            return track
-        end
-    end
-    return nil
+    local map = mapOnBoard()
+    return map and TRACKS[map.id]
 end
 
 local function editorStatus()
     if not Editor.isOpen() then
-        Hud.setEditor(nil)
+        Setup.setEditor(nil)
         return
     end
     local track = Editor.trackFor(TRACKS[Editor.openId()])
     local _, problems = Editor.problems()
-    Hud.setEditor(string.format("Editing %s: %d spaces, %d problem(s) shown red, %d marker(s) out, %d on the grid",
+    Setup.setEditor(string.format("Editing %s: %d spaces, %d problem(s) shown red, %d marker(s) out, %d on the grid",
         track.name, #track.spaces, #problems, Editor.markerCount(), Editor.gridCount()))
 end
 

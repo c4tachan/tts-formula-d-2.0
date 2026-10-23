@@ -44,6 +44,8 @@ function setMapImage(url)
     custom.secondary_image = url
     tile.setCustomObject(custom)
     tile.reload()
+    -- Once the tile is back, so the setup menu shows the new map.
+    Wait.time(function() Global.call("fdMapChanged") end, 1)
 end
 
 local function showPanel(active)

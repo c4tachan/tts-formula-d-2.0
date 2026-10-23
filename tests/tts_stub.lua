@@ -118,6 +118,23 @@ function Stub.object(name, props)
         return { center = o.pos, size = o.size or vec(1, 1, 1), offset = vec(0, 0, 0) }
     end
     o.setDescription = function(d) o.description = d end
+    -- An object's own UI. Its elements land in Stub.ui with the screen's:
+    -- the ids do not overlap.
+    o.UI = {
+        loading = false,
+        getXmlTable = function() return o.xml or {} end,
+        setXmlTable = function(t) Stub.counts.ui = Stub.counts.ui + 1 o.xml = t end,
+        setAttribute = function(id, k, v)
+            Stub.counts.ui = Stub.counts.ui + 1
+            Stub.ui[id] = Stub.ui[id] or {}
+            Stub.ui[id][k] = v
+        end,
+        setValue = function(id, v)
+            Stub.counts.ui = Stub.counts.ui + 1
+            Stub.ui[id] = Stub.ui[id] or {}
+            Stub.ui[id].value = v
+        end,
+    }
     o.menu = {}
     o.addContextMenuItem = function(label, fn) o.menu[label] = fn end
     o.clearContextMenu = function() o.menu = {} end

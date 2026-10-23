@@ -55,7 +55,7 @@ end
 --- Red joins at the beginner dashboard and gets the race under way.
 local function redRacing()
     local S = world()
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
     fdStart({ steam_name = "host", color = "Red" }) -- Red's start is rolled at once
     return S
 end
@@ -93,7 +93,7 @@ function T.the_big_box_menu_is_packed_away_for_the_race()
     eq(S.ui.showModMenuButton.active, "false", "the menu is out")
     setup_packed = false -- the setup board is out too
 
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
     fdStart(Player.Red)
     eq(menuBag.calls[2], "buttonClick_recall", "the menu goes back in its bag")
     eq(setupBag.calls[1], "buttonClick_recall", "and the setup board")
@@ -105,9 +105,15 @@ function T.the_big_box_menu_is_packed_away_for_the_race()
     eq(#menuBag.calls, 2, "nothing out to pack the second time")
 end
 
-function T.sitting_down_deals_you_in_at_the_dashboard_there()
+-- The script's die always comes up 10 unless a test loads it, so with two or
+-- more drivers Start race deals them in but leaves the grid tied: the cars
+-- stay where they were dealt.
+
+function T.start_race_deals_you_in_at_the_dashboard_there()
     local S = world()
     onPlayerChangeColor("Red")
+    eq(state().cars.Red, nil, "sitting down deals nobody in")
+    fdSetupStart(Player.Red)
     local red = state().cars.Red
     assert(red, "Red is in the race")
     eq(red.tts.dash, S.beginner.guid, "at the free dashboard in front of the seat")
@@ -118,8 +124,8 @@ function T.sitting_down_deals_you_in_at_the_dashboard_there()
         "beside the dashboard")
     assert(S.logged("dealt in"))
 
-    -- Sitting down again changes nothing.
-    onPlayerChangeColor("Red")
+    -- Pressing it again deals nobody twice.
+    fdSetupStart(Player.Red)
     eq(state().cars.Red.tts.car, red.tts.car)
     eq(S.count("Formula 1 Solid") + S.count("RedPlayer (Red)"), 1)
 end
@@ -129,6 +135,7 @@ function T.a_seat_with_no_dashboard_gets_one_from_the_bag()
     S.object("Beginner Dashboard Bag", { guid = "edfadc", spawns = "Beginner Dashboard" })
     S.player("Green", S.vec(-24, 1, -38))
     onPlayerChangeColor("Green")
+    fdSetupStart(Player.Red)
     local green = state().cars.Green
     assert(green, "Green is in the race")
     local dash = getObjectFromGUID(green.tts.dash)
@@ -139,7 +146,7 @@ function T.a_seat_with_no_dashboard_gets_one_from_the_bag()
     assert(dash.pos.y > 1, "on the table")
     eq(dash.buttons[1].click_function, "fdNoop", "its status label is drawn")
     assert(getObjectFromGUID(green.tts.car), "and a car")
-    eq(S.count("Gear Stick"), 1, "with its gear stick")
+    assert(getObjectFromGUID(green.tts.markers.gear), "with its gear stick")
 end
 
 function T.nobody_is_dealt_in_once_the_race_has_started()
@@ -150,9 +157,12 @@ function T.nobody_is_dealt_in_once_the_race_has_started()
     eq(state().cars.Grey, nil, "spectators never")
 end
 
-function T.players_seated_at_load_are_dealt_in()
+function T.players_seated_at_load_wait_for_start_race()
     local S = world()
     onLoad("")
+    eq(state().cars.Red, nil, "nobody is dealt in at load")
+    eq(S.ui.fds_drivers.value, "Drivers (2): BluePlayer, RedPlayer", "but the menu lists who is seated")
+    fdSetupStart(Player.Red)
     eq(state().cars.Red.tts.dash, S.beginner.guid)
     eq(state().cars.Blue.tts.dash, S.advanced.guid)
     assert(getObjectFromGUID(state().cars.Red.tts.car), "with a car")
@@ -170,7 +180,9 @@ function T.a_newcomer_is_moved_to_the_spectators_to_pick_a_colour()
     assert(S.logged("broadcast to Grey: Pick a colour"), "told what to do")
 
     green.changeColor("Green")
-    assert(state().cars.Green, "the seat they pick deals them in")
+    eq(state().cars.Green, nil, "not until the race starts")
+    fdSetupStart(Player.Red)
+    assert(state().cars.Green, "then the seat they picked is dealt in")
     assert(getObjectFromGUID(state().cars.Green.tts.car), "with a car")
 end
 
@@ -192,7 +204,7 @@ end
 
 function T.a_driver_reconnecting_keeps_their_seat()
     local S = world()
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
     onPlayerConnect(Player.Red)
     eq(Player.Red.color, "Red")
     assert(state().cars.Red)
@@ -207,7 +219,7 @@ end
 
 function T.deleting_a_dashboard_before_the_start_takes_its_driver_out()
     local S = world()
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
     S.beginner.destruct()
     eq(state().cars.Red, nil, "Red has left")
     eq(S.count("Gear Stick"), 0, "and their gear stick went with them")
@@ -216,7 +228,7 @@ end
 function T.a_save_whose_dashboard_was_deleted_deals_the_seat_in_again()
     local S = world()
     S.object("Beginner Dashboard Bag", { guid = "edfadc", spawns = "Beginner Dashboard" })
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
     local saved = onSave()
     -- Deleted without the script hearing of it, as when cleaning up a save.
     local hook = onObjectDestroy
@@ -225,6 +237,8 @@ function T.a_save_whose_dashboard_was_deleted_deals_the_seat_in_again()
     onObjectDestroy = hook
 
     onLoad(saved)
+    eq(state().cars.Red, nil, "Red is out")
+    fdSetupStart(Player.Red)
     local red = state().cars.Red
     assert(red, "Red is dealt in again")
     local dash = getObjectFromGUID(red.tts.dash)
@@ -251,7 +265,7 @@ function T.the_start_fetches_dice_swept_up_with_the_setup_board()
         { name = "First Gear Dice", guid = "a8062d" },
         { name = "Damage Dice", guid = "6e3283" },
     } })
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
     fdStart(Player.Red)
     local first = S.find("First Gear Dice")
     assert(first, "the 1st gear die is back")
@@ -269,7 +283,7 @@ function T.the_start_falls_back_on_the_spare_dice_set()
     local set = {}
     for i, name in ipairs(names) do set[i] = { name = name, guid = "d" .. i } end
     S.object("Dice Set Bag", { guid = "ac4939", spawns = "Dice Set", spawnContents = set })
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
     fdStart(Player.Red)
     for _, name in ipairs(names) do
         eq(S.count(name), 1, name)
@@ -284,21 +298,20 @@ end
 
 function T.no_dice_fetched_when_all_are_out()
     local S = world()
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
     fdStart(Player.Red)
     assert(not S.logged("dice out"))
 end
 
-function T.free_dashboards_offer_join()
+function T.free_dashboards_have_no_buttons()
     local S = world()
-    eq(#S.beginner.buttons, 1)
-    eq(S.beginner.buttons[1].click_function, "fdDashJoin")
-    eq(S.advanced.buttons[1].click_function, "fdDashJoin")
+    eq(#S.beginner.buttons, 0, "players are dealt in at Start race, not by joining")
+    eq(#S.advanced.buttons, 0)
 end
 
 function T.joining_from_a_dashboard_claims_it_and_places_markers()
     local S = world()
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
     eq(state().cars.Red.tts.dash, S.beginner.guid)
     eq(S.count("Gear Stick"), 1)
     eq(S.count("Wear Tracker"), 1)
@@ -309,8 +322,8 @@ end
 
 function T.buttons_read_the_same_way_as_the_printed_art()
     local S = world()
-    S.beginner.click("fdDashJoin", "Red")
-    S.advanced.click("fdDashJoin", "Blue")
+    joinRace("Red", S.beginner)
+    joinRace("Blue", S.advanced)
     local function row(dash)
         local out = {}
         for _, b in ipairs(dash.buttons) do
@@ -337,22 +350,20 @@ end
 
 function T.a_claimed_dashboard_cannot_be_taken()
     local S = world()
-    S.beginner.click("fdDashJoin", "Red")
-    eq(S.beginner.buttons[1].click_function, "fdNoop", "join button gone")
-    fdDashJoin(S.beginner, "Blue") -- a click that raced the redraw
+    joinRace("Red", S.beginner)
+    joinRace("Blue", S.beginner)
     eq(state().cars.Blue, nil)
-    assert(S.logged("already using"))
 end
 
 function T.spectators_cannot_join()
     local S = world()
-    S.beginner.click("fdDashJoin", "Grey")
+    joinRace("Grey", S.beginner)
     eq(state().cars.Grey, nil)
 end
 
 function T.advanced_face_warns_instead_of_placing_wear()
     local S = world()
-    S.advanced.click("fdDashJoin", "Blue")
+    joinRace("Blue", S.advanced)
     eq(S.count("Wear Tracker"), 0)
     assert(S.logged("beginner side"))
     eq(S.advanced.buttons[1].position[2], 0.7)
@@ -427,7 +438,7 @@ function T.leaving_clears_markers_and_frees_the_dashboard()
     eq(state().cars.Red, nil)
     eq(S.count("Gear Stick"), 0)
     eq(S.count("Wear Tracker"), 0)
-    eq(S.beginner.buttons[1].click_function, "fdDashJoin")
+    eq(#S.beginner.buttons, 0, "its buttons go with the car")
 end
 
 function T.flipping_a_dashboard_redraws_its_buttons()
@@ -559,7 +570,7 @@ end
 function T.a_car_claimed_by_someone_else_is_left_alone()
     local S = redRacing()
     local blues = S.object("Formula 1 Solid", { pos = S.vec(1, 1, 34) })
-    S.advanced.click("fdDashJoin", "Blue")
+    joinRace("Blue", S.advanced)
     S.advanced.click("fdDashCar", "Blue")
     eq(state().cars.Blue.tts.car, blues.guid)
     -- Even parked right next to Red, a claimed car is not up for grabs.
@@ -844,8 +855,8 @@ end
 --- Red and Blue in the race, each with a car parked off the board.
 local function twoCars()
     local S = world()
-    S.beginner.click("fdDashJoin", "Red")
-    S.advanced.click("fdDashJoin", "Blue")
+    joinRace("Red", S.beginner)
+    joinRace("Blue", S.advanced)
     S.beginner.click("fdDashCar", "Red")
     S.advanced.click("fdDashCar", "Blue")
     return S, getObjectFromGUID(state().cars.Red.tts.car), getObjectFromGUID(state().cars.Blue.tts.car)
@@ -907,7 +918,7 @@ end
 
 function T.a_driver_without_a_car_is_told_at_the_grid()
     local S = world()
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
     gridRoll(S, { Red = 7 })
     assert(S.logged("no car to put on the grid"))
     eq(state().cars.Red.space, nil)
@@ -1304,7 +1315,7 @@ function T.the_grid_key_marks_the_grid_in_order()
     -- Three rings, a second on pole, and the line through them.
     eq(#S.board.getVectorLines(), before + 5)
     assert(S.find("Space " .. b.id .. " (lane " .. b.lane .. ") - grid 2"), "its marker says its place")
-    assert(S.ui.fdr_editor.value:find("3 on the grid"), S.ui.fdr_editor.value)
+    assert(S.ui.fds_editor.value:find("3 on the grid"), S.ui.fds_editor.value)
 
     -- Pressed again on one: it comes off, and those behind move up.
     S.press(key, "Red", nil, at(a))
@@ -1354,9 +1365,9 @@ end
 function T.problems_are_counted_on_the_panel()
     local S = world()
     editor(S)
-    assert(S.ui.fdr_editor.value:find("problem"), S.ui.fdr_editor.value)
+    assert(S.ui.fds_editor.value:find("problem"), S.ui.fds_editor.value)
     fdEdit({ color = "Red", steam_name = "RedPlayer" })
-    eq(S.ui.fdr_editor.value, "", "status cleared when the editor closes")
+    eq(S.ui.fds_editor.value, "", "status cleared when the editor closes")
 end
 
 function T.track_overlay_refuses_another_map()
@@ -1369,6 +1380,7 @@ end
 function T.a_late_joiner_gets_the_panels_again()
     local S = redRacing()
     S.xml = {}
+    S.board.xml = {}
     S.ui = {}
     onPlayerConnect({ color = "Grey" })
     onPlayerChangeColor("Blue")
@@ -1376,7 +1388,11 @@ function T.a_late_joiner_gets_the_panels_again()
     for _, node in ipairs(S.xml) do
         ids[node.attributes.id or ""] = (ids[node.attributes.id or ""] or 0) + 1
     end
+    for _, node in ipairs(S.board.xml) do
+        ids[node.attributes.id or ""] = (ids[node.attributes.id or ""] or 0) + 1
+    end
     eq(ids.fdr, 1, "race panel sent once")
+    eq(ids.fds, 1, "setup menu sent once")
     eq(ids.fdm_Red, 1, "screen dashboards sent once")
     eq(S.ui.fdm_Red.active, "true", "filled in again")
     assert(S.ui.fdr_title, "race panel refreshed")
@@ -1396,10 +1412,10 @@ function T.a_dashboard_taken_out_later_gets_its_buttons()
     local S = world()
     local late = S.object("Beginner Dashboard", { pos = S.vec(0, 1, -60), up = S.vec(0, -1, 0) })
     onObjectSpawn(late)
-    eq(late.buttons[1] and late.buttons[1].click_function, "fdDashJoin")
+    eq(#late.buttons, 0, "free, so no buttons")
     -- And into a bag: no longer drawn, and no error.
     late.destruct()
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
 end
 
 function T.unchanged_ui_is_not_sent_again()
@@ -1436,10 +1452,8 @@ end
 
 function T.laps_button_sets_the_distance_and_undo_puts_it_back()
     local S = redRacing()
-    eq(S.ui.fdr_laps.value, "1 lap")
-    fdLaps({ steam_name = "host", color = "Red" })
+    fdSetupLaps({ steam_name = "host", color = "Red" }, "2")
     eq(state().laps, 2)
-    eq(S.ui.fdr_laps.value, "2 laps")
     assert(S.logged("The race is 2 laps"))
     fdUndo({ steam_name = "host", color = "Red" })
     eq(state().laps, 1)
@@ -1473,8 +1487,8 @@ function T.the_standings_are_a_table()
     local S = world()
     eq(S.ui.fdr_empty.active, "true", "an empty race says how to join")
     eq(S.ui.fdr_r1.active, "false")
-    S.beginner.click("fdDashJoin", "Red")
-    S.advanced.click("fdDashJoin", "Blue")
+    joinRace("Red", S.beginner)
+    joinRace("Blue", S.advanced)
     eq(S.ui.fdr_empty.active, "false")
     eq(S.ui.fdr_r1.active, "true")
     eq(S.ui.fdr_r2.active, "true")
@@ -1660,28 +1674,30 @@ end
 function T.only_the_host_can_use_the_race_controls()
     local S = redRacing()
     -- Shown only to the host and promoted players.
-    local rows = 0
-    local function walk(node)
-        if node.attributes.visibility == "Host|Admin" then rows = rows + 1 end
-        for _, c in ipairs(node.children or {}) do walk(c) end
+    local rows = {}
+    local function walk(node, panel)
+        if node.attributes.visibility == "Host|Admin" then rows[panel] = (rows[panel] or 0) + 1 end
+        for _, c in ipairs(node.children or {}) do walk(c, panel) end
     end
-    for _, node in ipairs(S.xml) do walk(node) end
-    eq(rows, 2, "both button rows are the host's")
+    for _, node in ipairs(S.xml) do walk(node, node.attributes.id) end
+    for _, node in ipairs(S.board.xml) do walk(node, node.attributes.id) end
+    eq(rows.fdr, 1, "Undo, on the race panel, is the host's")
+    eq(rows.fds, 4, "as are the setup menu's choices, Start race, the track tools and the editor line")
 
     -- A click that gets through anyway does nothing.
-    S.advanced.click("fdDashJoin", "Blue")
+    joinRace("Blue", S.advanced)
     local blue = Player.Blue
     fdReset(blue)
     eq(state().phase, "race", "not reset")
     assert(S.logged("Only the host"))
-    fdLaps(blue)
+    fdSetupLaps(blue, "2")
     eq(state().laps, 1)
     fdEdit(blue)
     eq(require("fd.tts.track_editor").isOpen(), false)
     S.press("Track editor: apply", "Blue")
     -- The host can, promoted players too.
     blue.admin = true
-    fdLaps(blue)
+    fdSetupLaps(blue, "2")
     eq(state().laps, 2)
 end
 
@@ -1690,6 +1706,212 @@ function T.spectator_roll_goes_to_the_car_in_that_gear()
     dropOn(S, S.find("Gear Stick"), "gear", 1)
     roll(S, 1, 1, "Grey")
     eq(state().cars.Red.lastRoll, 1)
+end
+
+--- Call `fn` with the script's black die coming up `values` in turn.
+local function withRolls(values, fn)
+    local random, i = math.random, 0
+    math.random = function(m, n)
+        if m == 20 and n == nil then
+            i = i + 1
+            return values[i] or 10
+        end
+        return random(m, n)
+    end
+    local ok, err = pcall(fn)
+    math.random = random
+    assert(ok, err)
+end
+
+function T.the_setup_menu_shows_from_the_load()
+    local S = world()
+    eq(S.ui.fds.active, "true", "everyone sees it at load")
+    eq(S.ui.fds_map.value, "Map: Formula D: Monaco")
+    eq(S.ui.fds_rules.value, "Rules: Formula D basic rules, 1 lap")
+    refresh() -- world() seats them without telling the script
+    eq(S.ui.fds_drivers.value, "Drivers (2): BluePlayer, RedPlayer", "everyone seated")
+    Player.Blue.changeColor("Grey")
+    eq(S.ui.fds_drivers.value, "Drivers (1): RedPlayer", "spectators are not")
+    Player.Red.changeColor("Grey")
+    assert(S.ui.fds_drivers.value:find("none yet"), S.ui.fds_drivers.value)
+end
+
+function T.the_setup_menu_sets_the_distance()
+    local S = world()
+    fdSetupLaps(Player.Red, "2")
+    eq(state().laps, 2)
+    eq(S.ui.fds_rules.value, "Rules: Formula D basic rules, 2 laps")
+    assert(S.ui.fds_laps2.colors:find("#2E7D32"), "the picked distance stands out")
+    assert(not S.ui.fds_laps1.colors:find("#2E7D32"))
+    fdSetupLaps(Player.Blue, "1")
+    eq(state().laps, 2, "only the host chooses")
+end
+
+function T.start_race_rolls_the_grid_and_starts()
+    local S, red, blue = twoCars()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    -- In join order: Red rolls 4, Blue 15; then the starts.
+    withRolls({ 4, 15 }, function() fdSetupStart(Player.Red) end)
+    eq(state().phase, "race")
+    eq(state().round, 1)
+    eq(state().cars.Blue.space, FDMonaco.start[1], "the higher roll takes pole")
+    eq(state().cars.Red.space, FDMonaco.start[2])
+    assert(onSpace(S, blue, FDMonaco.byId[FDMonaco.start[1]]))
+    eq(S.ui.fds.active, "false", "the menu goes once the race starts")
+    -- Reset brings it back for the next race.
+    fdReset(Player.Red)
+    eq(S.ui.fds.active, "true")
+end
+
+function T.start_race_waits_on_an_unsettled_grid()
+    local S = twoCars()
+    -- The script's die always comes up 10: a tie it cannot break.
+    fdSetupStart(Player.Red)
+    eq(state().phase, "grid")
+    assert(S.logged("press Start race again"))
+    eq(S.ui.fds.active, "true")
+end
+
+function T.start_race_needs_drivers_and_the_host()
+    local S = world()
+    fdSetupStart(Player.Blue)
+    eq(state().phase, "setup", "a player who is not the host cannot start")
+    eq(state().cars.Red, nil, "nor deal anyone in")
+    assert(S.logged("Only the host"))
+    local host = Player.Red
+    Player.Blue.changeColor("Grey")
+    host.changeColor("Grey")
+    fdSetupStart(host)
+    eq(state().phase, "setup")
+    assert(S.logged("Nobody is seated yet"))
+end
+
+function T.the_race_panel_lies_beside_the_board()
+    local S = world()
+    eq(S.board.xml[1].attributes.id, "fdr", "drawn on the board tile")
+    for _, node in ipairs(S.xml) do
+        assert(node.attributes.id ~= "fdr", "not on the screen")
+    end
+    -- Scaled back by the tile's scale (44): 0.04 world units per UI unit.
+    eq(S.board.xml[1].attributes.scale, "0.0909 0.0909 1")
+    -- A new map reloads the tile, which loses its UI: it is drawn again.
+    S.board.xml = {}
+    fdMapChanged()
+    eq(S.board.xml[1].attributes.id, "fdr")
+end
+
+function T.the_setup_menu_comes_back_after_the_flag()
+    local S = redRacing()
+    eq(S.ui.fds.active, "false")
+    local saved = onSave()
+    saved.json.race.phase = "finished"
+    onLoad(saved)
+    eq(S.ui.fds.active, "true", "back once the race is over")
+    withRolls({ 12 }, function() fdSetupStart(Player.Red) end)
+    eq(state().phase, "race", "Start race begins the next one")
+    eq(state().round, 1)
+    eq(S.ui.fds.active, "false")
+end
+
+function T.the_setup_menu_stays_up_while_the_editor_is_open()
+    local S = redRacing()
+    eq(S.ui.fds.active, "false")
+    fdEdit({ color = "Red", steam_name = "RedPlayer" })
+    eq(S.ui.fds.active, "true", "so the editor can be closed")
+    fdEdit({ color = "Red", steam_name = "RedPlayer" })
+    eq(S.ui.fds.active, "false")
+end
+
+--- Red drops out mid-race: their seat empties.
+local function redDropsOut(S)
+    local red = Player.Red
+    Player.Red = nil
+    red.seated = false
+    onPlayerDisconnect(red)
+    return red
+end
+
+local function hasButton(dash, fn)
+    for _, b in ipairs(dash.buttons) do
+        if b.click_function == fn then return true end
+    end
+    return false
+end
+
+function T.a_dropped_driver_comes_back_to_their_car()
+    local S = redRacing()
+    local red = redDropsOut(S)
+    assert(hasButton(S.beginner, "fdDashTakeOver"), "the dashboard offers its car")
+    -- TTS seats them wherever it likes when they reconnect.
+    red.color, red.seated = "Green", true
+    Player.Green = red
+    onPlayerConnect(red)
+    eq(red.color, "Red", "back in their own colour")
+    assert(state().cars.Red, "with their place in the race")
+    assert(S.logged("RedPlayer is back in the Red car"))
+    assert(not hasButton(S.beginner, "fdDashTakeOver"), "no longer orphaned")
+end
+
+function T.a_driver_back_by_the_dashboard_button()
+    local S = redRacing()
+    local red = redDropsOut(S)
+    red.color, red.seated = "Grey", false
+    Player.Grey = red
+    S.beginner.click("fdDashTakeOver", "Grey")
+    eq(red.color, "Red")
+    assert(S.logged("RedPlayer is back in the Red car"))
+end
+
+function T.someone_else_can_take_over_an_orphaned_car()
+    local S = redRacing()
+    redDropsOut(S)
+    local orange = S.player("Orange", S.vec(20, 1, -38))
+    S.beginner.click("fdDashTakeOver", "Orange")
+    eq(orange.color, "Red", "seated in the car's colour")
+    eq(state().cars.Red.name, "OrangePlayer", "and drives it under their name")
+    eq(state().cars.Red.tts.steam, "OrangeId")
+    assert(S.logged("OrangePlayer takes over the Red car"))
+end
+
+function T.only_an_orphaned_car_can_be_taken_over()
+    local S = redRacing()
+    assert(not hasButton(S.beginner, "fdDashTakeOver"), "Red is in their seat")
+    local orange = S.player("Orange", S.vec(20, 1, -38))
+    fdDashTakeOver(S.beginner, "Orange")
+    eq(orange.color, "Orange")
+    eq(state().cars.Red.name, "RedPlayer")
+end
+
+function T.a_newcomer_in_an_orphaned_seat_is_moved_to_the_spectators()
+    local S = redRacing()
+    redDropsOut(S)
+    local stranger = S.player("Red", S.vec(0, 1, -38))
+    stranger.steam_id, stranger.steam_name = "StrangerId", "Stranger"
+    onPlayerConnect(stranger)
+    eq(stranger.color, "Grey")
+    eq(state().cars.Red.name, "RedPlayer", "the car still waits for its driver")
+    assert(S.logged("waiting for its driver"))
+end
+
+function T.only_the_driver_or_the_host_can_take_a_car_out()
+    local S = redRacing()
+    joinRace("Blue", S.advanced)
+    S.beginner.click("fdDashLeave", "Blue")
+    assert(state().cars.Red, "another driver cannot")
+    assert(S.logged("Only RedPlayer or the host"))
+    S.advanced.click("fdDashLeave", "Red")
+    eq(state().cars.Blue, nil, "the host can")
+    assert(S.logged("RedPlayer takes BluePlayer out of the race"))
+end
+
+function T.the_host_can_remove_a_driver_who_dropped_out()
+    local S = redRacing()
+    local host = S.player("Orange", S.vec(20, 1, -38), true)
+    redDropsOut(S)
+    S.beginner.click("fdDashLeave", "Orange")
+    eq(state().cars.Red, nil, "out of the race")
+    eq(#S.beginner.buttons, 0, "and the dashboard is free")
+    assert(host.color == "Orange", "the host stays where they are")
 end
 
 return T

@@ -1,7 +1,10 @@
--- The race panel everyone sees: standings, pending black die checks, and the
--- race-wide buttons. Per-player controls live on the dashboards (fd.tts.controls).
--- Built at load and appended to whatever the Global XML already holds, so the
--- Big Box menu button survives.
+-- The race panel everyone sees, on the table beside the board: standings,
+-- pending black die checks, and Undo. Per-player controls live on the
+-- dashboards (fd.tts.controls), the race-wide ones on the setup menu
+-- (fd.tts.setup).
+--
+-- Hud.build also sends the Global UI, appended to whatever the Global XML
+-- already holds, so the Big Box menu button survives.
 
 local Race = require("fd.core.race")
 local Ui = require("fd.tts.ui")
@@ -43,7 +46,7 @@ end
 -- One row per seat, hidden until a car fills it.
 local MAX_ROWS = 10
 local ROW_HEIGHT = 18
-local PANEL_HEIGHT = 440
+local PANEL_HEIGHT = 360
 
 --- The standings columns: width 0 takes what the others leave. A column per
 -- wear zone, headed with its name, so the cells need no unit.
@@ -91,55 +94,77 @@ local function standingsTable(cols)
     }, rows)
 end
 
-local function racePanel(rules, cols)
+local function racePanel(rules, cols, place)
     return el("Panel", {
-        id = "fdr", rectAlignment = "UpperLeft", offsetXY = "20 -120", width = "380", height = tostring(PANEL_HEIGHT),
-        allowDragging = "true", returnToOriginalPositionWhenReleased = "false", color = PANEL_BG,
+        id = "fdr", width = "380", height = tostring(PANEL_HEIGHT), color = PANEL_BG,
+        position = place.position, scale = place.scale, rotation = "0 0 0",
     }, {
         el("VerticalLayout", { padding = "8 8 6 6", spacing = "4", childForceExpandHeight = "false" }, {
-            el("HorizontalLayout", { preferredHeight = "26", spacing = "4" }, {
-                text("fdr_title", "Formula D", { fontSize = "18", fontStyle = "Bold", flexibleWidth = "1" }),
-                button("fdr_min", "_", "fdToggleRace", { preferredWidth = "30", flexibleWidth = "0", tooltip = "Collapse" }),
-            }),
-            el("VerticalLayout", { id = "fdr_body", spacing = "4", childForceExpandHeight = "false", preferredHeight = tostring(PANEL_HEIGHT - 50) }, {
-                text("fdr_rules", rules.name, { fontSize = "12", color = "#AAB0B8", preferredHeight = "16" }),
-                standingsTable(cols),
-                text("fdr_empty", "No cars yet -- click Join race on a dashboard.", { preferredHeight = "18" }),
-                text("fdr_checks", "", { preferredHeight = "40", color = "#FFB74D" }),
-                -- The race-wide buttons are for the host and promoted players
-                -- only; Global checks again when one is pressed.
-                el("HorizontalLayout", { spacing = "4", preferredHeight = "34", visibility = ADMIN }, {
-                    button("fdr_grid", "Grid roll", "fdGrid", { tooltip = "Roll the black die for everyone and put the cars on the grid" }),
-                    button("fdr_start", "Start", "fdStart", { tooltip = "Reset cars and roll for the start" }),
-                    button("fdr_undo", "Undo", "fdUndo", { tooltip = "Undo the last change" }),
-                    button("fdr_reset", "Reset", "fdReset", { tooltip = "Back to setup, keeping the drivers" }),
-                    button("fdr_track", "Track", "fdTrack", { tooltip = "Show or hide the detected spaces on the board" }),
-                }),
-                el("HorizontalLayout", { spacing = "4", preferredHeight = "30", visibility = ADMIN }, {
-                    button("fdr_laps", "1 lap", "fdLaps", { tooltip = "Race over one lap (basic rules) or two" }),
-                    button("fdr_edit", "Edit track", "fdEdit", { tooltip = "Open or close the track editor for the map on the board" }),
-                    button("fdr_apply", "Apply", "fdApply", { tooltip = "Put the space markers back into the track" }),
-                    button("fdr_export", "Export", "fdExport", { tooltip = "How to get your edits into the repo" }),
-                }),
-                text("fdr_editor", "", { preferredHeight = "34", fontSize = "12", color = "#9FD3FF" }),
+            text("fdr_title", "Formula D", { fontSize = "18", fontStyle = "Bold", preferredHeight = "26" }),
+            text("fdr_rules", rules.name, { fontSize = "12", color = "#AAB0B8", preferredHeight = "16" }),
+            standingsTable(cols),
+            text("fdr_empty", "No cars yet -- take a coloured seat to join.", { preferredHeight = "18" }),
+            text("fdr_checks", "", { preferredHeight = "40", color = "#FFB74D" }),
+            -- For the host and promoted players only; Global checks again
+            -- when it is pressed. The rest of the race controls are on the
+            -- setup menu.
+            el("HorizontalLayout", { spacing = "4", preferredHeight = "34", visibility = ADMIN }, {
+                button("fdr_undo", "Undo", "fdUndo", { tooltip = "Undo the last change" }),
             }),
         }),
     })
 end
 
-local collapsed = false
-local editorText = ""
+-- The panel lies on the table, drawn as the board tile's UI just past its
+-- edge. Object UI is laid out at 100 units per local unit and then stretched
+-- with the object, so the panel is scaled back by the tile's scale to come
+-- out WORLD_PER_UNIT world units per UI unit whatever the board's size.
+local WORLD_PER_UNIT = 0.04 -- the 380-wide panel is about 15 units across
+local GAP = 1.5             -- world units between the board and the panel
+local UI_PER_LOCAL = 100
+
+--- Where the panel goes on `tile`: centred below the board as its picture
+-- reads, a little above the face.
+local function placement(tile)
+    local scale = tile.getScale()
+    local size = tile.getBoundsNormalized().size
+    local kx = WORLD_PER_UNIT * UI_PER_LOCAL / scale.x
+    local ky = WORLD_PER_UNIT * UI_PER_LOCAL / scale.z
+    local edge = size.z / scale.z / 2 * UI_PER_LOCAL
+    local below = edge + GAP / scale.z * UI_PER_LOCAL + PANEL_HEIGHT * ky / 2
+    local top = size.y / scale.y / 2 * UI_PER_LOCAL + 5
+    return {
+        position = string.format("0 %.1f %.1f", -below, -top),
+        scale = string.format("%.4f %.4f 1", kx, ky),
+    }
+end
+
 local cols = {}
 
---- Append the race panel for `rules` and any `extras` to the Global UI, then
--- call `onReady`. Safe to call again: it replaces the panels it added before.
-function Hud.build(rules, extras, onReady)
-    collapsed = false
+--- Set the race panel on the board `tile` and append any `extras` to the
+-- Global UI, then call `onReady`. Safe to call again: it replaces what it
+-- put there before. Without a tile only the Global UI is built.
+function Hud.build(rules, extras, tile, onReady)
     cols = columns(rules)
     -- Hold updates until the new XML has loaded: sent now, they would be lost
     -- with the old elements yet remembered by fd.tts.ui, and the refresh in
     -- onReady would then skip them as repeats.
     ready = false
+    local function placePanel()
+        if not tile then
+            Ui.route("fdr", nil)
+            return onReady()
+        end
+        tile.UI.setXmlTable({ racePanel(rules, cols, placement(tile)) })
+        Ui.route("fdr", tile.UI)
+        Ui.reset("fdr")
+        Wait.frames(function()
+            Wait.condition(function()
+                ready = true
+                onReady()
+            end, function() return tile == nil or not tile.UI.loading end)
+        end, 2)
+    end
     Wait.condition(function()
         local xml = UI.getXmlTable() or {}
         local kept = {}
@@ -149,36 +174,15 @@ function Hud.build(rules, extras, onReady)
                 kept[#kept + 1] = node
             end
         end
-        kept[#kept + 1] = racePanel(rules, cols)
         for _, node in ipairs(extras or {}) do
             kept[#kept + 1] = node
         end
         UI.setXmlTable(kept)
         Ui.reset()           -- every element is back to what the XML says
         Wait.frames(function()
-            Wait.condition(function()
-                ready = true
-                Ui.value("fdr_editor", editorText)
-                onReady()
-            end, function() return not UI.loading end)
+            Wait.condition(placePanel, function() return not UI.loading end)
         end, 2)
     end, function() return not UI.loading end)
-end
-
---- The track editor's status line; nil hides it.
-function Hud.setEditor(textValue)
-    editorText = textValue or ""
-    if not ready then
-        return
-    end
-    Ui.value("fdr_editor", textValue or "")
-end
-
-function Hud.toggleRace()
-    collapsed = not collapsed
-    Ui.set("fdr_body", "active", tostring(not collapsed))
-    Ui.set("fdr", "height", collapsed and "46" or tostring(PANEL_HEIGHT))
-    Ui.value("fdr_min", collapsed and "+" or "_")
 end
 
 local function wearSummary(race, car)
@@ -243,7 +247,6 @@ function Hud.refresh(race)
         title = title .. "  -  Finished"
     end
     Ui.value("fdr_title", title)
-    Ui.value("fdr_laps", s.laps == 1 and "1 lap" or (s.laps .. " laps"))
 
     -- Finishers first, in their places, so the panel ends as the result;
     -- the cars still racing are in the order they play this round.

@@ -59,7 +59,10 @@ do
         return random(m, n)
     end
 end
-local S = world() -- seated at load, so each is dealt in at their dashboard
+local S = world()
+-- Start race deals everybody in at their dashboard; with every roll a 10 the
+-- grid stays tied, so the race is started by hand.
+fdSetupStart({ steam_name = "host", color = "Red" })
 fdStart({ steam_name = "host", color = "Red" })
 -- The leader's start is rolled by the script; the others throw the die on
 -- the table for theirs now, so every gear roll below counts.
