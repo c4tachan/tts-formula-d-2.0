@@ -1822,4 +1822,75 @@ function T.the_setup_menu_stays_up_while_the_editor_is_open()
     eq(S.ui.fds.active, "false")
 end
 
+--- Red drops out mid-race: their seat empties.
+local function redDropsOut(S)
+    local red = Player.Red
+    Player.Red = nil
+    red.seated = false
+    onPlayerDisconnect(red)
+    return red
+end
+
+local function hasButton(dash, fn)
+    for _, b in ipairs(dash.buttons) do
+        if b.click_function == fn then return true end
+    end
+    return false
+end
+
+function T.a_dropped_driver_comes_back_to_their_car()
+    local S = redRacing()
+    local red = redDropsOut(S)
+    assert(hasButton(S.beginner, "fdDashTakeOver"), "the dashboard offers its car")
+    -- TTS seats them wherever it likes when they reconnect.
+    red.color, red.seated = "Green", true
+    Player.Green = red
+    onPlayerConnect(red)
+    eq(red.color, "Red", "back in their own colour")
+    assert(state().cars.Red, "with their place in the race")
+    assert(S.logged("RedPlayer is back in the Red car"))
+    assert(not hasButton(S.beginner, "fdDashTakeOver"), "no longer orphaned")
+end
+
+function T.a_driver_back_by_the_dashboard_button()
+    local S = redRacing()
+    local red = redDropsOut(S)
+    red.color, red.seated = "Grey", false
+    Player.Grey = red
+    S.beginner.click("fdDashTakeOver", "Grey")
+    eq(red.color, "Red")
+    assert(S.logged("RedPlayer is back in the Red car"))
+end
+
+function T.someone_else_can_take_over_an_orphaned_car()
+    local S = redRacing()
+    redDropsOut(S)
+    local orange = S.player("Orange", S.vec(20, 1, -38))
+    S.beginner.click("fdDashTakeOver", "Orange")
+    eq(orange.color, "Red", "seated in the car's colour")
+    eq(state().cars.Red.name, "OrangePlayer", "and drives it under their name")
+    eq(state().cars.Red.tts.steam, "OrangeId")
+    assert(S.logged("OrangePlayer takes over the Red car"))
+end
+
+function T.only_an_orphaned_car_can_be_taken_over()
+    local S = redRacing()
+    assert(not hasButton(S.beginner, "fdDashTakeOver"), "Red is in their seat")
+    local orange = S.player("Orange", S.vec(20, 1, -38))
+    fdDashTakeOver(S.beginner, "Orange")
+    eq(orange.color, "Orange")
+    eq(state().cars.Red.name, "RedPlayer")
+end
+
+function T.a_newcomer_in_an_orphaned_seat_is_moved_to_the_spectators()
+    local S = redRacing()
+    redDropsOut(S)
+    local stranger = S.player("Red", S.vec(0, 1, -38))
+    stranger.steam_id, stranger.steam_name = "StrangerId", "Stranger"
+    onPlayerConnect(stranger)
+    eq(stranger.color, "Grey")
+    eq(state().cars.Red.name, "RedPlayer", "the car still waits for its driver")
+    assert(S.logged("waiting for its driver"))
+end
+
 return T

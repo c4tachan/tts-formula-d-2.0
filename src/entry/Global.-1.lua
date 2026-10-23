@@ -193,6 +193,12 @@ function onPlayerChangeColor(color)
     rebuildUiSoon()
 end
 
+--- A driver who drops out leaves their car where it is, and once the seat
+-- is empty its dashboard offers "Drive this car" (see fdDashTakeOver).
+function onPlayerDisconnect()
+    Wait.time(function() refresh() end, 0.5)
+end
+
 function onSave()
     return JSON.encode({
         mp = mod_packed, sp = setup_packed, race = race and race:serialize(),
@@ -313,10 +319,16 @@ local function dashLabel(car)
     return table.concat(parts, "  |  ")
 end
 
+--- Whether somebody is sitting in `color`.
+local function seatedIn(color)
+    local p = Player[color]
+    return p ~= nil and p.seated == true
+end
+
 local function renderDashboards()
     for _, obj in ipairs(Dashboard.all()) do
         local car = carOnDash(obj.getGUID())
-        Controls.render(obj, car, car and dashLabel(car))
+        Controls.render(obj, car, car and dashLabel(car), car and not seatedIn(car.color))
     end
 end
 
@@ -823,6 +835,8 @@ joinAt = function(dash, color)
     car.tts = car.tts or {}
     car.tts.dash = dash.getGUID()
     car.tts.faceWarned = nil
+    -- Who drives it, so they can be put back in it if they drop out.
+    car.tts.steam = Player[color] and Player[color].steam_id
     return car
 end
 
@@ -938,10 +952,22 @@ dealInSeated = function(onDone)
     end, function() return next(delivering) == nil end, 12, onDone)
 end
 
---- Move the player with steam id `id`, who has just connected, to the
--- spectators, if the race has not started and the seat TTS gave them is not
--- one already racing (a driver back from a dropped connection keeps theirs).
--- Looked up afresh: they may have left again already.
+--- The car driven by the player with steam id `id`, if any.
+local function carOf(id)
+    for _, car in ipairs(race:cars()) do
+        if car.tts and car.tts.steam == id then
+            return car
+        end
+    end
+    return nil
+end
+
+--- Sort out the seat TTS gave the player with steam id `id`, who has just
+-- connected. A driver back from a dropped connection goes back to their own
+-- car's colour. Anybody else sitting in a colour with a car in the race --
+-- one whose driver is away -- is moved to the spectators, as is anybody in a
+-- coloured seat before the start: they pick their own seat. Looked up
+-- afresh: they may have left again already.
 bench = function(id)
     joining[id] = nil
     local player = nil
@@ -952,11 +978,56 @@ bench = function(id)
         return
     end
     local color = player.color
-    if race.state.phase ~= "setup" or not SEATS[color] or race:car(color) then
+    local mine = carOf(id)
+    if mine then
+        if mine.color == color then
+            return
+        end
+        if seatedIn(mine.color) then
+            player.broadcast("Somebody is sitting in your " .. mine.color
+                .. " seat: once they move, click Drive this car on your dashboard.", LEVEL_RGB.warn)
+            return
+        end
+        player.changeColor(mine.color)
+        printToAll(race:label(mine) .. " is back in the " .. mine.color .. " car", LEVEL_RGB.info)
         return
     end
-    player.changeColor("Grey")
-    player.broadcast("Pick a colour to race in: you get a dashboard and a car when the race starts.", LEVEL_RGB.info)
+    if not SEATS[color] then
+        return
+    end
+    local there = race:car(color)
+    if there then
+        player.changeColor("Grey")
+        player.broadcast(race:label(there) .. "'s car is waiting for its driver. To drive it instead, click Drive this car on its dashboard.",
+            LEVEL_RGB.info)
+    elseif race.state.phase == "setup" then
+        player.changeColor("Grey")
+        player.broadcast("Pick a colour to race in: you get a dashboard and a car when the race starts.", LEVEL_RGB.info)
+    end
+end
+
+--- "Drive this car", on the dashboard of a car whose driver has left their
+-- seat: seat whoever clicks in its colour. Its driver coming back gets their
+-- car again; anybody else takes it over, and drives it under their name.
+function fdDashTakeOver(dash, color)
+    local car = carOnDash(dash.getGUID())
+    local p = Player[color]
+    if not car or not p or seatedIn(car.color) then
+        return
+    end
+    local driving = race:car(color)
+    if driving then
+        broadcastToColor("You are driving the " .. driving.color .. " car already.", color, LEVEL_RGB.warn)
+        return
+    end
+    local back = car.tts.steam == p.steam_id
+    act(function()
+        car.tts.steam = p.steam_id
+        car.name = p.steam_name
+        race:emit("info", back and (race:label(car) .. " is back in the " .. car.color .. " car")
+            or (race:label(car) .. " takes over the " .. car.color .. " car"), car.color)
+    end)
+    p.changeColor(car.color)
 end
 
 local function onDash(dash, name)

@@ -3,6 +3,10 @@
 -- stick, wear marker) on it. An unclaimed one has none: players are dealt in
 -- at Start race, onto a dashboard in front of their seat.
 --
+-- A claimed dashboard whose driver has left their seat -- disconnected, as a
+-- rule -- also offers "Drive this car", so they can get back in, or someone
+-- else can take over.
+--
 -- The buttons sit in a strip just past the printed bottom edge of whichever
 -- face is up. Their click functions live in the Global script, which TTS calls
 -- as fn(dashboard, playerColor, altClick).
@@ -55,7 +59,7 @@ local function button(dash, params, face)
     dash.createButton(params)
 end
 
-local function drawCar(dash, face, tint)
+local function drawCar(dash, face, tint, orphaned)
     -- Label first so it is button index 0 for editButton.
     button(dash, {
         click_function = "fdNoop", label = "", x = 0, z = rowZ(face, LABEL_GAP),
@@ -72,29 +76,38 @@ local function drawCar(dash, face, tint)
             color = { 0.23, 0.25, 0.28 }, font_color = { 1, 1, 1 },
         }, face)
     end
+    if orphaned then
+        button(dash, {
+            click_function = "fdDashTakeOver", label = "Drive this car",
+            tooltip = "Its driver has left their seat: sit in it, to come back or to take over",
+            x = 0, z = rowZ(face, LABEL_GAP + 0.55), width = 1400, height = 240, font_size = 140,
+            color = { 0.18, 0.49, 0.2 }, font_color = { 1, 1, 1 },
+        }, face)
+    end
 end
 
 local faces = {}   -- guid -> which face was up when last drawn
 local labels = {}  -- guid -> the status label last written
 
 --- Draw the right buttons for `dash`. `car` is the race car claiming it, or
--- nil; `label` is the status text for a claimed dashboard.
+-- nil; `label` is the status text for a claimed dashboard, and `orphaned`
+-- says its driver is not in their seat.
 --
 -- Called after every click, so it does as little as it can: the buttons are
 -- only rebuilt when the owner changes or the board is flipped over (which
 -- invalidate() reports), and the label is only rewritten when it changes.
-function Controls.render(dash, car, label)
+function Controls.render(dash, car, label, orphaned)
     local guid = dash.getGUID()
     local face = faces[guid]
     if not face then
         face = Dashboard.face(dash)
         faces[guid] = face
     end
-    local key = face .. "|" .. (car and car.color or "-")
+    local key = face .. "|" .. (car and car.color or "-") .. (orphaned and "|orphaned" or "")
     if rendered[guid] ~= key then
         dash.clearButtons()
         if car then
-            drawCar(dash, face, Color.fromString(car.color))
+            drawCar(dash, face, Color.fromString(car.color), orphaned)
         end
         rendered[guid] = key
         labels[guid] = nil
