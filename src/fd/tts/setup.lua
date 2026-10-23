@@ -22,8 +22,6 @@ local ADMIN = "Host|Admin"
 local COLORS = "#3A3F47|#4E555F|#2A2E34|#3A3F4780"
 local PICKED = "#2E7D32|#388E3C|#1B5E20|#2E7D3280"
 
-local LAPS = { 1, 2 }
-
 local ready = false
 local editorText = ""
 local noRace = true -- whether the last refresh found no race on
@@ -83,10 +81,12 @@ end
 function Setup.panel(maps)
     -- The host's choices: the map, then the race distance.
     local choices = { mapList(maps or {}) }
-    for _, n in ipairs(LAPS) do
-        choices[#choices + 1] = button("fds_laps" .. n, n == 1 and "1 lap" or (n .. " laps"),
-            "fdSetupLaps(" .. n .. ")", { preferredWidth = "80" })
-    end
+    choices[#choices + 1] = text(nil, "Laps:", { preferredWidth = "40", alignment = "MiddleRight" })
+    choices[#choices + 1] = el("InputField", {
+        id = "fds_laps", onEndEdit = "fdSetupLaps", inputType = "IntegerNumber", characterLimit = "2",
+        preferredWidth = "50", fontSize = "14", alignment = "MiddleCenter",
+        tooltip = "How many laps the race lasts",
+    }, nil, "1")
     local tools = {
         button("fds_track", "Track", "fdTrack", { tooltip = "Show or hide the detected spaces on the board" }),
         button("fds_edit", "Edit track", "fdEdit", { tooltip = "Open or close the track editor for the map on the board" }),
@@ -187,10 +187,11 @@ function Setup.refresh(race, map, seated)
     end
     Ui.value("fds_rules", "Rules: " .. race.rules.name .. ", " .. (s.laps == 1 and "1 lap" or (s.laps .. " laps")))
     Ui.value("fds_drivers", driverList(race, seated))
-    for _, n in ipairs(LAPS) do
-        Ui.set("fds_laps" .. n, "colors", n == s.laps and PICKED or COLORS)
-    end
+    Ui.value("fds_laps", s.laps)
 end
+
+--- The most laps the field takes.
+Setup.MAX_LAPS = 99
 
 Setup.REPO = REPO
 

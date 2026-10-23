@@ -1382,11 +1382,17 @@ function fdSetupMap(player, value)
     Wait.time(function() fdMapChanged() end, 1)
 end
 
---- The race distance buttons on the setup menu.
+--- The race distance field on the setup menu. Anything but a whole number
+-- of laps from 1 up is put back to the distance the race has.
 function fdSetupLaps(player, value)
     if not admin(player) then return end
+    local current = race:serialize().laps
     local laps = tonumber(value)
-    if not laps or laps == race:serialize().laps then
+    if not laps or laps ~= math.floor(laps) or laps < 1 or laps > Setup.MAX_LAPS then
+        UI.setValue("fds_laps", tostring(current))
+        return
+    end
+    if laps == current then
         return
     end
     printToAll(player.steam_name .. " sets the race distance", LEVEL_RGB.info)
