@@ -246,6 +246,7 @@ function onSave()
         markers = (function()
             local out = Editor.markerGuids()
             for _, g in ipairs(Ghosts.guids()) do out[#out + 1] = g end
+            if startGhost then out[#out + 1] = startGhost end
             return out
         end)(),
     })
@@ -407,6 +408,35 @@ local function syncTurns(due)
     turnsSet = { on = true, order = key, color = due.color }
 end
 
+-- The ghost marking where the car to play started its move: its guid, and
+-- which car and space it stands for.
+local startGhost = nil
+local startKey = nil
+
+--- Put the ghost on the space the car to play started its move from (where
+-- it stands, before it rolls), in its colour; none outside a race. Put back
+-- on it, the car has not moved (Race:backToStart).
+local function markStart(due)
+    local from = due and (due.move and due.move.from or due.space)
+    local key = from and (due.color .. "@" .. from)
+    if key == startKey then
+        return
+    end
+    local old = startGhost and getObjectFromGUID(startGhost)
+    if old then
+        old.destruct()
+    end
+    startGhost, startKey = nil, key
+    local track, s = race.track, nil
+    for _, sp in ipairs(from and track and track.spaces or {}) do
+        if sp.id == from then s = sp end
+    end
+    if s then
+        local obj = Ghosts.mark(track, s, tintOf(due.color), race:label(due) .. " started here")
+        startGhost = obj and obj.getGUID()
+    end
+end
+
 --- Point everyone at the car to play: TTS's turn marker and a highlight on
 -- the car. `announce` also tells its driver, once, when the turn passes to
 -- them. (Black die rolls are made at once, so nothing else is waited on.)
@@ -421,6 +451,7 @@ local function showTurn(announce)
         litCar = guid
     end
     syncTurns(due)
+    markStart(due)
     local key = due and (race.state.round .. ":" .. due.color)
     if announce and key and key ~= turnTold then
         turnTold = key

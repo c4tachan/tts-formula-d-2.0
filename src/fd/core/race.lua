@@ -167,7 +167,11 @@ function Race:placed(color, spaceId, track)
     end
     car.space = spaceId
     if track and spaceId and car.move then
-        self:judgeMove(car, track)
+        if spaceId == car.move.from then
+            self:backToStart(car)
+        else
+            self:judgeMove(car, track)
+        end
     end
     -- Until somebody rolls in a new round, its order can still change.
     if self.state.phase == "race" and not self:anyMoved() and self:reorder() then
@@ -295,6 +299,50 @@ function Race:judgeMove(car, track)
     -- Last, so a car that goes out on the move does not take the flag.
     self:crossLine(car, o.crossed)
     self:checkCollisions(car, track)
+end
+
+--- Whether a car after `car` in this round's order has rolled already.
+function Race:rolledAfter(car)
+    local after = false
+    for _, color in ipairs(self.state.order) do
+        local other = self.state.cars[color]
+        if color == car.color then
+            after = true
+        elseif after and other and other.rolledRound == self.state.round then
+            return true
+        end
+    end
+    return false
+end
+
+--- The car was put back on the space its move started from: it has not
+-- moved. What the move cost is refunded, a crossing of the line taken back,
+-- and the collision checks it set off and not yet rolled dropped; the move
+-- stays open, so its turn is not over. Put down already this round, its
+-- turn comes back, so long as the car after it has not rolled.
+function Race:backToStart(car)
+    local m, s = car.move, self.state
+    self:chargeMove(car, "brake", 0, "back where it started")
+    self:chargeMove(car, "overshoot", 0, "back where it started")
+    car.crashed = nil
+    car.stops = m.stops
+    self:checkElimination(car)
+    self:crossLine(car, false)
+    if m.pack then
+        for i = #s.checks, 1, -1 do
+            if s.checks[i].pack == m.pack then
+                table.remove(s.checks, i)
+            end
+        end
+        s.packs[m.pack] = nil
+        m.pack = nil
+    end
+    local reopened = car.movedRound == s.round and not self:rolledAfter(car)
+    if reopened then
+        car.movedRound = nil
+    end
+    self:emit("info", self:label(car) .. " is back where its move started -- not moved"
+        .. (reopened and ", and still to move" or ""), car.color)
 end
 
 --- Which cars touch which, among the pack `car` is in: every car it can
@@ -863,7 +911,9 @@ end
 function Race:putDown(color)
     local car = self:car(color)
     local round = self.state.round
-    if car and self.state.phase == "race" and car.rolledRound == round and car.movedRound ~= round then
+    -- Back on the space its move started from, it has not moved: not done.
+    local still = car and car.move and car.space == car.move.from
+    if car and not still and self.state.phase == "race" and car.rolledRound == round and car.movedRound ~= round then
         car.movedRound = round
         self:advanceRound()
     end

@@ -98,6 +98,22 @@ local function inTray(S, die)
     return die.pos.x > x0 and die.pos.x < x1 and die.pos.z > z0 and die.pos.z < z1
 end
 
+--- Move `car` (of `color`) on the full roll it has open, to the first
+-- space the roll reaches, and put it down there.
+local function moveOn(S, car, color)
+    local Moves = require("fd.core.moves")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local m = state().cars[color].move
+    local to = nil
+    for id, o in pairs(Moves.reach(FDMonaco, m.from, m.roll)) do
+        if o.brake == 0 and (not to or id < to) then to = id end
+    end
+    local Track = require("fd.tts.track")
+    local s = FDMonaco.byId[to]
+    car.pos = Track.worldOf(S.board, FDMonaco, s.pos[1], s.pos[2])
+    onObjectDrop(color, car)
+end
+
 local T = {}
 
 function T.load_builds_the_panel_and_teaches_the_dice()
@@ -1645,7 +1661,7 @@ function T.each_first_turn_starts_with_the_start_roll()
     fdUiShift(Player.Blue, "1")
     roll(S, 1, 2, "Blue")
     eq(state().cars.Blue.lastRoll, 2)
-    onObjectDrop("Blue", blue)
+    moveOn(S, blue, "Blue")
 
     -- Then Red's first turn, starting with Red's start.
     assert(S.logged("RedPlayer rolls 10 on the black die %(start%): normal start"))
@@ -1735,7 +1751,7 @@ function T.the_car_to_play_is_lit_and_its_driver_told()
     eq(Turns.turn_color, first, "still moving")
     eq(cars[first].highlight[1], first)
     assert(not S.logged("Your turn, " .. second .. "Player"))
-    onObjectDrop(first, cars[first])
+    moveOn(S, cars[first], first)
     assert(S.logged("Your turn, " .. second .. "Player"))
     eq(Turns.turn_color, second)
     eq(cars[first].highlight, nil)
@@ -2114,6 +2130,49 @@ function T.without_the_black_die_the_script_rolls_for_it()
     S.find("Damage Dice").destruct()
     withRolls({ 4, 15 }, function() fdSetupStart(Player.Red) end)
     eq(state().phase, "race", "the grid is rolled all the same")
+end
+
+--- The ghost marking where the car to play started, if one is out.
+local function startGhost(S)
+    for _, o in ipairs(S.objects) do
+        if (o.description or ""):find("started here") then return o end
+    end
+    return nil
+end
+
+function T.a_ghost_marks_where_the_car_to_play_started()
+    local S, red, blue = twoCars()
+    eq(startGhost(S), nil, "none before the race")
+    gridRoll(S, { Red = 4, Blue = 15 })
+    fdStart(Player.Red)
+    local first, second = state().order[1], state().order[2]
+    local cars = { Red = red, Blue = blue }
+    local ghost = startGhost(S)
+    assert(ghost, "out for the car to play")
+    assert(ghost.description:find(first .. "Player"), ghost.description)
+    eq(ghost.interactable, false, "out of reach")
+    eq(ghost.tint.a < 1, true, "see-through")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local Track = require("fd.tts.track")
+    local s = FDMonaco.byId[state().cars[first].space]
+    local at = Track.worldOf(S.board, FDMonaco, s.pos[1], s.pos[2])
+    assert(math.abs(ghost.pos.x - at.x) < 1e-6 and math.abs(ghost.pos.z - at.z) < 1e-6, "on its space")
+
+    -- Rolled, and put back on the ghost: not moved, still its turn.
+    fdUiShift(Player[first], "1")
+    roll(S, 1, 2, first)
+    onObjectDrop(first, cars[first])
+    assert(S.logged(first .. "Player is back where its move started"))
+    eq(Turns.turn_color, first, "still to move")
+    -- Moved for real: the turn passes, and the ghost with it.
+    moveOn(S, cars[first], first)
+    eq(Turns.turn_color, second)
+    local marks = 0
+    for _, o in ipairs(S.objects) do
+        if (o.description or ""):find("started here") then marks = marks + 1 end
+    end
+    eq(marks, 1, "one ghost at a time")
+    assert(startGhost(S).description:find(second .. "Player"))
 end
 
 return T

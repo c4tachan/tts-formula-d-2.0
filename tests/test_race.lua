@@ -386,8 +386,31 @@ function T.braking_is_charged_and_rejudged()
     assert(hasEvent(r, "wear", "braked 1 short"))
     putDown(r, "Red", "c2", track)
     eq(r:car("Red").wear.wp, 18)
+    putDown(r, "Red", "c1", track)
+    eq(r:car("Red").wear.wp, 17)
+    -- Put back where it started, it has not moved: nothing charged.
     putDown(r, "Red", "c0", track)
-    eq(r:car("Red").wear.wp, 16, "not moving at all brakes the whole roll")
+    eq(r:car("Red").wear.wp, 18, "refunded")
+    assert(hasEvent(r, "info", "back where its move started"))
+end
+
+function T.back_at_the_start_takes_back_what_the_move_set_off()
+    local track = lane(20)
+    local r = started("Red", "Blue")
+    r:placed("Red", "c0")
+    r:placed("Blue", "c9")
+    r.state.order = { "Red", "Blue" }
+    move(r, track, 1, 2, "c2")
+    eq(r:car("Red").movedRound, r.state.round, "put down: done")
+    -- Back to where it started before Blue rolls: the turn comes back.
+    putDown(r, "Red", "c0", track)
+    eq(r:car("Red").movedRound, nil)
+    eq(r:turn().color, "Red")
+    -- Once Blue has rolled, it does not.
+    move(r, track, 1, 2, "c2")
+    rollDie(r, "Blue", 1, 2)
+    putDown(r, "Red", "c0", track)
+    eq(r:car("Red").movedRound, r.state.round, "Blue is moving: Red's turn stays over")
 end
 
 function T.an_unreachable_space_warns_and_charges_nothing()

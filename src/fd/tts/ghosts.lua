@@ -61,7 +61,8 @@ end
 --- Put a ghost on space `s`. `f` is the board's frame and `top` the height
 -- of its face, measured once by the caller for however many it puts out.
 -- `solid` false leaves it with no collision: for ghosts nobody handles.
-function Ghosts.spawn(tile, f, top, s, problem, description, solid)
+-- `tint` ({ r, g, b, a }) colours it other than by its lane.
+function Ghosts.spawn(tile, f, top, s, problem, description, solid, tint)
     local w = Track.worldIn(tile, f, s.pos[1], s.pos[2])
     return spawnObjectData({
         -- A custom model's collider only exists once its mesh has loaded.
@@ -75,7 +76,7 @@ function Ghosts.spawn(tile, f, top, s, problem, description, solid)
             },
             Nickname = Ghosts.name(s),
             Description = description or "",
-            ColorDiffuse = Ghosts.tint(s, problem),
+            ColorDiffuse = tint or Ghosts.tint(s, problem),
             Locked = true,
             Grid = false,
             Snap = false,
@@ -123,6 +124,21 @@ function Ghosts.show(track, flagged)
         shown[#shown + 1] = obj.getGUID()
     end)
     return true
+end
+
+--- A ghost in `color` (r, g, b) on space `s` of `track`, to mark where a
+-- car started its move: see-through, locked, out of reach, and with no
+-- collision, so the car can be put down on it. Returns it, or nil with no
+-- board.
+function Ghosts.mark(track, s, color, description)
+    local tile = Track.tile()
+    if not tile then
+        return nil
+    end
+    local tint = { r = color.r, g = color.g, b = color.b, a = ALPHA }
+    local obj = Ghosts.spawn(tile, Track.frame(tile, track), boardTop(tile), s, false, description, false, tint)
+    obj.interactable = false
+    return obj
 end
 
 function Ghosts.clear()
