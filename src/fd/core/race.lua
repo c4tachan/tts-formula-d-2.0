@@ -216,6 +216,15 @@ function Race:reachable(color, track)
     })
 end
 
+--- The corner that matters to `car` and how far it is: see Moves.ahead.
+-- Nil without track data, off the track, or out of the race.
+function Race:cornerAhead(car)
+    if not (self.track and car.space) or car.eliminated or car.place then
+        return nil
+    end
+    return Moves.ahead(self.track, car.space, car.stops)
+end
+
 --- Whether ending a move as `o` (a Moves.reach option) puts the car out.
 function Race:moveOut(o)
     return self.rules.overshootOut(o.missed)

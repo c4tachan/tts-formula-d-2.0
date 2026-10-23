@@ -145,12 +145,16 @@ local function panel(color)
     end
     return el("Panel", {
         id = "fdm_" .. color, visibility = color, rectAlignment = "LowerRight",
-        offsetXY = "-16 16", width = tostring(w + 16), height = tostring(h + 76),
+        offsetXY = "-16 16", width = tostring(w + 16), height = tostring(h + 96),
         color = "#15181CE8", allowDragging = "true", returnToOriginalPositionWhenReleased = "false",
     }, {
         el("VerticalLayout", { padding = "8 8 4 6", spacing = "3", childForceExpandHeight = "false" }, {
             el("Text", { id = p .. "label", color = HEX[color], fontSize = "14", preferredHeight = "20" },
                 nil, color),
+            el("Text", {
+                id = p .. "corner", color = "#D8DDE3", fontSize = "13", preferredHeight = "17",
+                tooltip = "Entry: fewest spaces to reach the corner. Exit: most spaces you can move and still stop in it.",
+            }, nil, ""),
             el("Panel", { preferredHeight = tostring(h) }, children),
             el("HorizontalLayout", { spacing = "3", preferredHeight = "28" }, buttons),
         }),
@@ -192,6 +196,20 @@ function Mini.setReady(on)
     ready = on ~= false
 end
 
+--- The corner line: the corner the car is in while it owes stops there,
+-- or else the next one, with how far to its entry and exit.
+local function cornerText(race, car)
+    local a = race:cornerAhead(car)
+    if not a then
+        return ""
+    end
+    if a.inside then
+        return string.format("Corner %s (%d of %d stops made)  -  exit %d", a.corner, a.made, a.need, a.exit)
+    end
+    return string.format("Corner %s (%d stop%s)  -  entry %d  -  exit %d",
+        a.corner, a.need, a.need == 1 and "" or "s", a.entry, a.exit)
+end
+
 local function moveMarker(id, slot, n)
     local x, y = slotOffset(slot, n)
     if x then
@@ -231,6 +249,7 @@ function Mini.refresh(race)
                 end
             end
             Ui.value(p .. "label", table.concat(bits, "  -  "))
+            Ui.value(p .. "corner", cornerText(race, car))
             moveMarker(p .. "gearMark", "gear", math.max(car.gear, 1))
             for _, z in ipairs(race.rules.zones) do
                 moveMarker(p .. "wpMark", z.id, math.max(0, car.wear[z.id]))
