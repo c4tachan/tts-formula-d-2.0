@@ -123,7 +123,14 @@ function T.load_builds_the_panel_and_teaches_the_dice()
     eq(#S.find("First Gear Dice").rotationValues, 4)
 end
 
-function T.the_setup_board_is_stowed_under_the_table()
+--- Whether `obj` is hidden from everyone, players and spectators alike.
+local function hidden(obj)
+    local seen = {}
+    for _, c in ipairs(obj.invisibleTo or {}) do seen[c] = true end
+    return seen.Red and seen.Blue and seen.Grey and seen.Black and true or false
+end
+
+function T.the_setup_board_is_hidden_where_it_stands()
     local S = world()
     local carBag = getObjectFromGUID("1bb99e") -- the world's, the one cars come from
     local rulebook = S.object("Beginner Rulebook Bag", { guid = "98b2d2", pos = S.vec(72, 0, -26) })
@@ -132,28 +139,29 @@ function T.the_setup_board_is_stowed_under_the_table()
         [carBag.guid] = {}, [rulebook.guid] = {}, [die.guid] = {},
     } } })
     onLoad("")
+    local at = rulebook.pos
     for _, obj in ipairs({ carBag, rulebook }) do
-        assert(obj.pos.y < -1, obj.name .. " under the table")
+        eq(hidden(obj), true, obj.name .. " hidden")
         eq(obj.locked, true, obj.name .. " locked")
         eq(obj.interactable, false, obj.name .. " out of reach")
     end
-    assert(die.pos.y > 0, "the dice stay by their tray")
-    -- The bags under the table still deal: a driver gets a car from it.
+    eq(rulebook.pos, at, "left where it stands")
+    eq(hidden(die), false, "the dice stay in sight, by their tray")
+    -- The hidden bags still deal: a driver gets a car from one.
     joinRace("Red", S.beginner)
     S.beginner.click("fdDashCar", "Red")
-    assert(getObjectFromGUID(state().cars.Red.tts.car), "a car out of the stowed bag")
+    assert(getObjectFromGUID(state().cars.Red.tts.car), "a car out of the hidden bag")
 end
 
-function T.the_source_bags_are_stowed_without_the_setup_board()
+function T.the_source_bags_are_hidden_without_the_setup_board()
     local S = world()
     local carBag = getObjectFromGUID("1bb99e")
-    carBag.pos = S.vec(66, 0, -1)
     onLoad("") -- no setup board's memory bag: deleted from the table
-    assert(carBag.pos.y < -1, "the car bag under the table all the same")
+    eq(hidden(carBag), true, "the car bag hidden all the same")
     eq(carBag.locked, true)
 end
 
-function T.a_packed_setup_board_is_put_out_and_stowed()
+function T.a_packed_setup_board_is_put_out_and_hidden()
     local S = world()
     local bag = S.object("Memory Bag - Setup Board", { guid = "0fde3b", tables = { memoryList = {} } })
     local saved = onSave()

@@ -81,15 +81,19 @@ local SEATS = {
 -- Setup ---------------------------------------------------------------------
 -- The table holds the board and nothing else to set up: the map and rules
 -- are chosen on the setup menu (fd.tts.setup). The Big Box menu board stays
--- packed in its bag, and the setup board and everything on it are stowed
--- out of sight under the table -- where the script still reaches the bags
--- it deals dashboards, cars and markers from.
+-- packed in its bag, and the setup board and everything on it are hidden
+-- where they stand -- the script still reaches the bags it deals
+-- dashboards, cars and markers from.
 
 local MOD_MENU_BAG = "a57988"
 local SETUP_BAG = "0fde3b"
--- Under the table: out of sight, and locked, so nothing there falls.
-local STOW = { x = 0, y = -6, z = 0 }
--- The bags the script deals from, which must stay on the table (stowed),
+-- Everyone a hidden object is hidden from: every seat, the spectators and
+-- the Game Master.
+local EVERYONE = {
+    "White", "Brown", "Red", "Orange", "Yellow", "Green", "Teal", "Blue", "Purple", "Pink",
+    "Grey", "Black",
+}
+-- The bags the script deals from, which must stay on the table (hidden),
 -- never inside another bag: everything else of the setup board can go.
 local SOURCE_BAGS = {
     "1bb99e", -- Formula 1 Black Bag: cars (CAR_BAG, below)
@@ -100,43 +104,43 @@ local SOURCE_BAGS = {
     "ac4939", -- Dice Set Bag: spare dice (fd.tts.dice)
 }
 
-local function stowObject(obj)
+--- Hide `obj` where it stands: locked, out of reach, and invisible to all.
+local function hideObject(obj)
     obj.setLock(true)
     obj.interactable = false
-    obj.setPosition(STOW)
+    obj.setInvisibleTo(EVERYONE)
 end
 
---- Stow the bags the script deals from, and whatever is left of the setup
--- board, but the dice, which sit by their tray: locked under the table,
--- where nobody can pick them up. The setup board, packed away, is put out
--- first: the bags it holds cannot be reached inside it. Without it -- once
--- deleted from the table -- only the bags are stowed. `onDone` runs once it
--- is all stowed.
-local function stowSetup(onDone)
+--- Hide the bags the script deals from, and whatever is left of the setup
+-- board, but the dice, which sit by their tray. The setup board, packed
+-- away, is put out first: the bags it holds cannot be reached inside it.
+-- Without it -- once deleted from the table -- only the bags are hidden.
+-- `onDone` runs once it is all hidden.
+local function hideSetup(onDone)
     local bag = getObjectFromGUID(SETUP_BAG)
-    local function stow()
+    local function hide()
         for _, guid in ipairs(SOURCE_BAGS) do
             local obj = getObjectFromGUID(guid)
-            if obj then stowObject(obj) end
+            if obj then hideObject(obj) end
         end
         for guid in pairs(bag and bag.getTable("memoryList") or {}) do
             local obj = getObjectFromGUID(guid)
             if obj and not Dice.gearOf(obj) and not Dice.isBlack(obj) then
-                stowObject(obj)
+                hideObject(obj)
             end
         end
         onDone()
     end
     if not bag then
-        return stow()
+        return hide()
     end
     if setup_packed then
         bag.call("buttonClick_place", {})
         setup_packed = false
         -- A moment for its objects to come out of the bag.
-        Wait.time(stow, 1.5)
+        Wait.time(hide, 1.5)
     else
-        stow()
+        hide()
     end
 end
 
@@ -191,7 +195,7 @@ function onLoad(saved_data)
         Dashboard.scan()
         dropDashless()
         packModMenu()
-        stowSetup(function() layDice() end)
+        hideSetup(function() layDice() end)
     end, 1)
 end
 

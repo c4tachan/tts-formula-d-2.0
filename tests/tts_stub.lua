@@ -173,6 +173,7 @@ function Stub.object(name, props)
     o.highlightOn = function(c, d) o.highlight = { c, d } end
     o.highlightOff = function() o.highlight = nil end
     o.setColorTint = function(c) o.tint = c end
+    o.setInvisibleTo = function(colors) o.invisibleTo = colors end
     o.setScale = function(s) o.scale = vec(s.x or s[1], s.y or s[2], s.z or s[3]) end
     o.setRotationValues = function(v) o.rotationValues = v end
     -- `value` is what the face that is up shows. As in TTS, getValue() on an
