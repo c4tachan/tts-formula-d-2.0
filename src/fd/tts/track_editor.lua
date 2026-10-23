@@ -36,11 +36,20 @@ local function changed()
     problemCache = nil
 end
 
+--- The sector in a space's code, <lane>.<sector>.<n> (with "+n" on the end
+-- for a space added here): edits saved before they kept sectors have none.
+local function sectorOf(id)
+    return type(id) == "string" and id:match("^[^.]+%.([^.]+)%.") or nil
+end
+
+-- The sector matters beyond the editor: fd.core.position measures turn
+-- order along it, and a space without one is measured from the wrong end
+-- of the lap.
 local function copySpace(s)
     local nxt = {}
     for i, n in ipairs(s.next or {}) do nxt[i] = n end
     return { id = s.id, pos = { s.pos[1], s.pos[2] }, rot = s.rot, lane = s.lane, next = nxt,
-             fixed = s.fixed or nil, corner = s.corner }
+             fixed = s.fixed or nil, corner = s.corner, sector = s.sector or sectorOf(s.id) }
 end
 
 --- The track as it stands: the edited copy if there is one, else the original.
@@ -285,6 +294,7 @@ function Editor.add(pointer)
     local s = {
         id = id, pos = { px, py }, next = {},
         lane = near and near.lane or 1, rot = near and near.rot or 0,
+        sector = near and near.sector or nil,
     }
     e.dirty = true
     table.insert(e.spaces, s)
@@ -607,6 +617,9 @@ function Editor.load(saved, strayMarkers)
             printToAll("Track edits for " .. id .. " in this save predate space codes and were dropped.",
                 { 1, 0.8, 0.3 })
         else
+            for _, sp in ipairs(e.spaces or {}) do
+                sp.sector = sp.sector or sectorOf(sp.id)
+            end
             edits[id] = { spaces = e.spaces, nextId = e.nextId or 1, dirty = true, start = e.start }
         end
     end

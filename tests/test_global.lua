@@ -1075,6 +1075,34 @@ function T.edits_are_saved_with_the_game_and_come_back()
     eq(#Editor2.trackFor(require("fd.data.tracks.FDMonaco")).spaces, #FDMonaco.spaces - 1)
 end
 
+function T.the_grid_plays_in_order_after_the_editor_has_been_open()
+    -- The edited copy of the track is what the race goes by: without its
+    -- spaces' sectors, pole measured as last on the lap (#20).
+    local S = twoCars()
+    local Editor, _, FDMonaco = editor(S)
+    for _, sp in ipairs(Editor.trackFor(FDMonaco).spaces) do
+        assert(sp.sector, sp.id .. " keeps its sector")
+    end
+    gridRoll(S, { Red = 4, Blue = 15 })
+    fdStart({ steam_name = "host", color = "Red" })
+    eq(table.concat(state().order, " "), "Blue Red", "pole plays first")
+end
+
+function T.edits_saved_without_sectors_get_them_back()
+    local S = world()
+    local _, _, FDMonaco = editor(S)
+    local saved = onSave()
+    for _, sp in ipairs(saved.json.edits.FDMonaco.spaces) do sp.sector = nil end
+    world()
+    onLoad(saved)
+    local Editor = require("fd.tts.track_editor")
+    local want = {}
+    for _, sp in ipairs(FDMonaco.spaces) do want[sp.id] = sp.sector end
+    for _, sp in ipairs(Editor.trackFor(FDMonaco).spaces) do
+        eq(sp.sector, want[sp.id], sp.id .. ": read back from its code")
+    end
+end
+
 function T.the_editor_works_from_right_click_menus()
     local S = world()
     local Editor, Track, FDMonaco = editor(S)
