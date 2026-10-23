@@ -55,7 +55,8 @@ local function copySpace(s)
     local nxt = {}
     for i, n in ipairs(s.next or {}) do nxt[i] = n end
     return { id = s.id, pos = { s.pos[1], s.pos[2] }, rot = s.rot, lane = s.lane, next = nxt,
-             fixed = s.fixed or nil, corner = s.corner, sector = s.sector or sectorOf(s.id) }
+             fixed = s.fixed or nil, corner = s.corner, sector = s.sector or sectorOf(s.id),
+             pit = s.pit or nil, box = s.box }
 end
 
 --- The track as it stands: the edited copy if there is one, else the original.
@@ -285,7 +286,8 @@ function Editor.grab(pointer)
     return #todo
 end
 
---- A new space at a point, in the lane and facing of the nearest one.
+--- A new space at a point, in the lane and facing of the nearest one (the
+-- pit lane, if that is where the nearest is).
 --
 -- Its id is the nearest space's code with "+n" on the end, which says where
 -- it was put: the next run of find_corners.py gives it a code of its own.
@@ -304,7 +306,7 @@ function Editor.add(pointer)
     local s = {
         id = id, pos = { px, py }, next = {},
         lane = near and near.lane or 1, rot = near and near.rot or 0,
-        sector = near and near.sector or nil,
+        sector = near and near.sector or nil, pit = near and near.pit or nil,
     }
     e.dirty = true
     table.insert(e.spaces, s)

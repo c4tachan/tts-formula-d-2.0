@@ -1,8 +1,7 @@
 # Track data format
 
-*Monaco is the first track through the pipeline; its grid and finish line
-are marked, but `pit` is still empty there, and will settle once it is
-filled in.*
+*Monaco is the first track through the pipeline; its grid, finish line and
+pit lane are all marked.*
 
 Everything in objectives 3 and 5 (snapping, facings, movement limits,
 highlighting) reduces to one problem: the mod has no idea where the spaces are.
@@ -49,7 +48,9 @@ the only thing needing measurement in game is the tile itself — not each track
       "next": ["m.c1.1", "i.c1.1"], // legal successors (lane changes included)
       "fixed": true,             // optional: `next` was set by hand; never recomputed
       "corner": 1,               // corner id when this space is inside one
-      "sector": "c1"             // the corner or straight it lies in
+      "sector": "c1",            // the corner or straight it lies in
+      "pit": true,               // optional: in the pit lane (below)
+      "box": "Brown"             // optional: a pit box, and the seat it belongs to
     }
   ],
 
@@ -70,10 +71,17 @@ the only thing needing measurement in game is the tile itself — not each track
   "panel": { "pos": [2172, 1410], "width": 400 }, // optional: the race panel's centre
                                  // and width, on an empty patch; default on the screen
 
-  "pit": {                       // omitted on tracks without a pit lane
-    "entry": 210,
-    "exit": 224,
-    "spaces": [211, 212]
+  "pit": {                       // omitted on tracks without a pit lane (below)
+    "entry": ["i.s11.0", "i.s11.1"], // the track spaces that lead into it
+    "exit": ["i.s1.1", "i.s1.2"],    // the track spaces it leads out to
+    "spaces": ["p.s11.0", "p.s11.1", ...], // entry to exit
+    "boxes": [{                  // the pit boxes, in running order
+      "space": "b.s11.3",        // the pit box itself
+      "beside": "p.s11.3",       // the pit lane space that is its way in and out
+      "colour": "white",         // as printed
+      "player": "White",         // the seat it belongs to
+      "garage": { "pos": [207.3, 1172.1], "rot": 267.3, "size": [41.2, 35.6] }
+    }, ...]
   }
 }
 ```
@@ -84,7 +92,9 @@ A space's id is its code, `<lane>.<sector>.<n>`, given by
 `tools/extract/find_corners.py`:
 
 - **lane**: `i`, `m` or `o`, the inside, middle and outside lane of the lap
-  (lanes 1, 2 and 3). This is fixed round the lap, not per bend.
+  (lanes 1, 2 and 3). This is fixed round the lap, not per bend. `p` is
+  the pit lane (below), lane 0 wherever it lies, and `b` a pit box, coded
+  after the pit lane space beside it.
 - **sector**: `c1`, `c2`, ... for the corners, in running order from the finish
   line; `s1`, `s2`, ... for the straights, `sK` being the one that leads into
   `cK`. The straight from the last corner round to the finish line is one more
@@ -103,6 +113,55 @@ steps onto one of these has crossed the line (`crossed` on each option from
 the line to land on one of them, never further into `s1`, which
 `tests/test_moves.lua` checks for Monaco. `find_corners.py` writes it along
 with the codes.
+
+Where the pit lane runs past the line, it has a space on the line too: the
+pit cell the checkered band would cross if it were carried on over the pit
+road. A car leaving the pits crosses the line there.
+
+## The pit lane
+
+The pit lane is lane 0, its spaces marked `pit` and coded `p.<sector>.<n>`
+like the rest, counting from 0 at the entry and starting again at the
+finish line. It is one lane, so each space leads on to the next and nothing
+else. At each end it opens into a merge space, and every track space
+touching a merge is a way in or out: each one touching the entry merge
+leads into it (`pit.entry`), and the exit merge leads to each one touching
+it (`pit.exit`). Those are the only links between the pit lane and the
+track, and the only ones that may step square across rather than ahead: a
+merge is beside the spaces touching it. All of the pit lane's links are
+`fixed`; the editor's relinking never links across its wall, and keeps the
+ways in and out, of the pit lane and of its pit boxes.
+
+Each team's garage is printed beside two cells of the pit lane, a car
+drawn in each; on Monaco there are five teams. There are ten seats at the
+table, so each of those cells is one seat's, and the half of the garage
+beside it is that seat's pit box, where its car stops to make a pit stop.
+Each printed colour is shared by the two seats nearest it in hue -- white
+by White and Brown, yellow by Yellow and Orange, green by Green and Teal,
+red by Red and Pink, blue by Blue and Purple -- the first cell of the
+colour going to the first seat.
+
+A pit box is a space of its own (`b.<sector>.<n>`, `pit`, with `box` the
+seat it belongs to), at the middle of its garage half. It links both ways
+with the pit lane space beside it (`beside` in `pit.boxes`): a car goes in
+from there and comes back out the same way, a step each, square across.
+`fd.core.moves` opens a pit box only to the car of its seat (`opts.color`).
+`garage` is the garage half as a rectangle (centre, the way its length
+runs, length by depth, in pixels), which the mod paints in the seat's
+colour (`fd.tts.track`, `Track.pits`).
+
+When a car may take the way into the pit lane is the ruleset's to say:
+`fd.core.moves` leaves it shut unless asked (`opts.pit`), and the race asks
+when the ruleset's `pitLane` is set. What a stop in a pit box does --
+wear restored, a gear cap, no exact roll needed to get there -- and the
+pit lane's own rules (no collisions, no overtaking) are rules (`fd.rules`),
+not track data.
+
+`tools/extract/find_pit.py` finds the pit lane's cells and the garages,
+and writes all of this. The two ends -- the slanted last divisions and the
+merge spaces past them -- are read by eye, and kept in the script with the
+colours printed on the garages. Which track spaces touch a merge is read off the print: two cells
+touch where only a grid line lies between them, never a wall.
 
 ## The starting grid
 
@@ -181,6 +240,10 @@ that one -- which is how a misread fork shows itself.
 Elsewhere links are worked out from positions and facings
 (`fd.core.trackgraph`), the same rules the in-game editor uses; a space whose
 links were set by hand, or read off an arrow, keeps them (`fixed`).
+
+`tools/extract/find_pit.py` adds the pit lane, which `find_grid.py` leaves
+out; see [The pit lane](#the-pit-lane). The other scripts set it aside, so
+it survives them.
 
 `tools/extract/find_adjacency.py` answers a different question from the
 links: which spaces touch, in any direction and whatever the arrows say. That

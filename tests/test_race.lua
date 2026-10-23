@@ -377,6 +377,43 @@ local function move(r, track, gear, roll, to)
     putDown(r, "Red", to, track)
 end
 
+function T.a_car_may_go_into_its_own_pit_box()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local brown, white = FDMonaco.pit.boxes[2], FDMonaco.pit.boxes[1]
+    eq(brown.player, "Brown")
+    local r = started("Brown", "White")
+    r:placed("Brown", brown.beside, FDMonaco)
+    r:placed("White", FDMonaco.pit.entry[1], FDMonaco)
+    rollDie(r, "Brown", 1, 1)
+    local reach = r:reachable("Brown", FDMonaco)
+    assert(reach[brown.space], "into Brown's box from beside it")
+    r:drain()
+    putDown(r, "Brown", brown.space, FDMonaco)
+    assert(not hasEvent(r, "warn", "not a legal"), "a legal move")
+    eq(r:car("Brown").space, brown.space)
+    -- Another seat's box is not on offer; the way into the pit lane is.
+    rollDie(r, "White", 1, 2)
+    reach = r:reachable("White", FDMonaco)
+    assert(reach[FDMonaco.pit.spaces[2]], "into the pit lane")
+    for id in pairs(reach) do
+        assert(not FDMonaco.byId[id].box, "White reaches " .. id)
+    end
+end
+
+function T.a_disputed_move_into_the_pits_still_crosses_the_line()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local r = started("Red")
+    r:placed("Red", FDMonaco.pit.entry[1], FDMonaco)
+    local lap = r:car("Red").lap
+    rollDie(r, "Red", 1, 1)
+    r:drain()
+    -- From the track, down the whole pit lane and over the line in it, on a
+    -- roll of one.
+    putDown(r, "Red", FDMonaco.pit.spaces[#FDMonaco.pit.spaces], FDMonaco)
+    assert(hasEvent(r, "warn", "not a legal"))
+    eq(r:car("Red").lap, lap + 1, "the lap still counts")
+end
+
 function T.braking_is_charged_and_rejudged()
     local track = lane(20)
     local r = started("Red")

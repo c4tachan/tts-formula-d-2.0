@@ -32,6 +32,28 @@ def neighbours(pairs):
     return {k: sorted(v) for k, v in near.items()}
 
 
+def lua_pit(pit):
+    if not pit:
+        return "T.pit = nil"
+    L = ["T.pit = {",
+         "    entry = { " + ", ".join(lit(v) for v in pit["entry"]) + " },",
+         "    exit = { " + ", ".join(lit(v) for v in pit["exit"]) + " },",
+         "    spaces = { " + ", ".join(lit(v) for v in pit["spaces"]) + " },",
+         "    boxes = {"]
+    for b in pit.get("boxes", []):
+        extra = ""
+        if b.get("player"):
+            extra += ', player = "{}"'.format(b["player"])
+        g = b.get("garage")
+        if g:
+            extra += ", garage = {{ pos = {{ {}, {} }}, rot = {}, size = {{ {}, {} }} }}".format(
+                g["pos"][0], g["pos"][1], g["rot"], g["size"][0], g["size"][1])
+        L.append('        {{ space = {}, beside = {}, colour = "{}"{} }},'.format(
+            lit(b["space"]), lit(b["beside"]), b["colour"], extra))
+    L += ["    },", "}"]
+    return "\n".join(L)
+
+
 def lua_track(track, near=None):
     L = [f"-- {BANNER.format(track['id'])}", "",
          "local T = {}", "",
@@ -53,7 +75,10 @@ def lua_track(track, near=None):
           "-- lane i/m/o (inside, middle, outside of the lap), sector cN or sN,",
           "-- n counting from 0 at the sector's leading edge. `corner`",
           "-- is the corner a space lies inside; `fixed` marks links set by hand",
-          "-- in the editor, which are never recomputed.",
+          "-- in the editor, which are never recomputed. `pit` marks the pit",
+          "-- lane, lane 0 and coded p.<sector>.<n>, and its pit boxes, coded",
+          "-- b.<sector>.<n> after the pit lane space beside them; `box` is the",
+          "-- seat a pit box belongs to.",
           "T.spaces = {"]
     for s in track["spaces"]:
         nxt = ", ".join(lit(n) for n in s["next"])
@@ -62,6 +87,10 @@ def lua_track(track, near=None):
             extra += ", corner = {}".format(s["corner"])
         if s.get("fixed"):
             extra += ", fixed = true"
+        if s.get("pit"):
+            extra += ", pit = true"
+        if s.get("box"):
+            extra += ', box = "{}"'.format(s["box"])
         L.append("    {{ id = {}, pos = {{ {}, {} }}, rot = {}, lane = {}, sector = {}, next = {{ {} }}{} }},".format(
             lit(s["id"]), s["pos"][0], s["pos"][1], s["rot"], s["lane"], lit(s["sector"]), nxt, extra))
     L += ["}", "",
@@ -82,6 +111,15 @@ def lua_track(track, near=None):
           "-- The finish line, as the space just past it in each lane: a move",
           "-- that steps onto one of these has crossed the line.",
           "T.finish = { line = {" + "".join(" " + lit(v) + "," for v in track.get("finish", {}).get("line", [])).rstrip(",") + (" } }" if track.get("finish", {}).get("line", []) else "} }"),
+          "",
+          "-- The pit lane: the track spaces that lead into it and the ones it",
+          "-- leads out to, and its spaces from entry to exit. Then the pit boxes,",
+          "-- where a car stops to make its pit stop: each a space in half of a",
+          "-- team's printed garage, the pit lane space beside it that is its way",
+          "-- in and out, the colour printed there, the seat it belongs to, and",
+          "-- the garage half (centre, facing and length by depth, in pixels) to",
+          "-- paint in that seat's colour. Nil on a track without one.",
+          lua_pit(track.get("pit")),
           "",
           "-- Where the dice sit (image pixels): on the map's name panel, clear of",
           "-- the track. Without it they sit in the middle of the board.",

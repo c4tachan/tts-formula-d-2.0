@@ -490,6 +490,14 @@ def main():
     path = ROOT / "tracks" / f"{map_id}.json"
     track = json.loads(path.read_text(encoding="utf-8"))
     info, im = board_image(map_id)
+    # The pit lane has no arrows, only the cars drawn on its stands: it is
+    # set aside, with the way into it, and goes back as it was.
+    pit = [s for s in track["spaces"] if s.get("pit")]
+    track["spaces"] = [s for s in track["spaces"] if not s.get("pit")]
+    pit_ids = {s["id"] for s in pit}
+    into_pit = {s["id"]: [n for n in s["next"] if n in pit_ids] for s in track["spaces"]}
+    for s in track["spaces"]:
+        s["next"] = [n for n in s["next"] if n not in pit_ids]
 
     lab, keep = arrow_ink(im)
     cell = cell_length(track)
@@ -564,6 +572,9 @@ def main():
                 s = spaces[sid]
                 s.pop("fixed", None)
                 s["next"] = sorted(o["id"] for o in ahead_of(s, track["spaces"], pos, cell).values())
+        for s in track["spaces"]:
+            s["next"] = sorted(s["next"] + into_pit.get(s["id"], []))
+        track["spaces"] += pit
         path.write_text(json.dumps(track, indent=1), encoding="utf-8")
         print("4. written to", path.relative_to(ROOT))
         sys.path.insert(0, str(ROOT / "tools" / "extract"))

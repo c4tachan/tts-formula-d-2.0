@@ -36,6 +36,7 @@ local spaceUnder -- likewise
 local showReach -- likewise
 local clearReach -- likewise
 local useBoardTrack -- likewise
+local drawPits -- likewise
 local joinAt -- with the dashboard buttons, below
 local deliver, dealInSeated, dropDashless, bench -- likewise
 local isAdmin -- with the race controls, below
@@ -190,7 +191,7 @@ function onLoad(saved_data)
     Dashboard.scan()
     Mini.registerAsset()
     setupTrackEditor(saved.edits, saved.markers)
-    useBoardTrack()
+    drawPits(useBoardTrack())
     buildUi()
     -- A moment for every object to have spawned: a dashboard not there yet
     -- would look deleted, and its driver be taken out. Nobody is dealt in
@@ -1402,9 +1403,10 @@ end
 
 --- A new map is on the board. Reloading the tile took the race panel with
 -- it, so it is drawn again; the setup menu says which map it is, turn order
--- goes by its track, and the dice move to its name panel.
+-- goes by its track, its pit boxes take their seats' colours, and the dice
+-- move to its name panel.
 function fdMapChanged()
-    useBoardTrack()
+    drawPits(useBoardTrack())
     buildUi()
     layDice()
 end
@@ -1521,10 +1523,19 @@ local function boardTrack()
 end
 
 --- Tell the race which track the cars are on, for turn order: after a load
--- or an undo, before any car has been put down on it.
+-- or an undo, before any car has been put down on it. Returns the board
+-- tile and the track, as boardTrack does.
 useBoardTrack = function()
-    local _, track = boardTrack()
+    local tile, track = boardTrack()
     race:useTrack(track)
+    return tile, track
+end
+
+--- Paint each pit box's half of its garage in the colour of the seat it
+-- belongs to, on a map with a pit lane; clear them on one without. Takes
+-- the board tile and track from useBoardTrack.
+drawPits = function(tile, track)
+    Track.setLayer("pits", tile and track and Track.pits(tile, track) or nil)
 end
 
 --- Where the dice tray goes: on the map's name panel, if its track data

@@ -17,7 +17,13 @@ function T.every_link_on_monaco_leads_forward()
         assert(P.along[s.id], s.id .. " has no place round the lap")
         for _, n in ipairs(s.next) do
             if not line[n] then
-                assert(P.along[n] > P.along[s.id], s.id .. " -> " .. n .. " runs backwards")
+                -- A pit lane merge is beside the track spaces touching it,
+                -- and a pit box beside its space in the pit lane, so the
+                -- step between them can be square across.
+                local t = FDMonaco.byId[n]
+                local across = (s.pit or false) ~= (t.pit or false) or s.box or t.box
+                local slack = across and P.cell / 2 or 0
+                assert(P.along[n] > P.along[s.id] - slack, s.id .. " -> " .. n .. " runs backwards")
             end
         end
     end

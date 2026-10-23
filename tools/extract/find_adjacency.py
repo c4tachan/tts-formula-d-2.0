@@ -138,7 +138,8 @@ def main():
     track_path = ROOT / "tracks" / f"{map_id}.json"
     if not track_path.exists():
         sys.exit(f"no track file {track_path.relative_to(ROOT)}")
-    spaces = json.loads(track_path.read_text(encoding="utf-8"))["spaces"]
+    # No collisions in the pit lane, so it has no neighbours to find.
+    spaces = [s for s in json.loads(track_path.read_text(encoding="utf-8"))["spaces"] if not s.get("pit")]
     _, im = board_image(map_id)
 
     pairs, cut, added = neighbours(spaces, im)

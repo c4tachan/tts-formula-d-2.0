@@ -215,7 +215,7 @@ function Race:reachable(color, track)
     local occupied = {}
     for _, id in ipairs(m.occupied) do occupied[id] = true end
     return Moves.reach(track, m.from, m.roll, {
-        occupied = occupied, stops = m.stops,
+        occupied = occupied, stops = m.stops, pit = self.rules.pitLane, color = color,
         cost = function(o) return self:moveCost(o) end,
     })
 end
@@ -280,7 +280,7 @@ function Race:judgeMove(car, track)
         self:chargeMove(car, "overshoot", 0)
         car.crashed = nil
         self:checkElimination(car)
-        local any = Moves.reach(track, m.from, LINE_SEARCH)
+        local any = Moves.reach(track, m.from, LINE_SEARCH, { pit = true, color = car.color })
         local way = any and any[car.space]
         self:crossLine(car, way and way.crossed or false)
         self:checkCollisions(car, track)

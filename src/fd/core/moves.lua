@@ -44,6 +44,11 @@ end
 --             one it is sitting on (default: 1 if that is a corner, else 0)
 --   cost      function(option) -> number, to prefer one way to a space over
 --             another (default Moves.defaultCost)
+--   pit       true if the car is going into the pits: only then is the way
+--             from the track into the pit lane open to it. A car already in
+--             the pit lane carries on down it either way.
+--   color     the seat of the car moving: a pit box is open only to the car
+--             it belongs to (the space's `box`)
 --
 -- Returns id -> option, one per space the car can end on, where an option is:
 --   space     the space's id
@@ -68,6 +73,10 @@ function Moves.reach(track, fromId, roll, opts)
     end
     local occupied = opts.occupied or {}
     local cost = opts.cost or Moves.defaultCost
+    local function open(s, t)
+        return t and not occupied[t.id] and (not t.pit or s.pit or opts.pit)
+            and (not t.box or t.box == opts.color)
+    end
     local made = opts.stops
     if made == nil then
         made = from.corner and 1 or 0
@@ -118,7 +127,7 @@ function Moves.reach(track, fromId, roll, opts)
             for _, s in ipairs(ring) do
                 for _, nid in ipairs(s.next or {}) do
                     local t = byId[nid]
-                    if t and not occupied[nid] and not d[nid] then
+                    if open(s, t) and not d[nid] then
                         d[nid] = k
                         nxt[#nxt + 1] = t
                     end
@@ -151,7 +160,7 @@ function Moves.reach(track, fromId, roll, opts)
             for _, nid in ipairs(s.next or {}) do
                 local t = byId[nid]
                 local run, runAt, ok = st.run, st.runAt, false
-                if t and not occupied[nid] then
+                if open(s, t) then
                     if s.corner or t.corner then
                         run, runAt, ok = t, moved, true
                     else

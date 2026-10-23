@@ -30,9 +30,12 @@ end
 
 --- The middle lane's spaces, from the finish line once round the lap. Where
 -- that lane has no space ahead, the chain steps to the lane nearest it.
+-- The pit lane is no part of it.
 local function chain(track, byId)
     local lanes = {}
-    for _, s in ipairs(track.spaces) do lanes[s.lane] = true end
+    for _, s in ipairs(track.spaces) do
+        if not s.pit then lanes[s.lane] = true end
+    end
     local lo, hi = nil, nil
     for l in pairs(lanes) do
         if not lo or l < lo then lo = l end
@@ -45,7 +48,7 @@ local function chain(track, byId)
     local line, first = {}, nil
     for _, id in ipairs(track.finish and track.finish.line or {}) do
         local s = byId[id]
-        if s then
+        if s and not s.pit then
             line[id] = true
             if not first or math.abs(s.lane - mid) < math.abs(first.lane - mid) then first = s end
         end
@@ -58,7 +61,7 @@ local function chain(track, byId)
         local best = nil
         for _, nid in ipairs(at.next or {}) do
             local t = byId[nid]
-            if t and (not best or math.abs(t.lane - mid) < math.abs(best.lane - mid)) then best = t end
+            if t and not t.pit and (not best or math.abs(t.lane - mid) < math.abs(best.lane - mid)) then best = t end
         end
         if not best or line[best.id] or seen[best.id] then
             break

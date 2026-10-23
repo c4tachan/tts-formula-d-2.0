@@ -37,8 +37,13 @@ local function boardTop(tile)
     return b.center.y + b.size.y / 2
 end
 
---- The colour a ghost of `s` takes: its lane's, or red if it has a problem.
+--- The colour a ghost of `s` takes: its lane's, or its seat's in a pit box,
+-- or red if it has a problem.
 function Ghosts.tint(s, problem)
+    if s.box and not problem then
+        local c = Color.fromString(s.box)
+        return { r = c.r, g = c.g, b = c.b, a = ALPHA }
+    end
     local c = problem and Ghosts.PROBLEM or Track.LANE_COLOUR[s.lane] or { 1, 1, 1 }
     return { r = c[1], g = c[2], b = c[3], a = ALPHA }
 end
