@@ -270,8 +270,18 @@ end
 Player = {}
 --- A seated player. `admin` makes them the host (or a promoted player).
 function Stub.player(color, handPos, admin)
-    local p = {
-        color = color, steam_name = color .. "Player", seated = true, admin = admin or false,
+    local p = nil
+    p = {
+        color = color, steam_name = color .. "Player", steam_id = color .. "Id", seated = true,
+        admin = admin or false,
+        -- Seats the player in `new`, telling the game as TTS does.
+        changeColor = function(new)
+            if Player[p.color] == p then Player[p.color] = nil end
+            p.color, p.seated = new, new ~= "Grey"
+            Player[new] = p
+            if onPlayerChangeColor then onPlayerChangeColor(new) end
+        end,
+        broadcast = function(msg) Stub.log[#Stub.log + 1] = "broadcast to " .. p.color .. ": " .. msg end,
         -- The hand zone faces into the table, square to its nearest edge.
         getHandTransform = function()
             local yaw = math.deg(math.atan2(-handPos.x, -handPos.z))

@@ -150,11 +150,46 @@ function T.nobody_is_dealt_in_once_the_race_has_started()
     eq(state().cars.Grey, nil, "spectators never")
 end
 
-function T.players_seated_at_load_are_dealt_in()
+function T.players_seated_at_load_pick_a_colour_to_be_dealt_in()
     local S = world()
     onLoad("")
-    eq(state().cars.Red.tts.dash, S.beginner.guid)
-    eq(state().cars.Blue.tts.dash, S.advanced.guid)
+    eq(state().cars.Red, nil, "not for the seat they happen to be in")
+    eq(state().cars.Blue, nil)
+    local red = Player.Red
+    red.changeColor("Grey")
+    red.changeColor("Red")
+    eq(state().cars.Red.tts.dash, S.beginner.guid, "picking a seat deals them in there")
+end
+
+function T.a_newcomer_is_moved_to_the_spectators_to_pick_a_colour()
+    local S = world()
+    S.object("Beginner Dashboard Bag", { guid = "edfadc", spawns = "Beginner Dashboard" })
+    local green = S.player("Green", S.vec(-24, 1, -38))
+    onPlayerConnect(green)
+    -- TTS's own seat for them, which it announces as a colour change.
+    onPlayerChangeColor("Green")
+    eq(green.color, "Grey", "benched")
+    eq(state().cars.Green, nil, "and not dealt in")
+    assert(S.logged("broadcast to Grey: Pick a colour"), "told what to do")
+
+    green.changeColor("Green")
+    assert(state().cars.Green, "the seat they pick deals them in")
+    assert(getObjectFromGUID(state().cars.Green.tts.car), "with a car")
+end
+
+function T.a_driver_reconnecting_keeps_their_seat()
+    local S = world()
+    S.beginner.click("fdDashJoin", "Red")
+    onPlayerConnect(Player.Red)
+    eq(Player.Red.color, "Red")
+    assert(state().cars.Red)
+end
+
+function T.newcomers_keep_their_seat_once_the_race_has_started()
+    local S = redRacing()
+    onPlayerConnect(Player.Blue)
+    eq(Player.Blue.color, "Blue")
+    eq(state().cars.Blue, nil, "mid-race, Blue joins by hand if they want to")
 end
 
 function T.deleting_a_dashboard_before_the_start_takes_its_driver_out()
@@ -177,8 +212,10 @@ function T.a_save_whose_dashboard_was_deleted_deals_the_seat_in_again()
     onObjectDestroy = hook
 
     onLoad(saved)
+    eq(state().cars.Red, nil, "Red has left")
+    onPlayerChangeColor("Red")
     local red = state().cars.Red
-    assert(red, "Red is dealt in again")
+    assert(red, "Red is dealt in again on picking the seat")
     local dash = getObjectFromGUID(red.tts.dash)
     assert(dash and dash ~= S.beginner, "at a fresh dashboard")
 end

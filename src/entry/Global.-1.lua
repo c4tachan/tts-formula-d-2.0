@@ -36,11 +36,12 @@ local showReach -- likewise
 local clearReach -- likewise
 local useBoardTrack -- likewise
 local joinAt -- with the dashboard buttons, below
-local deliver, deliverAll -- likewise
+local deliver, deliverAll, bench -- likewise
 -- What syncTurns last told TTS's Turns, as { on, order, color }; nil until
 -- it has, so the first sync after a load sets every part.
 local turnsSet = nil
 local undo = {}
+local joining = {} -- steam id -> true from connecting until moved to the spectators (see bench)
 local UNDO_LIMIT = 30
 
 --- One roll of the black die, made by the script: the grid, starts,
@@ -153,8 +154,15 @@ local function rebuildUiSoon()
     end, 1)
 end
 
-function onPlayerConnect()
+function onPlayerConnect(player)
     rebuildUiSoon()
+    -- TTS seats a newcomer in a free colour of its choosing. Before the
+    -- start they are moved to the spectators instead, to pick their own:
+    -- picking a seat is what deals them in.
+    if player and player.steam_id then
+        joining[player.steam_id] = true
+        Wait.time(function() bench(player) end, 0.5)
+    end
 end
 
 function onPlayerChangeColor(color)
@@ -812,12 +820,12 @@ local function dealIn(color, dash)
     end)
 end
 
---- Deal `color` in, if they are seated, not racing yet, and the race has
--- not started.
+--- Deal `color` in, if they are seated, picked the seat themselves, are not
+-- racing yet, and the race has not started.
 deliver = function(color)
     local p = Player[color]
     if not SEATS[color] or not (p and p.seated) or delivering[color] or race:car(color)
-        or race.state.phase ~= "setup" then
+        or race.state.phase ~= "setup" or joining[p.steam_id or ""] then
         return
     end
     local hand = p.getHandTransform()
@@ -873,12 +881,23 @@ local function dropDashless()
     end
 end
 
---- Deal in everybody seated: at load, for those already sat down.
+--- At load. Nobody is dealt in for the seat they happen to be in: they
+-- pick a colour, or press Join race on a dashboard.
 deliverAll = function()
     dropDashless()
-    for _, color in ipairs(getSeatedPlayers()) do
-        deliver(color)
+end
+
+--- Move a player who has just connected to the spectators, if the race has
+-- not started and the seat TTS gave them is not one already racing (a
+-- driver back from a dropped connection keeps theirs).
+bench = function(player)
+    joining[player.steam_id] = nil
+    local color = player.color
+    if race.state.phase ~= "setup" or not SEATS[color] or race:car(color) then
+        return
     end
+    player.changeColor("Grey")
+    player.broadcast("Pick a colour to race in: you get its dashboard and a car.", LEVEL_RGB.info)
 end
 
 local function onDash(dash, name)
