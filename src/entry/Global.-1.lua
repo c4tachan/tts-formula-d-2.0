@@ -159,9 +159,10 @@ function onPlayerConnect(player)
     -- TTS seats a newcomer in a free colour of its choosing. Before the
     -- start they are moved to the spectators instead, to pick their own:
     -- picking a seat is what deals them in.
-    if player and player.steam_id then
-        joining[player.steam_id] = true
-        Wait.time(function() bench(player) end, 0.5)
+    local id = player and player.steam_id
+    if id then
+        joining[id] = true
+        Wait.time(function() bench(id) end, 0.5)
     end
 end
 
@@ -896,14 +897,13 @@ deliverAll = function()
     end
 end
 
---- Move a player who has just connected to the spectators, if the race has
--- not started and the seat TTS gave them is not one already racing (a
--- driver back from a dropped connection keeps theirs).
-bench = function(player)
-    local id = player.steam_id
+--- Move the player with steam id `id`, who has just connected, to the
+-- spectators, if the race has not started and the seat TTS gave them is not
+-- one already racing (a driver back from a dropped connection keeps theirs).
+-- Looked up afresh: they may have left again already.
+bench = function(id)
     joining[id] = nil
-    -- Gone again already: the object handed to onPlayerConnect is no use.
-    player = nil
+    local player = nil
     for _, p in ipairs(getPlayers()) do
         if p.steam_id == id then player = p end
     end

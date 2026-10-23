@@ -188,6 +188,7 @@ function T.a_newcomer_who_leaves_at_once_is_left_alone()
     onPlayerConnect(green)
     Wait.time = wait
     Player.Green = nil -- gone before the moment is up
+    green.steam_id = nil -- and their old object knows nothing
     later()
     eq(moved, false, "not moved, and nothing thrown")
 end
