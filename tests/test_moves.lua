@@ -309,6 +309,25 @@ function T.an_edit_in_place_is_seen_once_forgotten()
     eq(Moves.ahead(track, "i0").entry, 3)
 end
 
+function T.the_corner_the_car_is_in_counts_its_stops()
+    local track = road(16, { { 1, 4, 6, 2 }, { 2, 10, 11, 1 } })
+    local a = Moves.ahead(track, "i5", 1)
+    eq(a.here.corner, 1)
+    eq(a.here.made, 1)
+    eq(a.here.need, 2)
+    eq(a.corner, 1, "one stop still owed: this corner")
+    local b = Moves.ahead(track, "i5", 2)
+    eq(b.here.made, 2, "both made")
+    eq(b.corner, 2, "and the next corner ahead")
+    eq(Moves.ahead(track, "i0", 0).here, nil, "on a straight there is none")
+end
+
+function T.in_the_only_corner_with_its_stops_made()
+    local a = Moves.ahead(road(12, { { 5, 4, 6, 1 } }), "i5", 1)
+    eq(a.corner, nil, "no other corner ahead")
+    eq(a.here.made, 1)
+end
+
 function T.no_corner_ahead()
     eq(Moves.ahead(road(12), "i0"), nil)
     eq(Moves.ahead(road(12, { { 5, 4, 6, 1 } }), "nowhere"), nil)

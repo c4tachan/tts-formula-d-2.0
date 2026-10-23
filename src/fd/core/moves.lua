@@ -211,7 +211,8 @@ end
 -- along. `stops` is as for Moves.reach. Other cars are left out: this is
 -- about the track, not who is on it this turn.
 --
--- Returns nil off the track or with no corner ahead, or a table:
+-- Returns nil off the track, or in no corner with none ahead, or a table
+-- (with only `here` for a car in a corner with no other ahead):
 --   corner  the corner's id
 --   need    stops it takes
 --   made    stops made in it so far (0 for the next corner)
@@ -219,6 +220,8 @@ end
 --   entry   fewest spaces to reach it (0 inside it)
 --   exit    most spaces the car can move and still stop in it: the long
 --           way round, by the same rules as Moves.reach
+--   here    for a car in a corner, that corner -- whether or not it is the
+--           one above -- as { corner, need, made }
 function Moves.ahead(track, fromId, stops)
     local cache = aheadCache[track.spaces]
     if not cache then
@@ -240,6 +243,7 @@ function Moves.ahead(track, fromId, stops)
         made = from.corner and 1 or 0
     end
 
+    local here = from.corner and { corner = from.corner, need = need[from.corner] or 0, made = made } or nil
     local corner, entry = nil, 0
     if from.corner and made < (need[from.corner] or 0) then
         corner = from.corner
@@ -265,8 +269,9 @@ function Moves.ahead(track, fromId, stops)
         end
     end
     if not corner then
-        cache[key] = false
-        return nil
+        -- In a corner with no other ahead: still worth its stops.
+        cache[key] = here and { here = here } or false
+        return cache[key] or nil
     end
 
     -- Far enough to cross the corner by any way through it, from any lane.
@@ -282,7 +287,7 @@ function Moves.ahead(track, fromId, stops)
     end
     local out = {
         corner = corner, need = need[corner] or 0, made = corner == from.corner and made or 0,
-        inside = corner == from.corner, entry = entry, exit = exit,
+        inside = corner == from.corner, entry = entry, exit = exit, here = here,
     }
     cache[key] = out
     return out

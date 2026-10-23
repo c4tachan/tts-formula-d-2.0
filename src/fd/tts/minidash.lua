@@ -145,12 +145,14 @@ local function panel(color)
     end
     return el("Panel", {
         id = "fdm_" .. color, visibility = color, rectAlignment = "LowerRight",
-        offsetXY = "-16 16", width = tostring(w + 16), height = tostring(h + 96),
+        offsetXY = "-16 16", width = tostring(w + 16), height = tostring(h + 116),
         color = "#15181CE8", allowDragging = "true", returnToOriginalPositionWhenReleased = "false",
     }, {
         el("VerticalLayout", { padding = "8 8 4 6", spacing = "3", childForceExpandHeight = "false" }, {
             el("Text", { id = p .. "label", color = HEX[color], fontSize = "14", preferredHeight = "20" },
                 nil, color),
+            el("Text", { id = p .. "here", color = "#D8DDE3", fontSize = "13", preferredHeight = "17" },
+                nil, ""),
             el("Text", {
                 id = p .. "corner", color = "#D8DDE3", fontSize = "13", preferredHeight = "17",
                 tooltip = "Entry: fewest spaces to reach the corner. Exit: most spaces you can move and still stop in it.",
@@ -196,18 +198,27 @@ function Mini.setReady(on)
     ready = on ~= false
 end
 
---- The corner line: the corner the car is in while it owes stops there,
--- or else the next one, with how far to its entry and exit.
+--- The corner lines, from Race:cornerAhead: the stops made in the corner
+-- the car is in, with how far it can go and stay there while it owes any;
+-- then, once it owes none, the next corner and how far to its entry and
+-- exit.
 local function cornerText(race, car)
     local a = race:cornerAhead(car)
     if not a then
-        return ""
+        return "", ""
+    end
+    local here, ahead = "", ""
+    if a.here then
+        here = string.format("In corner %s: %d of %d stop%s made", a.here.corner, a.here.made, a.here.need,
+            a.here.need == 1 and "" or "s")
     end
     if a.inside then
-        return string.format("Corner %s (%d of %d stops made)  -  exit %d", a.corner, a.made, a.need, a.exit)
+        here = here .. string.format("  -  exit %d", a.exit)
+    elseif a.corner then
+        ahead = string.format("Corner %s (%d stop%s)  -  entry %d  -  exit %d",
+            a.corner, a.need, a.need == 1 and "" or "s", a.entry, a.exit)
     end
-    return string.format("Corner %s (%d stop%s)  -  entry %d  -  exit %d",
-        a.corner, a.need, a.need == 1 and "" or "s", a.entry, a.exit)
+    return here, ahead
 end
 
 local function moveMarker(id, slot, n)
@@ -249,7 +260,9 @@ function Mini.refresh(race)
                 end
             end
             Ui.value(p .. "label", table.concat(bits, "  -  "))
-            Ui.value(p .. "corner", cornerText(race, car))
+            local here, ahead = cornerText(race, car)
+            Ui.value(p .. "here", here)
+            Ui.value(p .. "corner", ahead)
             moveMarker(p .. "gearMark", "gear", math.max(car.gear, 1))
             for _, z in ipairs(race.rules.zones) do
                 moveMarker(p .. "wpMark", z.id, math.max(0, car.wear[z.id]))
