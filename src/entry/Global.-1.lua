@@ -882,18 +882,12 @@ local function dropDashless()
     end
 end
 
---- At load. Nobody is dealt in for the seat they happen to be in: they
--- pick a colour, or press Join race on a dashboard, and are told so.
+--- Deal in everybody seated at load: a colour they are sitting in then is
+-- one they picked. Only newcomers are made to pick (see bench).
 deliverAll = function()
     dropDashless()
-    if race.state.phase ~= "setup" then
-        return
-    end
     for _, color in ipairs(getSeatedPlayers()) do
-        if SEATS[color] and not race:car(color) then
-            broadcastToColor("To race, press Join race on a dashboard, or pick another colour.",
-                color, LEVEL_RGB.info)
-        end
+        deliver(color)
     end
 end
 
