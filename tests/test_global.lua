@@ -978,22 +978,27 @@ function T.a_car_put_down_after_its_roll_is_charged_for_the_move()
     assert(S.logged("not a legal 2"))
 end
 
---- The board's vector lines, counted by colour: green rings, amber dots.
+--- The icons on the board, counted by name: { clean = 3, brake = 3, ... }.
 local function marksOn(S)
-    local n = { free = 0, brake = 0, other = 0 }
-    for _, l in ipairs(S.board.lines or {}) do
-        local c = l.color
-        if c.name then
-            -- a seat's colour (the stub's Color): the pit boxes, not a mark
-        elseif c[1] == 0.25 and c[2] == 1 then
-            n.free = n.free + 1
-        elseif c[1] == 1 and c[2] == 0.75 then
-            n.brake = n.brake + 1
-        else
-            n.other = n.other + 1
-        end
-    end
+    local n = {}
+    for _, d in ipairs(S.board.decals or {}) do n[d.name] = (n[d.name] or 0) + 1 end
     return n
+end
+
+--- The names of the icons on Monaco's space `id`, a badge included, sorted
+-- and joined.
+local function iconsAt(S, id)
+    local Track = require("fd.tts.track")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local f = Track.frame(S.board, FDMonaco)
+    local s = FDMonaco.byId[id]
+    local out = {}
+    for _, d in ipairs(S.board.decals or {}) do
+        local px, py = f.w / 2 - d.position.x / f.kx, f.h / 2 + d.position.z / f.kz
+        if (px - s.pos[1]) ^ 2 + (py - s.pos[2]) ^ 2 < 20 * 20 then out[#out + 1] = d.name end
+    end
+    table.sort(out)
+    return table.concat(out, ",")
 end
 
 function T.a_roll_marks_where_the_car_can_go()
@@ -1001,57 +1006,95 @@ function T.a_roll_marks_where_the_car_can_go()
     redOn(S, "m.s2.5")
     roll(S, 1, 2)
     local n = marksOn(S)
-    eq(n.free, 3, "a full roll ends one space on in each lane")
+    eq(n.clean, 3, "a full roll ends one space on in each lane")
     eq(n.brake, 3, "and one short in each")
-    eq(n.other, 0)
-    -- The next shift starts a turn: the marks go.
+    eq(n["start-Red"], 1, "and where the move started is flagged")
+    eq(#S.board.decals, 7, "nothing else")
+    -- The next shift starts a turn: the marks go, the flag stays.
     dropOn(S, S.find("Gear Stick"), "gear", 2)
-    eq(#S.board.lines, pitLines(S), "only the pit boxes are left")
+    eq(#S.board.decals, 1)
+    eq(S.board.decals[1].name, "start-Red")
 end
 
-function T.a_blocked_space_is_crossed_out()
+function T.an_icon_lies_face_up_on_its_space()
     local S = world()
     local Track = require("fd.tts.track")
+    local Icons = require("fd.data.icons")
     local FDMonaco = require("fd.data.tracks.FDMonaco")
     local id = FDMonaco.pit.spaces[3]
-    local lines = Track.marks(S.board, FDMonaco, { { id = id, kind = "blocked" } })
-    eq(#lines, 2, "two strokes")
+    local decals = Track.marks(S.board, FDMonaco, { { id = id, kind = "blocked" } })
+    eq(#decals, 1)
+    local d = decals[1]
+    eq(d.url, Icons.url("blocked"))
     local s = FDMonaco.byId[id]
     local mid = Track.localOf(S.board, FDMonaco, s.pos[1], s.pos[2])
-    for _, l in ipairs(lines) do
-        local a, b = l.points[1], l.points[2]
-        assert(math.abs((a.x + b.x) / 2 - mid.x) < 1e-9 and math.abs((a.z + b.z) / 2 - mid.z) < 1e-9,
-            "crossing on the space")
+    assert(math.abs(d.position.x - mid.x) < 1e-9 and math.abs(d.position.z - mid.z) < 1e-9, "on the space")
+    assert(d.position.y > mid.y, "over the lines")
+    eq(d.rotation[1], 90, "face up")
+    -- A badge rides ahead of the icon it is on.
+    decals = Track.marks(S.board, FDMonaco, { { id = id, kind = "brake", badge = "collision" } })
+    eq(#decals, 2)
+    eq(decals[2].name, "collision")
+    assert(decals[2].scale[1] < decals[1].scale[1], "smaller")
+end
+
+function T.every_icon_the_board_can_show_is_drawn()
+    local Icons = require("fd.data.icons")
+    local listed = {}
+    for _, n in ipairs(Icons.names) do listed[n] = true end
+    local wanted = { "clean", "brake", "overshoot", "collision", "out", "blocked" }
+    for _, seat in ipairs({ "White", "Brown", "Red", "Orange", "Yellow", "Green", "Teal", "Blue", "Purple", "Pink" }) do
+        wanted[#wanted + 1] = "start-" .. seat
     end
+    for _, n in ipairs(wanted) do
+        assert(listed[n], n .. " is not in fd.data.icons: rerun tools/make_icons.py")
+        local f = io.open(ROOT .. "/assets/icons/" .. n .. ".png", "rb")
+        assert(f, n .. ".png is not in assets/icons")
+        f:close()
+    end
+end
+
+function T.a_move_that_would_put_the_car_out_is_marked()
+    local S = redRacing()
+    redOn(S, "m.s2.5")
+    for _ = 1, 17 do S.beginner.click("fdDashWear", "Red") end
+    eq(state().cars.Red.wear.wp, 1)
+    roll(S, 1, 2)
+    local n = marksOn(S)
+    eq(n.clean, 3, "the full roll costs nothing")
+    eq(n.out, 3, "braking 1 costs the last WP")
+    eq(n.brake, nil)
 end
 
 function T.changing_the_distance_redraws_the_marks()
     local S = redRacing()
     redOn(S, "m.s2.5")
     roll(S, 1, 2)
-    local before = S.board.lines
-    assert(marksOn(S).free > 0)
+    local before = S.board.decals
+    assert(marksOn(S).clean)
     fdSetupLaps({ color = "Red", steam_name = "host" }, "2")
-    assert(S.board.lines ~= before, "drawn again")
-    eq(marksOn(S).free, 3)
+    assert(S.board.decals ~= before, "drawn again")
+    eq(marksOn(S).clean, 3)
     -- With no marks out, nothing is drawn.
     dropOn(S, S.find("Gear Stick"), "gear", 2)
-    eq(marksOn(S).free, 0)
+    eq(marksOn(S).clean, nil)
     fdSetupLaps({ color = "Red", steam_name = "host" }, "1")
-    eq(marksOn(S).free, 0)
+    eq(marksOn(S).clean, nil)
 end
 
-function T.marks_and_the_track_overlay_share_the_board()
+function T.the_marks_leave_the_track_overlay_alone()
     local S = redRacing()
     redOn(S, "m.s2.5")
     fdTrack({ color = "Red", steam_name = "RedPlayer" })
     local overlay = #S.board.lines
     roll(S, 1, 2)
-    eq(#S.board.lines, overlay + 6, "marks drawn over the overlay")
+    eq(#S.board.lines, overlay, "the marks are icons, not lines")
+    eq(marksOn(S).clean, 3)
     fdTrack({ color = "Red", steam_name = "RedPlayer" })
-    eq(#S.board.lines, pitLines(S) + 6, "the overlay goes, the marks stay")
+    eq(#S.board.lines, pitLines(S), "the overlay goes")
+    eq(marksOn(S).clean, 3, "the marks stay")
     fdUndo({ color = "Red", steam_name = "RedPlayer" })
-    eq(#S.board.lines, pitLines(S), "undo clears them")
+    eq(marksOn(S).clean, nil, "undo clears them")
 end
 
 function T.undo_keeps_the_cars_where_they_are()
@@ -1829,6 +1872,46 @@ function T.a_collision_is_rolled_at_once()
     eq(#state().checks, 0)
 end
 
+function T.beside_another_car_a_mark_warns_of_a_collision()
+    local S, red, blue = twoCars()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local Moves = require("fd.core.moves")
+    gridRoll(S, { Red = 4, Blue = 15 }) -- Blue on pole, to play first
+    fdStart(Player.Red)
+    -- Blue moves on to somewhere Red can end beside in 2.
+    local redCan = Moves.reach(FDMonaco, state().cars.Red.space, 2)
+    local ahead = nil
+    for id in pairs(Moves.reach(FDMonaco, state().cars.Blue.space, 2)) do
+        for _, n in ipairs(FDMonaco.near[id] or {}) do
+            if redCan[n] and n ~= state().cars.Red.space and (not ahead or id < ahead) then ahead = id end
+        end
+    end
+    fdUiShift(Player.Blue, "1")
+    roll(S, 1, 2, "Blue")
+    putNear(S, blue, FDMonaco.byId[ahead], 0, 0, "Blue")
+    fdUiShift(Player.Red, "1")
+    roll(S, 1, 2, "Red")
+    local nearBlue = {}
+    for _, id in ipairs(FDMonaco.near[ahead] or {}) do nearBlue[id] = true end
+    local seen = { collision = 0, badge = 0, clean = 0 }
+    for id, o in pairs(redCan) do
+        local icons = iconsAt(S, id)
+        if id == ahead then
+            eq(icons, "", "nothing on Blue's own space")
+        elseif nearBlue[id] and o.brake == 0 and o.overshoot == 0 then
+            eq(icons, "collision", id .. ", a full roll beside Blue")
+            seen.collision = seen.collision + 1
+        elseif nearBlue[id] then
+            assert(icons:find("collision"), id .. ", short of the roll beside Blue: " .. icons)
+            seen.badge = seen.badge + 1
+        elseif o.brake == 0 and o.overshoot == 0 then
+            eq(icons, "clean", id)
+            seen.clean = seen.clean + 1
+        end
+    end
+    assert(seen.collision > 0 and seen.badge > 0, "a full roll and a short one beside Blue")
+end
+
 function T.the_car_to_play_is_lit_and_its_driver_told()
     local S, red, blue = twoCars()
     gridRoll(S, { Red = 4, Blue = 15 })
@@ -2232,46 +2315,40 @@ function T.without_the_black_die_the_script_rolls_for_it()
 end
 
 --- The ghost marking where the car to play started, if one is out.
-local function startGhost(S)
-    for _, o in ipairs(S.objects) do
-        if (o.description or ""):find("started here") then return o end
+--- The start flag on the board and the seat it is for; nil if none is out.
+local function startFlag(S)
+    for _, d in ipairs(S.board.decals or {}) do
+        local seat = d.name:match("^start%-(%a+)$")
+        if seat then return d, seat end
     end
     return nil
 end
 
-function T.a_ghost_marks_where_the_car_to_play_started()
+function T.a_flag_marks_where_the_car_to_play_started()
     local S, red, blue = twoCars()
-    eq(startGhost(S), nil, "none before the race")
+    eq(startFlag(S), nil, "none before the race")
     gridRoll(S, { Red = 4, Blue = 15 })
     fdStart(Player.Red)
     local first, second = state().order[1], state().order[2]
     local cars = { Red = red, Blue = blue }
-    local ghost = startGhost(S)
-    assert(ghost, "out for the car to play")
-    assert(ghost.description:find(first .. "Player"), ghost.description)
-    eq(ghost.interactable, false, "out of reach")
-    eq(ghost.tint.a < 1, true, "see-through")
-    local FDMonaco = require("fd.data.tracks.FDMonaco")
-    local Track = require("fd.tts.track")
-    local s = FDMonaco.byId[state().cars[first].space]
-    local at = Track.worldOf(S.board, FDMonaco, s.pos[1], s.pos[2])
-    assert(math.abs(ghost.pos.x - at.x) < 1e-6 and math.abs(ghost.pos.z - at.z) < 1e-6, "on its space")
+    eq(select(2, startFlag(S)), first, "out for the car to play, in its colour")
+    eq(iconsAt(S, state().cars[first].space), "start-" .. first, "on its space")
 
-    -- Rolled, and put back on the ghost: not moved, still its turn.
+    -- Rolled, and put back on the flag: not moved, still its turn.
     fdUiShift(Player[first], "1")
     roll(S, 1, 2, first)
     onObjectDrop(first, cars[first])
     assert(S.logged(first .. "Player is back where its move started"))
     eq(Turns.turn_color, first, "still to move")
-    -- Moved for real: the turn passes, and the ghost with it.
+    -- Moved for real: the turn passes, and the flag with it.
     moveOn(S, cars[first], first)
     eq(Turns.turn_color, second)
-    local marks = 0
-    for _, o in ipairs(S.objects) do
-        if (o.description or ""):find("started here") then marks = marks + 1 end
+    local flags = 0
+    for _, d in ipairs(S.board.decals or {}) do
+        if d.name:find("^start%-") then flags = flags + 1 end
     end
-    eq(marks, 1, "one ghost at a time")
-    assert(startGhost(S).description:find(second .. "Player"))
+    eq(flags, 1, "one flag at a time")
+    eq(select(2, startFlag(S)), second)
 end
 
 function T.the_panels_go_up_even_if_the_ui_never_says_it_has_loaded()
@@ -2286,18 +2363,18 @@ function T.the_panels_go_up_even_if_the_ui_never_says_it_has_loaded()
     eq(S.ui.fds.active, "true", "and shown")
 end
 
-function T.the_start_ghost_is_cleared_on_load()
-    local S, red, blue = twoCars()
-    gridRoll(S, { Red = 4, Blue = 15 })
-    fdStart(Player.Red)
-    local ghost = startGhost(S)
-    assert(ghost, "out")
-    local saved = onSave()
-    local listed = false
-    for _, g in ipairs(saved.json.markers or {}) do
-        if g == ghost.guid then listed = true end
-    end
-    assert(listed, "saved among the markers a load clears")
+function T.a_load_clears_the_marks_the_save_kept()
+    local S = redRacing()
+    redOn(S, "m.s2.5")
+    roll(S, 1, 2)
+    assert(marksOn(S).clean, "marks out")
+    local saved, kept = onSave(), S.board.decals
+    -- Loaded afresh, the board comes back with the decals it was saved with.
+    local S2 = world()
+    S2.board.decals = kept
+    onLoad(saved)
+    eq(marksOn(S2).clean, nil, "the move's marks are gone")
+    eq(marksOn(S2).brake, nil)
 end
 
 function T.the_map_cannot_change_during_the_grid_roll()

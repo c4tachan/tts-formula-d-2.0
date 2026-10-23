@@ -929,6 +929,83 @@ function T.ending_beside_cars_rolls_once_for_each()
     eq(collisionChecks(r, "Red"), "")
 end
 
+-- What a move would bring ------------------------------------------------------
+
+local function touching(r, color, track, id)
+    local ahead = r:outcome(color, r:reachable(color, track)[id])
+    table.sort(ahead.touching)
+    return table.concat(ahead.touching, ",")
+end
+
+function T.the_cars_a_move_would_end_beside_are_foreseen()
+    local track = twoLanes()
+    local r = started("Red", "Blue", "Grey", "Green")
+    r:placed("Red", "i0")
+    r:placed("Blue", "o3")
+    r:placed("Grey", "i3")
+    r:placed("Green", "o6")
+    rollDie(r, "Red", 1, 2)
+    eq(touching(r, "Red", track, "i2"), "Blue,Grey", "as putting it down there would roll for")
+    eq(touching(r, "Red", track, "i1"), "", "nobody beside, the car itself aside")
+    -- A car out of the race is no longer on the track to hit.
+    r:setWear("Grey", nil, 0)
+    eq(touching(r, "Red", track, "i2"), "Blue")
+end
+
+function T.no_collision_is_foreseen_in_the_pit_lane()
+    local spaces = {}
+    for k = 0, 5 do
+        spaces[#spaces + 1] = { id = "p" .. k, lane = 0, pit = true, next = k < 5 and { "p" .. (k + 1) } or {} }
+    end
+    local track = { spaces = spaces, corners = {}, near = { p2 = { "p3" }, p3 = { "p2" } } }
+    local r = started("Red", "Blue")
+    r:placed("Red", "p3", track)
+    r:placed("Blue", "p0", track)
+    rollDie(r, "Blue", 1, 2)
+    eq(touching(r, "Blue", track, "p2"), "")
+end
+
+function T.no_collision_is_foreseen_over_the_line_for_the_last_time()
+    local track = twoLanes()
+    track.finish = { line = { "i2", "o2" } }
+    local r = started("Red", "Blue")
+    r:placed("Red", "i0", track)
+    r:placed("Blue", "o3", track)
+    r:car("Red").lap = 1
+    rollDie(r, "Red", 1, 2)
+    eq(touching(r, "Red", track, "i2"), "", "it has finished")
+    r:setLaps(2)
+    eq(touching(r, "Red", track, "i2"), "Blue", "with a lap to go it has not")
+end
+
+function T.a_move_that_wears_the_car_out_is_foreseen()
+    local track = lane(20)
+    local r = started("Red")
+    r:placed("Red", "c0", track)
+    r:adjust("Red", nil, -16) -- 2 WP left
+    rollDie(r, "Red", 3, 6)
+    local reach = r:reachable("Red", track)
+    eq(r:outcome("Red", reach.c6).out, false, "the full roll costs nothing")
+    eq(r:outcome("Red", reach.c5).out, false, "braking 1 leaves 1")
+    eq(r:outcome("Red", reach.c4).out, true, "braking 2 leaves none")
+    -- Put down braking 1, it has paid for that already: the same holds.
+    putDown(r, "Red", "c5", track)
+    eq(r:car("Red").wear.wp, 1)
+    eq(r:outcome("Red", reach.c6).out, false)
+    eq(r:outcome("Red", reach.c5).out, false)
+    eq(r:outcome("Red", reach.c4).out, true)
+end
+
+function T.a_corner_left_without_its_stops_is_foreseen()
+    local track = lane(20, { 3, 5, 2 })
+    local r = started("Red")
+    r:placed("Red", "c0", track)
+    rollDie(r, "Red", 3, 8)
+    local reach = r:reachable("Red", track)
+    eq(r:outcome("Red", reach.c8).out, true, "through a 2-stop corner without stopping")
+    eq(r:outcome("Red", reach.c4).out, false, "a stop in it")
+end
+
 function T.a_collision_roll_spreads_until_each_pair_has_rolled_twice()
     -- A chain: Red ends touching Blue, Blue touches Grey, Grey touches
     -- Green. Nobody else touches Red, and Purple is clear of them all.

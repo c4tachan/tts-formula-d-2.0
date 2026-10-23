@@ -15,6 +15,11 @@ plus Python tooling for data extraction.
   the JSON and rerun `tools/extract/gen_registry.py`, never the output.
   `src/fd/data/dice.lua` likewise comes from `tools/extract/dice_faces.json`
   via `gen_dice.py`.
+- **The move icons are drawn by `tools/make_icons.py`** into `assets/icons/`
+  and loaded in game from GitHub, at the commit that last changed them. After
+  changing an icon: run it, commit and push the PNGs, then
+  `python tools/make_icons.py --pin` rewrites `src/fd/data/icons.lua` with
+  that commit. A pin to a commit that isn't pushed yet won't load.
 - **`fd.core` and `fd.rules` make no TTS calls.** They are tested under real
   Lua 5.2 (`tools/test_lua.py`). Anything touching objects, UI or `Wait` goes
   in `fd.tts` or the entry scripts. `tests/tts_stub.lua` fakes just enough of
@@ -110,3 +115,8 @@ the two seconds.
   `steamusercontent-a.akamaihd.net/ugc/<same path>` form instead.
 - Changing a tile's image requires `setCustomObject` followed by `reload()`, and
   `reload()` invalidates the old object reference.
+- The board tile is scaled unevenly (44 × 1 × 26). The icon decals are placed
+  and sized in its local space and kept square to it (rotation `{90, 180, 0}`,
+  scale divided per axis), since a child turned on an unevenly scaled parent
+  comes out skewed. `setDecals` replaces every decal on the object, and a save
+  keeps them, so `onLoad` sends the board's decals afresh.

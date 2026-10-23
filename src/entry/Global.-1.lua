@@ -45,9 +45,8 @@ local layDice, activateDie, restockDice -- with the track, below
 local throwChecks -- with the dice, below
 local startRace -- with the race controls, below
 local pendingStart = nil -- who pressed Start race, while the grid is rolled
--- The ghost marking where the car to play started its move: its guid, and
--- which car and space it stands for (see markStart).
-local startGhost = nil
+-- Which car and space the flag marking where the car to play started its
+-- move stands for (see markStart).
 local startKey = nil
 -- What syncTurns last told TTS's Turns, as { on, order, color }; nil until
 -- it has, so the first sync after a load sets every part.
@@ -193,6 +192,8 @@ function onLoad(saved_data)
     Mini.registerAsset()
     setupTrackEditor(saved.edits, saved.markers)
     drawPits(useBoardTrack())
+    -- The save keeps the icons that were on the board; none are wanted yet.
+    Track.drawIcons()
     buildUi()
     -- A moment for every object to have spawned: a dashboard not there yet
     -- would look deleted, and its driver be taken out. Nobody is dealt in
@@ -275,7 +276,6 @@ function onSave()
         markers = (function()
             local out = Editor.markerGuids()
             for _, g in ipairs(Ghosts.guids()) do out[#out + 1] = g end
-            if startGhost then out[#out + 1] = startGhost end
             return out
         end)(),
     })
@@ -437,28 +437,19 @@ local function syncTurns(due)
     turnsSet = { on = true, order = key, color = due.color }
 end
 
---- Put the ghost on the space the car to play started its move from (where
--- it stands, before it rolls), in its colour; none outside a race. Put back
--- on it, the car has not moved (Race:backToStart).
+--- Flag the space the car to play started its move from (where it stands,
+-- before it rolls), in its colour; none outside a race. Put back on it,
+-- the car has not moved (Race:backToStart).
 local function markStart(due)
     local from = due and (due.move and due.move.from or due.space)
     local key = from and (due.color .. "@" .. from)
     if key == startKey then
         return
     end
-    local old = startGhost and getObjectFromGUID(startGhost)
-    if old then
-        old.destruct()
-    end
-    startGhost, startKey = nil, key
-    local track, s = race.track, nil
-    for _, sp in ipairs(from and track and track.spaces or {}) do
-        if sp.id == from then s = sp end
-    end
-    if s then
-        local obj = Ghosts.mark(track, s, tintOf(due.color), race:label(due) .. " started here")
-        startGhost = obj and obj.getGUID()
-    end
+    startKey = key
+    local tile, track = Track.tile(), race.track
+    Track.setIcons("start", from and tile and track
+        and Track.marks(tile, track, { { id = from, kind = "start", color = due.color } }) or nil)
 end
 
 --- Point everyone at the car to play: TTS's turn marker and a highlight on
@@ -1413,6 +1404,7 @@ end
 -- move to its name panel.
 function fdMapChanged()
     drawPits(useBoardTrack())
+    Track.drawIcons()
     buildUi()
     layDice()
 end
@@ -1672,11 +1664,14 @@ spaceUnder = function(obj)
     return s and s.id
 end
 
---- Mark where the car of `color` can end the move it has just opened: a
--- green ring for the full roll, amber dots for braking, orange for an
--- overshoot and red for going out; and a red cross on each space the move
--- is blocked from -- by cars in the way, or a pit lane shut to it.
--- Advisory: nothing stops a car going anywhere else.
+--- Mark where the car of `color` can end the move it has just opened, with
+-- an icon on each space (see Track.marks): a skull where it would go out of
+-- the race, else a speedometer for an overshoot or the brake light for
+-- braking, each with a crash badge if it ends beside another car; else the
+-- crash for a full roll beside one, or a tick for a full roll that costs
+-- nothing. No entry on each space the move is blocked from -- by cars in the
+-- way, or a pit lane shut to it. Advisory: nothing stops a car going
+-- anywhere else.
 showReach = function(color)
     local tile, track = boardTrack()
     local reach = track and race:reachable(color, track)
@@ -1689,26 +1684,29 @@ showReach = function(color)
     local marks = {}
     for id, o in pairs(reach) do
         if id ~= from then
-            local kind = "free"
-            if race:moveOut(o) then
+            local ahead = race:outcome(color, o)
+            local crash = #ahead.touching > 0
+            local kind, badge = "clean", nil
+            if ahead.out then
                 kind = "out"
-            elseif o.overshoot > 0 then
-                kind = "overshoot"
-            elseif o.brake > 0 then
-                kind = "brake"
+            elseif o.overshoot > 0 or o.brake > 0 then
+                kind = o.overshoot > 0 and "overshoot" or "brake"
+                badge = crash and "collision" or nil
+            elseif crash then
+                kind = "collision"
             end
-            marks[#marks + 1] = { id = id, kind = kind }
+            marks[#marks + 1] = { id = id, kind = kind, badge = badge }
         end
     end
     for _, id in ipairs(race:blockedSpaces(color, track, reach)) do
         marks[#marks + 1] = { id = id, kind = "blocked" }
     end
-    Track.setLayer("reach", Track.marks(tile, track, marks))
+    Track.setIcons("reach", Track.marks(tile, track, marks))
 end
 
 clearReach = function()
     reachShown = nil
-    Track.setLayer("reach", nil)
+    Track.setIcons("reach", nil)
 end
 
 local function pickUpAt(color, pos)

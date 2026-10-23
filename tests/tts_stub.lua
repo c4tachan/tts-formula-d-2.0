@@ -114,6 +114,8 @@ function Stub.object(name, props)
     end
     o.setVectorLines = function(l) o.lines = l end
     o.getVectorLines = function() return o.lines or {} end
+    o.setDecals = function(d) o.decals = d end
+    o.getDecals = function() return o.decals end
     o.getTransformUp = function() return o.up end
     -- Local space is scaled like TTS's; rotation is left out apart from the
     -- flip a dashboard takes when turned face down.
