@@ -38,6 +38,7 @@ local clearReach -- likewise
 local useBoardTrack -- likewise
 local joinAt -- with the dashboard buttons, below
 local deliver, dealInSeated, dropDashless, bench -- likewise
+local isAdmin -- with the race controls, below
 -- What syncTurns last told TTS's Turns, as { on, order, color }; nil until
 -- it has, so the first sync after a load sets every part.
 local turnsSet = nil
@@ -1037,7 +1038,25 @@ end
 function fdDashCar(dash) onDash(dash, "car") end
 function fdDashCollision(dash) onDash(dash, "collision") end
 function fdDashPit(dash) onDash(dash, "pit") end
-function fdDashLeave(dash) onDash(dash, "leave") end
+--- Leave, on a dashboard: its own driver leaves, or the host (or a promoted
+-- player) takes the car out of the race -- a driver who has dropped out and
+-- is not coming back, say.
+function fdDashLeave(dash, color)
+    local car = carOnDash(dash.getGUID())
+    if not car then
+        return
+    end
+    if color ~= car.color then
+        if not isAdmin({ color = color }) then
+            broadcastToColor("Only " .. race:label(car) .. " or the host can take this car out of the race.",
+                color, LEVEL_RGB.warn)
+            return
+        end
+        local p = Player[color]
+        printToAll((p and p.steam_name or color) .. " takes " .. race:label(car) .. " out of the race", LEVEL_RGB.info)
+    end
+    runAction(car, "leave")
+end
 
 function fdDashWear(dash, color, alt)
     onDash(dash, alt and "wearUp" or "wearDown")
@@ -1114,7 +1133,7 @@ end
 
 --- Whether `player` may use the race controls. `player` is a TTS Player, or
 -- just a colour as the hotkeys and context menus give it.
-local function isAdmin(player)
+isAdmin = function(player)
     if player.admin ~= nil then
         return player.admin
     end

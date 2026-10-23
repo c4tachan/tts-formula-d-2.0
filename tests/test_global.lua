@@ -1893,4 +1893,25 @@ function T.a_newcomer_in_an_orphaned_seat_is_moved_to_the_spectators()
     assert(S.logged("waiting for its driver"))
 end
 
+function T.only_the_driver_or_the_host_can_take_a_car_out()
+    local S = redRacing()
+    joinRace("Blue", S.advanced)
+    S.beginner.click("fdDashLeave", "Blue")
+    assert(state().cars.Red, "another driver cannot")
+    assert(S.logged("Only RedPlayer or the host"))
+    S.advanced.click("fdDashLeave", "Red")
+    eq(state().cars.Blue, nil, "the host can")
+    assert(S.logged("RedPlayer takes BluePlayer out of the race"))
+end
+
+function T.the_host_can_remove_a_driver_who_dropped_out()
+    local S = redRacing()
+    local host = S.player("Orange", S.vec(20, 1, -38), true)
+    redDropsOut(S)
+    S.beginner.click("fdDashLeave", "Orange")
+    eq(state().cars.Red, nil, "out of the race")
+    eq(#S.beginner.buttons, 0, "and the dashboard is free")
+    assert(host.color == "Orange", "the host stays where they are")
+end
+
 return T
