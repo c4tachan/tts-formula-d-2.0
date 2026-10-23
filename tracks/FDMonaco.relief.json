@@ -1,0 +1,45 @@
+{
+  "id": "FDMonaco",
+  "about": "How tools/make_relief.py lifts the Monaco board into a 3D model. Hand-written; the profile it reads is fetched by `make_relief.py fetch`.",
+
+  "circuit": {
+    "geojson": "https://raw.githubusercontent.com/bacinger/f1-circuits/master/circuits/mc-1929.geojson",
+    "length": 3337,
+    "elevation": ["eudem25m", "srtm30m"],
+    "range": 42,
+    "range_source": "Casino (T4) to just before La Rascasse, as formula1.com and most circuit guides give it"
+  },
+
+  "finish": 2300,
+
+  "anchors": {
+    "c1": 2615,
+    "c2": 3165,
+    "c3": 3300,
+    "c4": 225,
+    "c5": 362,
+    "s6": 525,
+    "c6": 1195,
+    "c7": 1465,
+    "c8": 1720,
+    "c9": 2000,
+    "c10": 2090
+  },
+  "anchors_note": "Each board sector's middle, as metres along the real lap (from the GeoJSON's first point, at the Casino). s6 is Portier, where the board's long right-hand run turns along the shore.",
+
+  "bridge": [
+    { "from": 380, "to": 1440, "why": "Mirabeau Bas and Portier read buildings as a rise and then a cliff, though the road falls steadily from the hairpin to the tunnel; the tunnel reads the hill and hotel over it, its exit the harbour beside it, and the quay on to Tabac the buildings along it; the road just eases down to the waterfront" },
+    { "from": 2420, "to": 2900, "why": "Sainte Devote sits in a ravine under a bridge, which the grid reads as a 30 m crest; the road climbs steadily from the pit straight up Beau Rivage" },
+    { "from": 1940, "to": 2160, "why": "Rascasse and Noghes: the cliff behind the quay bleeds into a 25 m grid" },
+    { "from": 2160, "to": 2400, "why": "the pit straight: the GeoJSON line strays onto the harbour (0 m) and the hillside" }
+  ],
+
+  "smooth": 60,
+
+  "model": {
+    "width": 44,
+    "base": 0.3,
+    "step": 10,
+    "exaggerate": 1.0
+  }
+}
