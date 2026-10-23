@@ -5,14 +5,17 @@
 -- snapped to it follows the board when a player drags or turns it.
 
 local Maps = require("fd.data.maps")
+local Icons = require("fd.data.icons")
 local Graph = require("fd.core.trackgraph")
 
 local Track = {}
 
 Track.TILE_GUID = "ebde54"
 
--- How far above the board face to float the overlay, in world units.
+-- How far above the board face to float the overlay, in world units, and
+-- the icons a little higher, over its lines.
 local LIFT = 0.12
+local ICON_LIFT = 0.14
 
 -- Line thickness in world units. Lines attached to an object are given in its
 -- local space, and the board tile is scaled up ~44x, so this is divided by the
@@ -50,6 +53,7 @@ function Track.frame(tile, track)
         kx = size.x / scale.x / track.image.width,
         kz = size.z / scale.z / track.image.height,
         y = (size.y * 0.5 + LIFT) / scale.y,
+        iconY = (size.y * 0.5 + ICON_LIFT) / scale.y,
         w = track.image.width,
         h = track.image.height,
         -- World units per image pixel, for distances on the board.
@@ -250,48 +254,63 @@ function Track.overlay(tile, track, flagged, links)
     return lines
 end
 
--- Marks on single spaces, by kind: rings where a move can end, small dots
--- where it only gets by braking, crosses where it gets but is blocked.
--- In image pixels.
-local MARKS = {
-    free = { colour = { 0.25, 1, 0.35 }, radius = 13 },
-    brake = { colour = { 1, 0.75, 0.2 }, radius = 5 },
-    overshoot = { colour = { 1, 0.45, 0.1 }, radius = 13 },
-    out = { colour = { 1, 0.15, 0.15 }, radius = 13 },
-    blocked = { colour = { 1, 0.15, 0.15 }, radius = 9, cross = true },
-}
+-- Icons ------------------------------------------------------------------------
+--
+-- Marks on single spaces are icons (tools/make_icons.py), put on the tile as
+-- decals, which follow it like its lines. They stand upright on the board's
+-- picture rather than turning with their spaces: the tile is scaled more
+-- along one side than the other, so a decal turned on it would come out
+-- skewed.
 
---- A mark on each space listed in `marks` ({ id, kind } with a kind from
--- MARKS), as an octagon round its centre, or a cross turned with the space.
+-- How wide each icon is on the board, in image pixels (a printed space is
+-- about 45 long, its lanes 34 apart). A braking move can end on most of the
+-- spaces a roll passes, so those are small.
+local ICON_SIZE = {
+    clean = 24, collision = 24, overshoot = 24, out = 24,
+    brake = 16, blocked = 18, start = 26,
+}
+-- A second icon on a space -- the collision check that comes with braking
+-- or overshooting there -- is a badge this wide, this far ahead of the
+-- space's middle along the way the track runs.
+local BADGE_SIZE, BADGE_AHEAD = 14, 15
+
+--- The decal of icon `name` (see Icons.names), `size` image pixels across,
+-- centred on (px, py).
+local function decal(f, name, px, py, size)
+    local p = Track.localIn(f, px, py)
+    p.y = f.iconY
+    return {
+        name = name,
+        url = Icons.url(name),
+        position = p,
+        -- Face up, the icon's top towards the top of the board's picture
+        -- (local -Z; see Track.localIn).
+        rotation = { 90, 180, 0 },
+        scale = { size * f.kx, size * f.kz, 1 },
+    }
+end
+
+--- An icon on each space listed in `marks`: { id, kind, badge }, where
+-- `kind` names the icon (a key of ICON_SIZE; "start" takes `color`, the
+-- seat) and `badge`, if given, a second one ahead of it.
 function Track.marks(tile, track, marks)
-    local thickness = THICKNESS / math.max(tile.getScale().x, 0.001)
     local f = Track.frame(tile, track)
     local byId = {}
     for _, s in ipairs(track.spaces) do byId[s.id] = s end
-    local lines = {}
+    local decals = {}
     for _, m in ipairs(marks) do
-        local s, style = byId[m.id], MARKS[m.kind]
-        if s and style and style.cross then
-            for _, a in ipairs({ 45, 135 }) do
-                local r = math.rad(s.rot + a)
-                local dx, dy = style.radius * math.cos(r), style.radius * math.sin(r)
-                lines[#lines + 1] = {
-                    points = { Track.localIn(f, s.pos[1] - dx, s.pos[2] - dy),
-                               Track.localIn(f, s.pos[1] + dx, s.pos[2] + dy) },
-                    color = style.colour, thickness = thickness,
-                }
+        local s, size = byId[m.id], ICON_SIZE[m.kind]
+        if s and size then
+            local name = m.kind == "start" and ("start-" .. m.color) or m.kind
+            decals[#decals + 1] = decal(f, name, s.pos[1], s.pos[2], size)
+            if m.badge then
+                local a = math.rad(s.rot)
+                decals[#decals + 1] = decal(f, m.badge, s.pos[1] + BADGE_AHEAD * math.cos(a),
+                    s.pos[2] + BADGE_AHEAD * math.sin(a), BADGE_SIZE)
             end
-        elseif s and style then
-            local pts = {}
-            for i = 0, 8 do
-                local a = i * math.pi / 4
-                pts[#pts + 1] = Track.localIn(f, s.pos[1] + style.radius * math.cos(a),
-                    s.pos[2] + style.radius * math.sin(a))
-            end
-            lines[#lines + 1] = { points = pts, color = style.colour, thickness = thickness }
         end
     end
-    return lines
+    return decals
 end
 
 -- A vector line is only ever a line, so a garage half is filled with
@@ -366,9 +385,9 @@ function Track.grid(tile, track, ids)
 end
 
 -- The tile has one set of vector lines, shared by layers drawn in this
--- order: the pit boxes' colours, the space overlay, the grid being marked,
--- then the reach highlight on top.
-local LAYERS = { "pits", "overlay", "grid", "reach" }
+-- order: the pit boxes' colours, the space overlay, then the grid being
+-- marked.
+local LAYERS = { "pits", "overlay", "grid" }
 local layers = {}
 
 --- Replace one layer's lines (nil or empty clears it) and redraw the tile.
@@ -390,6 +409,37 @@ function Track.setLayer(name, lines)
         for _, l in ipairs(layers[layer] or {}) do all[#all + 1] = l end
     end
     tile.setVectorLines(all)
+end
+
+-- Its decals are layered the same way: where the car to move started, then
+-- where it can go.
+local ICON_LAYERS = { "start", "reach" }
+local iconLayers = {}
+
+--- Send the icon layers to the tile, replacing every decal on it.
+function Track.drawIcons()
+    local tile = Track.tile()
+    if not tile then
+        return
+    end
+    local all = {}
+    for _, layer in ipairs(ICON_LAYERS) do
+        for _, d in ipairs(iconLayers[layer] or {}) do all[#all + 1] = d end
+    end
+    tile.setDecals(all)
+end
+
+--- Replace one icon layer's decals (nil or empty clears it) and redraw.
+-- Clearing a layer that is already clear sends nothing.
+function Track.setIcons(name, decals)
+    if decals and #decals == 0 then
+        decals = nil
+    end
+    if decals == nil and iconLayers[name] == nil then
+        return
+    end
+    iconLayers[name] = decals
+    Track.drawIcons()
 end
 
 --- Draw the space graph on the board. Returns false if the board is showing

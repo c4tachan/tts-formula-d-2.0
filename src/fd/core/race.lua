@@ -286,6 +286,62 @@ function Race:moveOut(o)
     return self.rules.overshootOut(o.missed)
 end
 
+--- What ending the move `color` has open as `o` (an option Race:reachable
+-- gave) would bring, worked out as Race:placed would judge it, for the board
+-- to show before the car is put down:
+--   out       true if it puts the car out of the race: leaving a corner
+--             without its stops, or wearing a zone away
+--   touching  the colours of the cars it would end beside, a collision
+--             check against each
+function Race:outcome(color, o)
+    local car = self:car(color)
+    local m, rules = car.move, self.rules
+    local box = self:ownBox(car, o.space)
+    -- Wear goes by what the car had before the move, which is what it has
+    -- less what the move has charged so far, and less what a stop made on
+    -- it gave unless it stays in the box.
+    local delta = {}
+    local function add(wear, k)
+        for z, pts in pairs(wear) do delta[z] = (delta[z] or 0) + k * pts end
+    end
+    add(rules.brakeWear(o.brake), 1)
+    add(rules.overshootWear(o.overshoot), 1)
+    add(rules.brakeWear(m.charged.brake), -1)
+    add(rules.overshootWear(m.charged.overshoot), -1)
+    if m.pit and not box then
+        add(m.pit.gained, 1)
+    end
+    local restored = {}
+    if box and not m.pit then
+        for _, id in ipairs(rules.pitRestores) do restored[id] = true end
+    end
+    local out = self:moveOut(o)
+    for _, z in ipairs(rules.zones) do
+        local left = restored[z.id] and z.start or car.wear[z.id] - (delta[z.id] or 0)
+        if z.eliminateAt and left <= z.eliminateAt then out = true end
+    end
+    -- No collision for a car out of the race, over the line for the last
+    -- time, or in the pit lane where the ruleset spares it.
+    local touching = {}
+    local lap = car.lap + (o.crossed and 1 or 0) - (m.crossed and 1 or 0)
+    local s = self:space(o.space)
+    local exempt = rules.pitLaneExempt
+    local spared = s and s.pit and exempt and exempt.collisions
+    if not out and lap <= self.state.laps and not spared then
+        local beside = {}
+        for _, id in ipairs(self.track and self.track.near and self.track.near[o.space] or {}) do
+            beside[id] = true
+        end
+        for _, other in ipairs(self:cars()) do
+            if other ~= car and other.space and beside[other.space] and not other.eliminated
+                    and not other.place and not self:pitExempt(other, "collisions") then
+                touching[#touching + 1] = other.color
+            end
+        end
+    end
+    return { out = out, touching = touching }
+end
+
 --- How bad ending a move this way is, to choose between two ways there.
 function Race:moveCost(o)
     local rules, total = self.rules, 0

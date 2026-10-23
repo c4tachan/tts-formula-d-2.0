@@ -49,6 +49,14 @@ That original is preserved verbatim in [`reference/original-2020/`](reference/or
   so far): braking and corner overshoots are charged, corner stops are
   counted from move to move, and missing two or more stops puts a car out.
   Putting the car down again re-judges the move; nothing is ever refused.
+- **Move marks:** after the roll, an icon on each space the car can end on
+  says what ending there brings: a tick for the full roll at no cost, the
+  brake light for braking short, a speedometer for overshooting a corner, a
+  crash burst for ending beside another car (a collision check; a small one
+  rides on the brake light or speedometer), and a skull where the car would
+  go out of the race. A no-entry sign marks spaces the roll reaches but the
+  move may not end on, and a flag in the driver's colour marks where the move
+  started. The icons are drawn by `tools/make_icons.py`.
 - **Wear:** pit stop and manual ±1 buttons; elimination at
   0 WP. The WP marker follows on the beginner side of the dashboard, and
   dropping it on a number sets WP to that number.
