@@ -151,8 +151,10 @@ local function panel(color)
         el("VerticalLayout", { padding = "8 8 4 6", spacing = "3", childForceExpandHeight = "false" }, {
             el("Text", { id = p .. "label", color = HEX[color], fontSize = "14", preferredHeight = "20" },
                 nil, color),
-            el("Text", { id = p .. "here", color = "#D8DDE3", fontSize = "13", preferredHeight = "17" },
-                nil, ""),
+            el("Text", {
+                id = p .. "here", color = "#D8DDE3", fontSize = "13", preferredHeight = "17",
+                tooltip = "Stops made in the corner you are in. Exit, while you owe one: most spaces you can move and still stop in it.",
+            }, nil, ""),
             el("Text", {
                 id = p .. "corner", color = "#D8DDE3", fontSize = "13", preferredHeight = "17",
                 tooltip = "Entry: fewest spaces to reach the corner. Exit: most spaces you can move and still stop in it.",
