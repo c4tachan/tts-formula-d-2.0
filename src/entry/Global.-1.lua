@@ -23,7 +23,10 @@ local Track = require("fd.tts.track")
 local Editor = require("fd.tts.track_editor")
 local Ghosts = require("fd.tts.ghosts")
 local Setup = require("fd.tts.setup")
-local TRACKS = { FDMonaco = require("fd.data.tracks.FDMonaco") }
+local TRACKS = {
+    FDAustin = require("fd.data.tracks.FDAustin"),
+    FDMonaco = require("fd.data.tracks.FDMonaco"),
+}
 
 mod_packed = false
 setup_packed = false

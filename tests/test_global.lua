@@ -341,7 +341,7 @@ end
 function T.the_setup_menu_chooses_the_map()
     local S = world()
     local Maps = require("fd.data.maps")
-    -- The list: Monaco first, as it has track data, then the rest, marked.
+    -- The list: the maps with track data first, then the rest, marked.
     local list = nil
     for _, node in ipairs(S.xml) do
         if node.attributes.id == "fds" then
@@ -353,13 +353,14 @@ function T.the_setup_menu_chooses_the_map()
         end
     end
     assert(list, "a map list on the setup menu")
-    eq(list.children[1].value, "Formula D: Monaco")
-    eq(list.children[1].attributes.selected, "true", "showing the map on the board")
-    eq(list.children[2].value:match("%(no track data%)$"), "(no track data)")
+    eq(list.children[1].value, "Formula D: Austin")
+    eq(list.children[2].value, "Formula D: Monaco")
+    eq(list.children[2].attributes.selected, "true", "showing the map on the board")
+    eq(list.children[3].value, "Formula D: Baltimore  (no track data)")
 
-    fdSetupMap(Player.Blue, "Formula D: Austin  (no track data)")
+    fdSetupMap(Player.Blue, "Formula D: Austin")
     eq(S.board.custom.image, Maps.byId.FDMonaco.url, "only the host chooses")
-    fdSetupMap(Player.Red, "Formula D: Austin  (no track data)")
+    fdSetupMap(Player.Red, "Formula D: Austin")
     eq(S.board.custom.image, Maps.byId.FDAustin.url, "the host's choice goes on the board")
     eq(S.board.reloads, 1, "reloaded to show it")
     assert(S.logged("puts Formula D: Austin on the board"))
