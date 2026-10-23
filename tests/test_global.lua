@@ -2192,4 +2192,16 @@ function T.a_ghost_marks_where_the_car_to_play_started()
     assert(startGhost(S).description:find(second .. "Player"))
 end
 
+function T.the_panels_go_up_even_if_the_ui_never_says_it_has_loaded()
+    local S = world()
+    UI.loading = true -- TTS stuck saying so
+    S.xml, S.ui = {}, {}
+    onLoad("")
+    UI.loading = false
+    local ids = {}
+    for _, node in ipairs(S.xml) do ids[node.attributes.id or ""] = true end
+    assert(ids.fds, "the setup menu is sent")
+    eq(S.ui.fds.active, "true", "and shown")
+end
+
 return T

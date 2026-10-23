@@ -29,7 +29,10 @@ JSON = {
 }
 
 Wait = {
-    condition = function(fn, cond) if cond() then fn() end end,
+    -- Met now, or never: then the timeout, as TTS calls it once it is up.
+    condition = function(fn, cond, _, timeout)
+        if cond() then fn() elseif timeout then timeout() end
+    end,
     frames = function(fn) fn() end,
     time = function(fn) fn() end,
 }
