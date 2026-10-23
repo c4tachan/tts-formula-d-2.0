@@ -13,7 +13,7 @@ numbered so they sort in order:
 and finally writes the spaces to tracks/<id>.json -- unless that file has been
 edited by hand in TTS, in which case it is left alone.
 
-Close-up crops of the tricky corners go to out/_work/.
+Close-up crops of Monaco's tricky corners go to out/_work/.
 
 Which way is across the road is taken from the road's own edges, and each
 rung's place in the running order from where it sits along its edge, so the
@@ -22,7 +22,14 @@ other leg -- come out as cleanly as the straights. A rung whose spacing is
 well off its neighbours' is treated as a missed or stray division and marked
 in the step images: what the detector guessed is always visible.
 
+A board whose grid is printed dark and crisp, as Austin's is, reads better as
+cells: the patches of asphalt the lines enclose, one per space. --cells does
+that in place of steps 4-5, writing <id>_5_cells.png (each patch tinted, the
+scraps left out in red). --reverse says the lap runs the other way round.
+Both are kept in the track file's `detect`, so later runs read it the same way.
+
 Run:  python tools/extract/find_grid.py FDMonaco
+      python tools/extract/find_grid.py FDAustin --cells
 """
 import sys
 
@@ -31,8 +38,8 @@ import numpy as np
 from scipy.spatial import cKDTree
 from skimage.morphology import skeletonize
 
-from detect_track import (OUT, LANES, board_image, corner_lines, inner_side, keep_long,
-                          normals, racing_line, smooth_closed, surface_mask)
+from detect_track import (OUT, LANES, board_image, inner_side, normals, racing_line, road_surface,
+                          smooth_closed)
 
 WORK = OUT / "_work"
 
@@ -45,17 +52,7 @@ def track_only(im):
     """Asphalt and what is painted on it; kerbs, verges and scenery removed."""
     hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV).astype(int)
     S, V = hsv[..., 1], hsv[..., 2]
-    kerbs = cv2.dilate(keep_long((S < 60) & (V >= 205), 60), np.ones((3, 3), np.uint8))
-    m = surface_mask(im) | corner_lines(im)
-    m = cv2.morphologyEx(m.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8))
-    m[kerbs > 0] = 0
-    n, lab, st, _ = cv2.connectedComponentsWithStats(m, 8)
-    m = (lab == 1 + int(np.argmax(st[1:, 4]))).astype(np.uint8)
-    # Fill what is enclosed and small: arrows, grid boxes, the start band.
-    n, lab, st, _ = cv2.connectedComponentsWithStats((1 - m).astype(np.uint8), 4)
-    for i in range(1, n):
-        if st[i, 4] < 3000:
-            m[lab == i] = 1
+    m = road_surface(im)
     # The road's own edge line is black, so the asphalt mask stops a few
     # pixels short of the printed limit, and with it every division that
     # reaches the limit. The mask itself is left alone -- grown, it closes
@@ -67,10 +64,19 @@ def track_only(im):
 
 # 2. Arrows ----------------------------------------------------------------------
 
+# An arrow lies within its cell: the longest, curving round a hairpin, run to
+# about 50 px. Ink that runs further is grid -- on a board whose lines are
+# printed as dark as its arrows (Austin's), the lane lines and divisions join
+# up into one long net.
+ARROW_EXTENT = 60
+
+
 def paint_out_arrows(track, road):
     """Arrows are dark for where they are, and bold; grid lines are a pixel or
     two wide. Judging darkness against the local asphalt keeps the lines in
-    the darker tunnel stretch, which a fixed cut-off takes for arrows."""
+    the darker tunnel stretch, which a fixed cut-off takes for arrows. Where
+    the lines are as dark and bold as the arrows, the arrows are the marks
+    that stay inside a cell (ARROW_EXTENT)."""
     gray = cv2.cvtColor(track, cv2.COLOR_BGR2GRAY)
     bg = cv2.medianBlur(gray, 21).astype(np.float32)
     dark = bg - gray.astype(np.float32)
@@ -79,7 +85,8 @@ def paint_out_arrows(track, road):
     thick = cv2.distanceTransform(ink, cv2.DIST_L2, 3)
     core = ((rel < 0.55) & (ink > 0)).astype(np.uint8)
     n, lab, st, _ = cv2.connectedComponentsWithStats(core, 8)
-    keep = [i for i in range(1, n) if st[i, 4] >= 25 and thick[lab == i].max() >= 2.0]
+    keep = [i for i in range(1, n) if st[i, 4] >= 25 and thick[lab == i].max() >= 2.0
+            and max(st[i, 2], st[i, 3]) <= ARROW_EXTENT]
     arrows = np.isin(lab, keep).astype(np.uint8)
     halo = cv2.dilate(arrows, np.ones((5, 5), np.uint8))
     halo &= ((dark > 3) | (arrows > 0)).astype(np.uint8)
@@ -90,15 +97,20 @@ def paint_out_arrows(track, road):
 def paint_out_flag(track, road):
     """The start/finish flag: a band of white squares on the asphalt (nothing
     else painted on the road is that bright) with black ones between them.
-    Its edges would otherwise pass for divisions."""
+    Its edges would otherwise pass for divisions. Where a striped kerb is
+    taken for road, as on Austin, its white blocks pass for squares too, but
+    they alternate with red, and the flag has none."""
     gray = cv2.cvtColor(track, cv2.COLOR_BGR2GRAY)
     bg = cv2.medianBlur(gray, 21).astype(np.float32)
     bright = ((gray.astype(np.float32) - bg > 35) & (road > 0)).astype(np.uint8)
     n, lab, st, _ = cv2.connectedComponentsWithStats(bright, 8)
     squares = np.isin(lab, [i for i in range(1, n) if 12 <= st[i, 4] <= 400]).astype(np.uint8)
     band = cv2.morphologyEx(squares, cv2.MORPH_CLOSE, np.ones((15, 15), np.uint8))
+    hsv = cv2.cvtColor(track, cv2.COLOR_BGR2HSV).astype(int)
+    red = (((hsv[..., 0] <= 10) | (hsv[..., 0] >= 170)) & (hsv[..., 1] > 90) & (hsv[..., 2] > 80))
     n, lab, st, _ = cv2.connectedComponentsWithStats(band, 8)
-    band = np.isin(lab, [i for i in range(1, n) if st[i, 4] >= 600]).astype(np.uint8)
+    band = np.isin(lab, [i for i in range(1, n) if st[i, 4] >= 600
+                         and red[lab == i].mean() < 0.05]).astype(np.uint8)
     band = cv2.dilate(band, np.ones((7, 7), np.uint8)) & road
     return cv2.inpaint(track, band, 5, cv2.INPAINT_TELEA), band
 
@@ -385,26 +397,42 @@ def lap_sense(line, reverse):
     return (1.0 if cw else -1.0) * (-1.0 if reverse else 1.0)
 
 
-def order_rungs(rungs, line, tangent, reverse, sense, k=40):
-    """Each lane's rungs in running order, by where each sits along the
-    racing line. The nearest point of the line is not enough in a hairpin,
-    where it may be on the other leg: of the nearest points, the one taken is
-    the first whose tangent runs the way the rung itself faces (square to it,
-    in the sense the lap runs) -- the other leg runs the opposite way.
-    Returns the rungs by lane, each in order with `along` its arc position."""
+def lap_position(line, tangent, reverse, k=40):
+    """A function giving how far round the lap a point lies, facing a given
+    way, and the lap's length. The nearest point of the racing line is not
+    enough in a hairpin, where it may be on the other leg: of the nearest
+    points, the one taken is the first whose tangent runs the way the point
+    faces -- the other leg runs the opposite way."""
     arc = np.r_[0, np.cumsum(np.hypot(*np.diff(line, axis=0).T))]
     L = arc[-1] + np.hypot(*(line[0] - line[-1]))
     travel = tangent * (-1.0 if reverse else 1.0)
     tree = cKDTree(line)
+
+    def along(p, fwd):
+        """For one point, or for many (an array of points, each facing its
+        own way)."""
+        p, fwd = np.asarray(p, float), np.asarray(fwd, float)
+        many = p.ndim == 2
+        ks = tree.query(p.reshape(-1, 2), k=min(k, len(line)))[1]
+        f = np.broadcast_to(fwd.reshape(-1, 2), (len(ks), 2))
+        ok = np.einsum("nkd,nd->nk", travel[ks], f) > 0.5
+        j = ks[np.arange(len(ks)), np.where(ok.any(1), ok.argmax(1), 0)]
+        out = (L - arc[j]) if reverse else arc[j]
+        return out if many else float(out[0])
+    return along, L
+
+
+def order_rungs(rungs, line, tangent, reverse, sense):
+    """Each lane's rungs in running order, by where each sits along the
+    racing line, facing square to the rung in the sense the lap runs.
+    Returns the rungs by lane, each in order with `along` its arc position."""
+    along, L = lap_position(line, tangent, reverse)
     by_lane = {}
     for r in rungs:
         a = r["outer"] - r["inner"]
         a = a / (np.linalg.norm(a) + 1e-9)
         r["fwd"] = np.array([-a[1], a[0]]) * sense
-        ds, ks = tree.query(r["mid"], k=min(k, len(line)))
-        with_us = [j for j in ks if travel[j] @ r["fwd"] > 0.5]
-        j = with_us[0] if with_us else ks[0]
-        r["along"] = (L - arc[j]) if reverse else arc[j]
+        r["along"] = along(r["mid"], r["fwd"])
         r["loop_len"] = L
         by_lane.setdefault(r["lane"], []).append(r)
     for l in by_lane:
@@ -498,7 +526,13 @@ def spaces_from_rungs(by_lane, shape, origin):
     labels = np.zeros(shape, np.int32)
     for i, corners in quads:
         cv2.fillPoly(labels, [corners.round().astype(np.int32).reshape(-1, 1, 2)], int(i))
-    # Which cells touch across the line between them.
+    link_across(spaces, labels)
+    return spaces, labels
+
+
+def link_across(spaces, labels):
+    """Add to each space's `next` the spaces in the lanes either side that
+    touch it, across the line between them, and lie ahead of it."""
     touch = {}
     for dy, dx in ((0, 3), (3, 0), (2, 2), (2, -2), (0, 6), (6, 0), (4, 4), (4, -4)):
         a = labels[6:-6, 6:-6]
@@ -513,12 +547,144 @@ def spaces_from_rungs(by_lane, shape, origin):
             if abs(spaces[j]["lane"] - s["lane"]) == 1 and d @ s["flow"] > 0.35 * np.hypot(*d):
                 s["next"].append(j)
         s["next"] = sorted(set(s["next"]))
-    return spaces, labels
+
+
+# 5-6, read as cells (--cells) ---------------------------------------------------------
+#
+# Where the grid is printed as dark as on Austin -- black lane lines, crisp
+# divisions -- the cells come out cleaner read directly: the asphalt left over
+# once every printed line is taken away, a patch per cell. On Monaco's paler
+# grid the divisions are too faint for that, and the rungs above are better.
+
+CELL_CONTRAST = 8   # grey levels a printed line sits below the asphalt around it
+SCRAP = 0.35        # a patch smaller than this share of a cell is a scrap, not a cell
+SIDE_BY_SIDE = 1.4  # a patch this many lanes across is cells side by side
+
+
+def printed_cells(clean, im, main):
+    """The patches of asphalt the printed lines enclose, as a label image
+    with stats and centroids. `clean` has the arrows and the flag painted
+    out; red corner lines and white paint count as lines."""
+    gray = cv2.cvtColor(np.where(main[..., None] > 0, clean, im), cv2.COLOR_BGR2GRAY)
+    bg = cv2.medianBlur(gray, 21).astype(np.float32)
+    lines = (bg - gray.astype(np.float32)) > CELL_CONTRAST
+    hsv = cv2.cvtColor(clean, cv2.COLOR_BGR2HSV).astype(int)
+    H, S, V = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+    red = ((H <= 12) | (H >= 165)) & (S > 60) & (V > 60)
+    white = (S < 60) & (V >= 205)
+    cells = ((main > 0) & ~lines & ~red & ~white).astype(np.uint8)
+    cells = cv2.morphologyEx(cells, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    return cv2.connectedComponentsWithStats(cells, connectivity=4)
+
+
+def middle(xs, ys):
+    """The middle of a patch: its centroid, unless that falls off the patch
+    or near its edge, as it does for a cell bent round a hairpin -- then the
+    point well inside the patch nearest to it."""
+    x0, y0 = xs.min() - 1, ys.min() - 1
+    m = np.zeros((ys.max() - y0 + 2, xs.max() - x0 + 2), np.uint8)
+    m[ys - y0, xs - x0] = 1
+    d = cv2.distanceTransform(m, cv2.DIST_L2, 3)
+    c = np.array([xs.mean(), ys.mean()])
+    deep = d[ys - y0, xs - x0] >= 0.6 * d.max()
+    if d[int(round(c[1])) - y0, int(round(c[0])) - x0] >= 0.6 * d.max():
+        return c
+    k = np.argmin(np.hypot(xs[deep] - c[0], ys[deep] - c[1]))
+    return np.array([xs[deep][k], ys[deep][k]], float)
+
+
+def spaces_from_cells(cells, across_dir, pos, local_w, lane_w, lap, sense, origin, pit=()):
+    """A space per printed cell: its centre the middle of the patch, its lane
+    where it sits across the road, its facing square to the way across there,
+    and the spaces it touches ahead. `lap` is lap_position()'s pair.
+
+    A patch that spans more than a lane across the road is cells whose lines
+    did not show: under the painted-out flag the lane lines go, and the
+    divisions with them. It is cut up by lane, and each lane's share into as
+    many cells as it holds along the lap, all marked as guesses. A patch
+    one lane wide is one cell however big -- the outside of a bend, and the
+    inside of a hairpin, have cells twice the usual size.
+
+    The patch at or nearest one of the points in `pit` (the track proper can
+    stop short of it) is the pit road's -- one of its merge spaces, which
+    find_pit.py adds -- and is left out. Each lane's order starts at the
+    space nearest `origin`."""
+    n, lab, st, _ = cells
+    along, L = lap
+    areas = st[:, cv2.CC_STAT_AREA]
+    typical = float(np.median([areas[i] for i in range(1, n) if areas[i] >= 150]))
+    strip = np.floor(LANES * pos / local_w).astype(np.int32).clip(0, LANES - 1)
+
+    def facing(xs, ys, at):
+        """The way along the road at `at`, from the way across around it."""
+        near = np.hypot(xs - at[0], ys - at[1]) <= 8
+        out = across_dir[ys[near], xs[near]].mean(0)
+        out /= np.linalg.norm(out) + 1e-9
+        return np.array([-out[1], out[0]]) * sense
+
+    off_track = set()
+    for x, y in pit:
+        x, y, r = int(round(x)), int(round(y)), 10
+        near = np.argwhere(lab[y - r:y + r + 1, x - r:x + r + 1] > 0)
+        if len(near):
+            dy, dx = near[np.argmin(np.hypot(*(near - r).T))]
+            off_track.add(int(lab[y - r + dy, x - r + dx]))
+    spaces, labels, scraps = {}, np.zeros(lab.shape, np.int32), []
+    for i in range(1, n):
+        x, y, w, h, area = st[i]
+        if i in off_track:
+            continue
+        if area < SCRAP * typical:
+            if area >= 40:
+                scraps.append(i)
+            continue
+        ys, xs = np.nonzero(lab[y:y + h, x:x + w] == i)
+        ys, xs = ys + y, xs + x
+        lanes = strip[ys, xs]
+        across = np.percentile(pos[ys, xs], 90) - np.percentile(pos[ys, xs], 10)
+        merged = across > SIDE_BY_SIDE * lane_w
+        if merged:
+            groups = [(l, np.flatnonzero(lanes == l)) for l in np.unique(lanes)]
+            groups = [(l, g) for l, g in groups if len(g) >= SCRAP * typical]
+        else:
+            groups = [(np.bincount(lanes).argmax(), np.arange(len(xs)))]
+        parts = []
+        for l, g in groups:
+            k = max(1, int(round(len(g) / typical))) if merged else 1
+            if k == 1:
+                parts.append((l, g))
+                continue
+            # Along the lap, each pixel facing its own way: a patch round a
+            # hairpin bends through half a turn.
+            a = across_dir[ys[g], xs[g]]
+            t = along(np.c_[xs[g], ys[g]], np.c_[-a[:, 1], a[:, 0]] * sense)
+            t = (t - np.median(t) + L / 2) % L      # in one piece, wherever the lap starts
+            cuts = np.quantile(t, np.linspace(0, 1, k + 1))
+            parts += [(l, g[(t >= c0) & (t <= c1)]) for c0, c1 in zip(cuts[:-1], cuts[1:])]
+        for l, part in parts:
+            sid = len(spaces) + 1
+            mid = middle(xs[part], ys[part])
+            fwd = facing(xs[part], ys[part], mid)
+            spaces[sid] = {"pos": mid, "flow": fwd, "lane": int(l) + 1,
+                           "rot": float(np.degrees(np.arctan2(fwd[1], fwd[0]))),
+                           "along": along(mid, fwd), "guessed": merged, "next": []}
+            labels[ys[part], xs[part]] = sid
+    for l in range(1, LANES + 1):
+        lane = sorted((i for i, s in spaces.items() if s["lane"] == l), key=lambda i: spaces[i]["along"])
+        if not lane:
+            continue
+        start = min(lane, key=lambda i: np.hypot(*(spaces[i]["pos"] - origin)))
+        for i in lane:
+            spaces[i]["order"] = (spaces[i]["along"] - spaces[start]["along"]) % L
+        for i, j in zip(lane, lane[1:] + lane[:1]):
+            spaces[i]["next"].append(j)
+    link_across(spaces, labels)
+    return spaces, labels, typical, scraps
 
 
 # 7. The track file ------------------------------------------------------------------
 
-def write_track(info, im, spaces, line, reverse, path):
+def write_track(info, im, spaces, line, reverse, read, path):
     """Spaces lane by lane, each lane in running order, with its links ahead.
 
     A track file that has been edited by hand is never overwritten: the
@@ -556,7 +722,7 @@ def write_track(info, im, spaces, line, reverse, path):
         "image": {"width": im.shape[1], "height": im.shape[0]},
         "lanes": LANES,
         "laps": 2,
-        "detect": {"reverse": bool(reverse), "tool": "find_grid.py"},
+        "detect": {"reverse": bool(reverse), "tool": "find_grid.py", "read": read},
         "edited": False,
         "spaces": out,
         "corners": [],
@@ -607,6 +773,89 @@ def main():
     print("3. %d red corner-line pixels redrawn as thin grey lines; road wider than usual on %d px"
           % (n_red, widened))
 
+    # How this board is read, and which way round it runs: as passed, or as
+    # the last run on it was.
+    from detect_track import ROOT
+    import json
+    existing = ROOT / "tracks" / f"{map_id}.json"
+    detect = {}
+    if existing.exists():
+        detect = json.loads(existing.read_text(encoding="utf-8")).get("detect", {})
+    reverse = "--reverse" in sys.argv or detect.get("reverse", False)
+    read = "cells" if "--cells" in sys.argv else detect.get("read", "rungs")
+    if read == "cells":
+        spaces, labels = cells_steps(map_id, im, clean, main, across_dir, pos, local_w, lane_w, line, tangent,
+                                     reverse, name)
+    else:
+        spaces, labels = rungs_steps(map_id, grey, main, flag, across_dir, pos, local_w, lane_w, line, tangent,
+                                     reverse, name)
+    per = [sum(1 for s in spaces.values() if s["lane"] == l) for l in range(1, LANES + 1)]
+    guessed = sum(1 for s in spaces.values() if s["guessed"])
+    print("6. cells %d -- per lane %s; %d %s"
+          % (len(spaces), per, guessed, "cut from a patch of several" if read == "cells"
+             else "rest on a guessed division"))
+    np.savez(OUT / f"{map_id}_spaces.npz",
+             ids=np.array(list(spaces)), pos=np.array([s["pos"] for s in spaces.values()]),
+             rot=np.array([s["rot"] for s in spaces.values()]),
+             lane=np.array([s["lane"] for s in spaces.values()]))
+
+    colours = [(0, 200, 255), (0, 220, 90), (255, 140, 0)]
+    overlay = np.zeros_like(grey)
+    for i, s in spaces.items():
+        overlay[labels == i] = colours[(s["lane"] - 1) % 3]
+    vis = cv2.addWeighted(grey, 0.5, overlay, 0.5, 0)
+    for i, s in spaces.items():
+        c = tuple(s["pos"].round().astype(int))
+        for j in s["next"]:
+            cv2.line(vis, c, tuple(spaces[j]["pos"].round().astype(int)), (60, 60, 60), 1)
+    for i, s in spaces.items():
+        c = tuple(s["pos"].round().astype(int))
+        cv2.circle(vis, c, 3, (255, 0, 255) if s["guessed"] else (255, 255, 255), -1)
+        a = np.radians(s["rot"])
+        cv2.line(vis, c, (int(c[0] + 10 * np.cos(a)), int(c[1] + 10 * np.sin(a))), (255, 255, 255), 1)
+    cv2.imwrite(str(name("6_spaces")), vis)
+
+    # 7. The track file
+    track_path = ROOT / "tracks" / f"{map_id}.json"
+    if write_track(info, im, spaces, line, reverse, read, track_path):
+        print("7. %d spaces -> %s" % (len(spaces), track_path.relative_to(ROOT)))
+    else:
+        print("7. %s has been edited by hand; left as it is" % track_path.relative_to(ROOT))
+    if map_id == "FDMonaco":
+        for label, box in MONACO_CROPS.items():
+            cv2.imwrite(str(WORK / f"{map_id}_6_spaces_{label}.png"), crop(vis, box))
+    return 0
+
+
+# Close-ups of Monaco's trickiest corners, for the step images.
+MONACO_CROPS = {"loews": (1850, 80, 2330, 520), "grid": (100, 480, 420, 1020),
+                "chicane": (780, 480, 1250, 800), "rascasse": (250, 950, 650, 1350)}
+
+
+def cells_steps(map_id, im, clean, main, across_dir, pos, local_w, lane_w, line, tangent, reverse, name):
+    """Steps 4-6 read as cells (--cells): the patches the printed lines enclose."""
+    from find_pit import READING        # find_pit builds on this module
+    cells = printed_cells(clean, im, main)
+    lap = lap_position(line, tangent, reverse)
+    spaces, labels, typical, scraps = spaces_from_cells(cells, across_dir, pos, local_w, lane_w, lap,
+                                                        lap_sense(line, reverse), line[0],
+                                                        READING.get(map_id, {}).get("merges", ()))
+    n, lab, st, _ = cells
+    print("4-5. %d patches of asphalt between the printed lines; a cell is %.0f px; %d scraps left out"
+          % (n - 1, typical, len(scraps)))
+    vis = cv2.addWeighted(im, 0.4, np.full_like(im, 255), 0.6, 0)
+    np.random.seed(1)
+    tint = np.random.randint(40, 230, (n, 3)).astype(np.uint8)
+    on = lab > 0
+    vis[on] = tint[lab[on]]
+    for i in scraps:
+        vis[lab == i] = (0, 0, 255)
+    cv2.imwrite(str(name("5_cells")), vis)
+    return spaces, labels
+
+
+def rungs_steps(map_id, grey, main, flag, across_dir, pos, local_w, lane_w, line, tangent, reverse, name):
+    """Steps 4-6 read as rungs: the divisions across each lane."""
     skel, ink = grid_skeleton(grey, main, flag)
     across, along = split_lines(skel, across_dir)
     print("4. skeleton %d px: %d across the road, %d along it"
@@ -615,13 +864,6 @@ def main():
     vis[cv2.dilate(along, np.ones((2, 2), np.uint8)) > 0] = (255, 160, 0)
     vis[cv2.dilate(across, np.ones((2, 2), np.uint8)) > 0] = (0, 220, 0)
     cv2.imwrite(str(name("4_lines")), vis)
-
-    from detect_track import ROOT
-    import json
-    existing = ROOT / "tracks" / f"{map_id}.json"
-    reverse = False
-    if existing.exists():
-        reverse = json.loads(existing.read_text(encoding="utf-8")).get("detect", {}).get("reverse", False)
 
     rungs = find_rungs(across, pos, local_w, lane_w, flag)
     by_lane = order_rungs(rungs, line, tangent, reverse, lap_sense(line, reverse))
@@ -648,47 +890,10 @@ def main():
         cv2.line(vis, (c[0] - 5, c[1] - 5), (c[0] + 5, c[1] + 5), (0, 0, 255), 2)
         cv2.line(vis, (c[0] - 5, c[1] + 5), (c[0] + 5, c[1] - 5), (0, 0, 255), 2)
     cv2.imwrite(str(name("5_rungs")), vis)
-    for label, box in {"loews": (1850, 80, 2330, 520), "grid": (100, 480, 420, 1020),
-                       "chicane": (780, 480, 1250, 800), "rascasse": (250, 950, 650, 1350)}.items():
-        cv2.imwrite(str(WORK / f"{map_id}_5_rungs_{label}.png"), crop(vis, box))
-
-    # 6. Spaces
-    spaces, labels = spaces_from_rungs(by_lane, main.shape, line[0])
-    per = [sum(1 for s in spaces.values() if s["lane"] == l) for l in range(1, LANES + 1)]
-    guessed = sum(1 for s in spaces.values() if s["guessed"])
-    print("6. cells %d -- per lane %s; %d rest on a guessed division"
-          % (len(spaces), per, guessed))
-    np.savez(OUT / f"{map_id}_spaces.npz",
-             ids=np.array(list(spaces)), pos=np.array([s["pos"] for s in spaces.values()]),
-             rot=np.array([s["rot"] for s in spaces.values()]),
-             lane=np.array([s["lane"] for s in spaces.values()]))
-
-    colours = [(0, 200, 255), (0, 220, 90), (255, 140, 0)]
-    overlay = np.zeros_like(grey)
-    for i, s in spaces.items():
-        overlay[labels == i] = colours[(s["lane"] - 1) % 3]
-    vis = cv2.addWeighted(grey, 0.5, overlay, 0.5, 0)
-    for i, s in spaces.items():
-        c = tuple(s["pos"].round().astype(int))
-        for j in s["next"]:
-            cv2.line(vis, c, tuple(spaces[j]["pos"].round().astype(int)), (60, 60, 60), 1)
-    for i, s in spaces.items():
-        c = tuple(s["pos"].round().astype(int))
-        cv2.circle(vis, c, 3, (255, 0, 255) if s["guessed"] else (255, 255, 255), -1)
-        a = np.radians(s["rot"])
-        cv2.line(vis, c, (int(c[0] + 10 * np.cos(a)), int(c[1] + 10 * np.sin(a))), (255, 255, 255), 1)
-    cv2.imwrite(str(name("6_spaces")), vis)
-
-    # 7. The track file
-    track_path = ROOT / "tracks" / f"{map_id}.json"
-    if write_track(info, im, spaces, line, reverse, track_path):
-        print("7. %d spaces -> %s" % (len(spaces), track_path.relative_to(ROOT)))
-    else:
-        print("7. %s has been edited by hand; left as it is" % track_path.relative_to(ROOT))
-    for label, box in {"loews": (1850, 80, 2330, 520), "grid": (100, 480, 420, 1020),
-                       "chicane": (780, 480, 1250, 800), "rascasse": (250, 950, 650, 1350)}.items():
-        cv2.imwrite(str(WORK / f"{map_id}_6_spaces_{label}.png"), crop(vis, box))
-    return 0
+    if map_id == "FDMonaco":
+        for label, box in MONACO_CROPS.items():
+            cv2.imwrite(str(WORK / f"{map_id}_5_rungs_{label}.png"), crop(vis, box))
+    return spaces_from_rungs(by_lane, main.shape, line[0])
 
 
 if __name__ == "__main__":

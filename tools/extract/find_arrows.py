@@ -44,7 +44,7 @@ import numpy as np
 from skimage.morphology import skeletonize
 
 from detect_track import OUT, board_image, edge_line, racing_line, surface_mask
-from find_grid import track_only, track_proper
+from find_grid import ARROW_EXTENT, track_only, track_proper
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -90,6 +90,7 @@ def arrow_ink(im):
     n, lab, st, cen = cv2.connectedComponentsWithStats(core, 8)
     keep = [i for i in range(1, n)
             if st[i, cv2.CC_STAT_AREA] >= MIN_AREA and thick[lab == i].max() >= MIN_THICK
+            and max(st[i, cv2.CC_STAT_WIDTH], st[i, cv2.CC_STAT_HEIGHT]) <= ARROW_EXTENT
             and main[int(cen[i][1]), int(cen[i][0])] > 0]
     return lab, keep
 
@@ -452,11 +453,43 @@ def from_reading(track, reading, cell):
                 cost[(a, s["id"])] = far / cell
         pairs = matching(sources, targets, order, cost)
         for a in sources:
+            if a not in pairs:
+                level = level_target(a, sources, pairs, lane + side, spaces, sp, order, cell)
+                if level is not None:
+                    pairs[a] = level
+        for a in sources:
             if a in pairs:
                 out.add((a, pairs[a]))
             else:
                 dropped.append((a, None, "read as a fork, but no space is free for it"))
     return sorted(out), dropped
+
+
+def level_target(a, sources, pairs, lane, spaces, sp, order, cell):
+    """A space in `lane` squarely alongside `a`, for a fork the reading is
+    sure of that found nothing ahead to take.
+
+    At a hairpin's exit the lane on the inside has cells twice as long, and
+    the one the arrow points into starts level with this space and reaches
+    well ahead of it (Austin's Turns 1, 5 and 7). Only a space that no other
+    fork has taken, and that keeps the links in order with the forks either
+    side, will do; the nearest of those."""
+    here = order.get(a, 0)
+    before = [order.get(pairs[s], 0) for s in sources if s in pairs and order.get(s, 0) < here]
+    after = [order.get(pairs[s], 0) for s in sources if s in pairs and order.get(s, 0) > here]
+    lo, hi = max(before, default=-1), min(after, default=float("inf"))
+    taken = set(pairs.values())
+    best, best_d = None, None
+    for s in spaces:
+        if s["lane"] != lane or s["id"] in taken or not lo < order.get(s["id"], 0) < hi:
+            continue
+        v = np.array(s["pos"], float) - sp[a]["pos"]
+        far = float(np.hypot(*v))
+        if abs(np.dot(v, facing(sp[a]))) >= MIN_AHEAD * cell or far > TOUCHING * cell:
+            continue
+        if best_d is None or far < best_d:
+            best, best_d = s["id"], far
+    return best
 
 
 def cell_length(track):

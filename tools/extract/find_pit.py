@@ -70,6 +70,13 @@ READING = {
         "boxes": ["white", "white", "yellow", "yellow", "green", "green", "red", "red", "blue", "blue"],
         "rows": (570, 1356),  # image rows the pit road's wall runs through
     },
+    "FDAustin": {
+        "ends": [[[280.0, 959.5], [265.0, 979.5]], [[640.0, 1205.0], [627.0, 1225.0]]],
+        "merges": [[222.0, 940.0], [665.0, 1245.0]],
+        "first_box": 1,
+        "boxes": ["white", "white", "yellow", "yellow", "green", "green", "red", "red", "blue", "blue"],
+        "rows": (940, 1230),
+    },
 }
 
 # The two seats sharing each printed team colour, in running order: the
@@ -88,6 +95,7 @@ DARK = 10       # grey levels any printed line sits below the asphalt around it
 SEAM = 4        # px: as far as a grid line runs across; a wall is wider
 TOUCH = 30      # px of another cell within SEAM of a merge space's: a shared edge
 GARAGE = (14, 62)   # px out from a pit box's centre that its garage lies within
+ON_LINE = 8     # px: a division this near the middle of the finish band lies under it
 
 
 def lavender(hsv):
@@ -98,13 +106,20 @@ def lavender(hsv):
 
 
 def pit_road(im):
-    """The road off the track proper: the pit road, plus scraps beside it."""
+    """The road off the track proper: the pit road's asphalt. Only the
+    lavender: the road mask can take in the garages, and on Austin the crowd
+    beyond them, which would pass for the wall."""
     _, road = track_only(im)
     line, _, width = racing_line(im)
     main = track_proper(road, line, width)
     pit = ((road > 0) & ~(cv2.dilate(main, np.ones((9, 9), np.uint8)) > 0)).astype(np.uint8)
-    n, lab, st, _ = cv2.connectedComponentsWithStats(pit, 8)
-    return lab == 1 + int(np.argmax(st[1:, 4])), road
+    for asphalt_only in (False, True):
+        if asphalt_only:
+            pit &= lavender(cv2.cvtColor(im, cv2.COLOR_BGR2HSV).astype(int))
+            pit = cv2.morphologyEx(pit, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+        n, lab, st, _ = cv2.connectedComponentsWithStats(pit, 8)
+        pit = (lab == 1 + int(np.argmax(st[1:, 4]))).astype(np.uint8)
+    return pit > 0, road
 
 
 def middle_line(pit, rows, toward):
@@ -230,16 +245,19 @@ def garage(im, cells):
     `out` points from the pit lane towards the garages. The garage is the
     largest patch of its colour within GARAGE of the boxes -- the cars drawn
     in the boxes are its colour too, but nearer -- and the white team's,
-    grey but warm, is told from the pavement by being less saturated."""
+    grey but warm, is told from the pavement by its hue and by being less
+    saturated. (Austin's is paler than Monaco's.)"""
     hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV).astype(int)
     seeds = [np.round(c + o * np.mean(GARAGE)).astype(int) for c, _, o in cells]
     seed = np.median([hsv[y, x] for x, y in seeds], axis=0)
     h, sat, val = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+    dh = np.minimum(abs(h - seed[0]), 180 - abs(h - seed[0]))
     if seed[1] > 100:
-        dh = np.minimum(abs(h - seed[0]), 180 - abs(h - seed[0]))
         colour = (dh < 10) & (sat > 110)
     else:
-        colour = (abs(h - seed[0]) <= 4) & (sat > 25) & (sat < 52) & (val > 140)
+        # The paler the grey, the less its hue says: Austin's spreads twice
+        # as wide as Monaco's, though still short of the pavement's.
+        colour = (dh <= (4 if seed[1] >= 25 else 8)) & (sat > min(25, seed[1] - 8)) & (sat < 52) & (val > 140)
     ys, xs = np.mgrid[0:im.shape[0], 0:im.shape[1]]
     band = np.zeros(colour.shape, bool)
     length = np.linalg.norm(cells[-1][0] - cells[0][0]) / max(len(cells) - 1, 1)
@@ -248,6 +266,9 @@ def garage(im, cells):
         a, b = dx * f[0] + dy * f[1], dx * o[0] + dy * o[1]
         band |= (abs(a) <= length) & (b >= GARAGE[0]) & (b <= GARAGE[1])
     mask = cv2.morphologyEx((colour & band).astype(np.uint8), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    # A garage printed as bays with dark lines between (Austin's white one)
+    # comes apart in stripes: close them up into the one garage.
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8)) & band
     n, lab, st, _ = cv2.connectedComponentsWithStats(mask, 8)
     if n < 2:
         return None
@@ -342,13 +363,16 @@ def main():
     rots.append(mean_rot(exits))
 
     # The band, carried on across the pit road, crosses one cell: that one
-    # is the pit lane's space on the line.
+    # is the pit lane's space on the line. Where it lies along a division
+    # instead (Austin's), the space on the line is the cell just past it, as
+    # on the track.
     line_spaces = [by_id[v] for v in track.get("finish", {}).get("line", []) if v in by_id]
     if not line_spaces:
         sys.exit("no finish line in %s -- run find_corners.py first" % path.relative_to(ROOT))
     c, d = band_line(im, road, line_spaces)
-    side = [(p - c)[0] * d[1] - (p - c)[1] * d[0] for p in pts[cuts]]
-    on_line = next((k + 1 for k in range(len(side) - 1) if side[k] * side[k + 1] <= 0), None)
+    side = np.array([(p - c)[0] * d[1] - (p - c)[1] * d[0] for p in pts[cuts]])
+    side *= np.sign(side[-1] - side[0])          # + is past the band, in running order
+    on_line = next((k for k in range(1, len(side)) if side[0] < 0 < side[k] - ON_LINE), None)
     line_sector, before = exits[0]["sector"], entries[0]["sector"]
 
     spaces = []
@@ -371,6 +395,18 @@ def main():
           % (len(spaces), ids[0], ids[-1], ", ".join(entry_ids), ", ".join(exit_ids)))
 
     boxes = [{"beside": ids[rd["first_box"] + i], "colour": col} for i, col in enumerate(rd["boxes"])]
+    # Which side of the pit lane the garages are on: Monaco's lie between it
+    # and the track, away from the wall; Austin's along the wall. It is the
+    # side where the ground beside the pit boxes is coloured.
+    sat = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)[..., 1]
+
+    def beside(b, sign):
+        """The pit box's cell centre, and the way out of it to the side `sign`."""
+        k = ids.index(b["beside"])                    # printed cell k: cuts[k - 1] to cuts[k]
+        mid = (cuts[k - 1] + cuts[k]) // 2
+        return np.array(spaces[k]["pos"]), nrms[mid] * sign
+    garage_side = max((1, -1), key=lambda sign: np.median([
+        sat[tuple(np.round(p + o * np.mean(GARAGE)).astype(int)[::-1])] for p, o in (beside(b, sign) for b in boxes)]))
     # Each team's two boxes: a seat and half the garage each.
     teams = {}
     for b in boxes:
@@ -378,10 +414,9 @@ def main():
     for colour, team in teams.items():
         cells = []
         for b in team:
-            k = ids.index(b["beside"])                # printed cell k: cuts[k - 1] to cuts[k]
-            mid = (cuts[k - 1] + cuts[k]) // 2
-            a = np.radians(rots[k])
-            cells.append((np.array(spaces[k]["pos"]), np.array([np.cos(a), np.sin(a)]), nrms[mid]))
+            a = np.radians(rots[ids.index(b["beside"])])
+            at, out = beside(b, garage_side)
+            cells.append((at, np.array([np.cos(a), np.sin(a)]), out))
         halves = garage(im, cells)
         if halves is None:
             sys.exit("no %s garage found beside %s" % (colour, ", ".join(b["beside"] for b in team)))

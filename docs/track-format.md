@@ -1,7 +1,7 @@
 # Track data format
 
-*Monaco is the first track through the pipeline; its grid, finish line and
-pit lane are all marked.*
+*Monaco and Austin have been through the pipeline; their grids, finish
+lines and pit lanes are all marked.*
 
 Everything in objectives 3 and 5 (snapping, facings, movement limits,
 highlighting) reduces to one problem: the mod has no idea where the spaces are.
@@ -116,7 +116,8 @@ with the codes.
 
 Where the pit lane runs past the line, it has a space on the line too: the
 pit cell the checkered band would cross if it were carried on over the pit
-road. A car leaving the pits crosses the line there.
+road -- or, where the band would lie along a division (Austin), the cell
+just past it. A car leaving the pits crosses the line there.
 
 ## The pit lane
 
@@ -140,6 +141,10 @@ Each printed colour is shared by the two seats nearest it in hue -- white
 by White and Brown, yellow by Yellow and Orange, green by Green and Teal,
 red by Red and Pink, blue by Blue and Purple -- the first cell of the
 colour going to the first seat.
+
+The garages can lie on either side of the pit lane: on Monaco between it
+and the track, on Austin along its wall. `find_pit.py` takes the side
+where the ground beside the pit lane is coloured.
 
 A pit box is a space of its own (`b.<sector>.<n>`, `pit`, with `box` the
 seat it belongs to), at the middle of its garage half. It links both ways
@@ -176,6 +181,9 @@ the key on a space already on the grid takes it off; **Clear the grid** on
 the board's right-click menu starts again. `import_track.py` brings the list
 out with the rest of the edits.
 
+Where the grid boxes are printed with their numbers, as on Austin, the
+list can be read straight off the board into the track file instead.
+
 A fresh scan from `find_grid.py` has plain numbers for ids until
 `find_corners.py` runs; that step renames every link and the arrow reading in
 `tracks/<id>.arrows.json` to match. A space added in the editor is named
@@ -197,6 +205,21 @@ corner lines as grid lines, and cuts the road along its printed lines so each
 cell comes out as one piece. A cell's lane comes from where it sits on its own
 chord across the road, which stays right through corners where a traced racing
 line drifts.
+
+Boards differ in how the grid is printed. Monaco's is pale, and is read as
+rungs: the divisions across each lane, with gaps filled in where one is too
+faint to see. Austin's is printed dark and crisp, and reads better as cells
+(`--cells`): each patch of asphalt the lines enclose is a space. A patch
+spanning more than a lane is cells whose lines were painted out with the
+flag, and is cut up by lane and along the lap; one lane wide it is one cell
+however long, since the inside of a hairpin and the outside of a bend have
+cells twice the usual size. The choice is kept in the track file's
+`detect.read`, with `detect.reverse` for which way round the lap runs, so a
+rerun reads the board the same way.
+
+Austin's board also prints its run-off and service roads in the same grey
+as the track, but warm where the asphalt is cool, so only the cool grey
+counts as road (`detect_track.asphalt`).
 
 `tools/extract/find_corners.py` then finds the corners: it cuts the road along
 the red lines painted across it, which leaves a ring of pieces that are corners
@@ -239,6 +262,12 @@ Within one lane's run through a corner, then, the forks pair off with the lane
 beside them in order. Where the lanes have different numbers of spaces some
 space has to go without a fork, and the board prints a single arrow on exactly
 that one -- which is how a misread fork shows itself.
+
+A fork normally lands on a space ahead of it. The one exception is a
+hairpin's exit, where the lane on the inside has cells twice as long, and
+the one an arrow points into starts level with the fork. A fork the reading
+is sure of that finds nothing ahead may take a space squarely alongside, if
+no other fork has it and the links stay in order (Austin's Turns 1, 5 and 7).
 
 Elsewhere links are worked out from positions and facings
 (`fd.core.trackgraph`), the same rules the in-game editor uses; a space whose

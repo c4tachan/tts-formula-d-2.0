@@ -59,6 +59,16 @@ def board_image(map_id):
 
 
 
+def asphalt(hsv):
+    """Grey enough to be the track's asphalt, which is printed a cool
+    lavender grey. The run-off and service roads round some boards (Austin's)
+    are as grey and as bright, but warm -- olive to sand -- and joined onto
+    the track they swallow it."""
+    H, S, V = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+    warm = (H >= 10) & (H <= 75) & (S >= 12)
+    return (S < 50) & (V > 105) & (V < 205) & ~warm
+
+
 def road_mask(im):
     """The asphalt ribbon.
 
@@ -72,7 +82,7 @@ def road_mask(im):
     """
     hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV).astype(int)
     S, V = hsv[..., 1], hsv[..., 2]
-    grey = ((S < 50) & (V > 105) & (V < 205)).astype(np.uint8) * 255
+    grey = asphalt(hsv).astype(np.uint8) * 255
     white = ((S < 60) & (V >= 205)).astype(np.uint8) * 255
     white = cv2.dilate(white, np.ones((3, 3), np.uint8))
     m = cv2.morphologyEx(grey, cv2.MORPH_CLOSE, np.ones((9, 9), np.uint8))
@@ -151,9 +161,29 @@ def path(pred, a, b):
     return out[::-1]
 
 
-def find_cycle(points, extra=()):
+def without_spurs(points, extra=()):
+    """The indices of the points that lie on a loop: the skeleton with every
+    spur pruned back, end by end, to where it branches off."""
+    adj = {i: set() for i in range(len(points))}
+    for i, j in list(cKDTree(points).query_pairs(1.5)) + list(extra):
+        adj[i].add(j)
+        adj[j].add(i)
+    tips = [i for i in adj if len(adj[i]) <= 1]
+    while tips:
+        i = tips.pop()
+        for j in adj.pop(i, ()):
+            adj[j].discard(i)
+            if len(adj[j]) == 1:
+                tips.append(j)
+    return np.array(sorted(adj))
+
+
+def find_cycle(points, extra=(), pruned=False):
     """The loop through `points`: two independent shortest paths between the
-    two most distant points, which together close the ring."""
+    two most distant points, which together close the ring.
+
+    The most distant point can be the tip of a spur, and there is no second
+    way back from a dead end. Then the spurs are pruned and it goes again."""
     g = graph_of(points, extra=extra)
     d0, p0 = dijkstra(g, indices=0, return_predecessors=True)
     finite = np.isfinite(d0)
@@ -174,6 +204,12 @@ def find_cycle(points, extra=()):
     g2 = graph_of(points[idx], extra=remapped)
     d2, p2 = dijkstra(g2, indices=remap[a], return_predecessors=True)
     second = path(p2, remap[a], remap[b])
+    if second is None and not pruned:
+        core = without_spurs(points, extra)
+        at = -np.ones(len(points), int)
+        at[core] = np.arange(len(core))
+        return find_cycle(points[core], [(at[i], at[j]) for i, j in extra if at[i] >= 0 and at[j] >= 0],
+                          pruned=True)
     if second is None:
         return points[first]
     second = idx[second]
@@ -242,7 +278,7 @@ def surface_mask(im):
     """
     hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV).astype(int)
     S, V = hsv[..., 1], hsv[..., 2]
-    grey = ((S < 50) & (V > 105) & (V < 205)).astype(np.uint8)
+    grey = asphalt(hsv).astype(np.uint8)
     white = ((S < 60) & (V >= 205)).astype(np.uint8)
     kerbs = keep_long(white, 60)
     marks = interior_marks(grey, (white - kerbs).astype(np.uint8))
@@ -484,6 +520,11 @@ def outer_edge(edge_pixels, line, norm, side, width, reverse, step=6.0, jump=2.5
 def racing_line(im):
     """The middle of the road, as one closed loop, plus the road width."""
     mask = road_mask(im)
+    # Thin white grid lines can speckle the asphalt (Austin's); closing the
+    # specks keeps the skeleton in one piece without welding passes together.
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7)))
+    n, lab, st, _ = cv2.connectedComponentsWithStats((mask == 0).astype(np.uint8), 4)
+    mask[np.isin(lab, [i for i in range(1, n) if st[i, 4] < 400])] = 1
     dist = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
     skel = skeletonize(mask > 0)
     # The pit road is one lane wide (~25 px on Monaco) and the track three
@@ -491,11 +532,88 @@ def racing_line(im):
     keep = skel & (dist * 2 > 35)
     lab = cv2.connectedComponents(keep.astype(np.uint8), 8)[1]
     sizes = np.bincount(lab[keep])
-    pts = np.argwhere(lab == int(np.argmax(sizes[1:])) + 1)
+    # The start/finish band always breaks the line, and on a busy board a
+    # corner line or two can as well (Austin's Turn 7): keep every sizeable
+    # piece, not just the longest, and let bridge_ends() join them up.
+    pieces = [i for i in range(1, len(sizes)) if sizes[i] >= 0.05 * sizes[1:].max()]
+    pts = np.argwhere(np.isin(lab, pieces))
     loop = find_cycle(pts, extra=bridge_ends(pts))
     line, length = resample(loop, 3.0)
     width = float(np.median([dist[int(round(y)), int(round(x))] * 2 for x, y in line]))
-    return smooth_closed(line, 7), length, width
+    return centre_line(smooth_closed(line, 7), road_surface(im, red=False), width), length, width
+
+
+def centre_line(line, surface, width, off=0.6, reach=0.45, widest=1.3, win=15, passes=2):
+    """Put the racing line back in the middle of the road where it has
+    strayed well off it.
+
+    The skeleton the line comes from runs through the asphalt alone, and
+    where a corner is thick with arrows (Austin's Turn 8) that is holes
+    enough to send it round one edge. The middle of the road is the ridge of
+    the solid surface's distance to its edge, looked for across the road
+    from each point -- `reach` of a road's width either side, but never past
+    the road's edge, or a hairpin's other leg would do. A point with less
+    than `off` of the ridge's distance is moved onto it, unless the road is
+    more than `widest` road widths across there: that is a pit lane opening
+    off the side, and its middle is no guide. The moves are eased in along
+    the lap, which leaves the ends of a long run short of the ridge; a
+    second pass takes them the rest of the way."""
+    d = cv2.distanceTransform((surface > 0).astype(np.uint8), cv2.DIST_L2, 5)
+    H, W = d.shape
+    steps = np.arange(-1.2 * width, 1.2 * width + 1, 1.0)
+    zero = int(np.argmin(np.abs(steps)))
+    near = np.abs(steps) <= reach * width
+    for _ in range(passes):
+        nrm = normals(line)
+        move = np.zeros(len(line))
+        for i, (p, n) in enumerate(zip(line, nrm)):
+            q = np.round(p + steps[:, None] * n).astype(int)
+            q[:, 0] = q[:, 0].clip(0, W - 1)
+            q[:, 1] = q[:, 1].clip(0, H - 1)
+            v = d[q[:, 1], q[:, 0]]
+            if v[zero] <= 0:
+                continue
+            lo, hi = zero, zero
+            while lo > 0 and v[lo - 1] > 0:
+                lo -= 1
+            while hi < len(v) - 1 and v[hi + 1] > 0:
+                hi += 1
+            if steps[hi] - steps[lo] > widest * width:
+                continue
+            look = np.flatnonzero(near[lo:hi + 1]) + lo
+            k = look[int(np.argmax(v[look]))]
+            if v[zero] < off * v[k]:
+                move[i] = steps[k]
+        if not move.any():
+            break
+        # Ease each move in and out over its neighbours, so the line bends
+        # onto the ridge rather than stepping.
+        around = np.arange(-win, win + 1)
+        grown = np.array([move[(i + around) % len(move)][np.abs(move[(i + around) % len(move)]).argmax()]
+                          for i in range(len(move))])
+        line = line + nrm * smooth_closed(grown, win)[:, None]
+    return line
+
+
+def road_surface(im, red=True):
+    """The road as one solid shape: asphalt and what is painted on it, the
+    kerbs, verges and scenery removed, and every mark enclosed by the road
+    (arrows, grid boxes, the start band) filled in. With `red`, the red
+    corner lines are road too -- and so, here and there, a red kerb, which
+    can join the two legs of a hairpin (Monaco's Loews)."""
+    hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV).astype(int)
+    S, V = hsv[..., 1], hsv[..., 2]
+    kerbs = cv2.dilate(keep_long((S < 60) & (V >= 205), 60), np.ones((3, 3), np.uint8))
+    m = surface_mask(im) | (corner_lines(im) if red else 0)
+    m = cv2.morphologyEx(m.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8))
+    m[kerbs > 0] = 0
+    n, lab, st, _ = cv2.connectedComponentsWithStats(m, 8)
+    m = (lab == 1 + int(np.argmax(st[1:, 4]))).astype(np.uint8)
+    n, lab, st, _ = cv2.connectedComponentsWithStats((1 - m).astype(np.uint8), 4)
+    for i in range(1, n):
+        if st[i, 4] < 3000:
+            m[lab == i] = 1
+    return m
 
 
 def link(keep, info, lane, reverse, n_steps, reach=45):
