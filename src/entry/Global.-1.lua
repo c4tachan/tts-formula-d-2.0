@@ -35,6 +35,7 @@ local placeOnGrid -- likewise
 local spaceUnder -- likewise
 local showReach -- likewise
 local clearReach -- likewise
+local reachShown = nil -- whose move the marks on the board are for
 local useBoardTrack -- likewise
 local drawPits -- likewise
 local joinAt -- with the dashboard buttons, below
@@ -1399,6 +1400,11 @@ function fdSetupLaps(player, value)
     end
     printToAll(player.steam_name .. " sets the race distance", LEVEL_RGB.info)
     act(function() race:setLaps(laps) end)
+    -- Whether the pit lane is open goes by the distance: marks still out
+    -- are drawn again.
+    if reachShown then
+        showReach(reachShown)
+    end
 end
 
 --- A new map is on the board. Reloading the tile took the race panel with
@@ -1668,8 +1674,9 @@ end
 
 --- Mark where the car of `color` can end the move it has just opened: a
 -- green ring for the full roll, amber dots for braking, orange for an
--- overshoot and red for going out. Advisory: nothing stops a car going
--- anywhere else.
+-- overshoot and red for going out; and a red cross on each space the move
+-- is blocked from -- by cars in the way, or a pit lane shut to it.
+-- Advisory: nothing stops a car going anywhere else.
 showReach = function(color)
     local tile, track = boardTrack()
     local reach = track and race:reachable(color, track)
@@ -1677,6 +1684,7 @@ showReach = function(color)
         clearReach()
         return
     end
+    reachShown = color
     local from = race:car(color).move.from
     local marks = {}
     for id, o in pairs(reach) do
@@ -1692,10 +1700,14 @@ showReach = function(color)
             marks[#marks + 1] = { id = id, kind = kind }
         end
     end
+    for _, id in ipairs(race:blockedSpaces(color, track, reach)) do
+        marks[#marks + 1] = { id = id, kind = "blocked" }
+    end
     Track.setLayer("reach", Track.marks(tile, track, marks))
 end
 
 clearReach = function()
+    reachShown = nil
     Track.setLayer("reach", nil)
 end
 

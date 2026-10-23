@@ -940,6 +940,25 @@ local function redOn(S, id)
     return mine
 end
 
+function T.a_car_put_down_in_its_pit_box_makes_its_pit_stop()
+    local S = redRacing()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local box = nil
+    for _, b in ipairs(FDMonaco.pit.boxes) do
+        if b.player == "Red" then box = b end
+    end
+    local before = nil
+    for i, id in ipairs(FDMonaco.pit.spaces) do
+        if id == box.beside then before = FDMonaco.pit.spaces[i - 1] end
+    end
+    local mine = redOn(S, before)
+    roll(S, 1, 2)
+    putNear(S, mine, FDMonaco.byId[box.space])
+    eq(state().cars.Red.space, box.space, "settled into the box")
+    eq(state().cars.Red.maxGear, 4, "out in 4th at most")
+    assert(S.logged("pits: wear restored"))
+end
+
 function T.a_car_put_down_after_its_roll_is_charged_for_the_move()
     local S = redRacing()
     local FDMonaco = require("fd.data.tracks.FDMonaco")
@@ -988,6 +1007,38 @@ function T.a_roll_marks_where_the_car_can_go()
     -- The next shift starts a turn: the marks go.
     dropOn(S, S.find("Gear Stick"), "gear", 2)
     eq(#S.board.lines, pitLines(S), "only the pit boxes are left")
+end
+
+function T.a_blocked_space_is_crossed_out()
+    local S = world()
+    local Track = require("fd.tts.track")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local id = FDMonaco.pit.spaces[3]
+    local lines = Track.marks(S.board, FDMonaco, { { id = id, kind = "blocked" } })
+    eq(#lines, 2, "two strokes")
+    local s = FDMonaco.byId[id]
+    local mid = Track.localOf(S.board, FDMonaco, s.pos[1], s.pos[2])
+    for _, l in ipairs(lines) do
+        local a, b = l.points[1], l.points[2]
+        assert(math.abs((a.x + b.x) / 2 - mid.x) < 1e-9 and math.abs((a.z + b.z) / 2 - mid.z) < 1e-9,
+            "crossing on the space")
+    end
+end
+
+function T.changing_the_distance_redraws_the_marks()
+    local S = redRacing()
+    redOn(S, "m.s2.5")
+    roll(S, 1, 2)
+    local before = S.board.lines
+    assert(marksOn(S).free > 0)
+    fdSetupLaps({ color = "Red", steam_name = "host" }, "2")
+    assert(S.board.lines ~= before, "drawn again")
+    eq(marksOn(S).free, 3)
+    -- With no marks out, nothing is drawn.
+    dropOn(S, S.find("Gear Stick"), "gear", 2)
+    eq(marksOn(S).free, 0)
+    fdSetupLaps({ color = "Red", steam_name = "host" }, "1")
+    eq(marksOn(S).free, 0)
 end
 
 function T.marks_and_the_track_overlay_share_the_board()

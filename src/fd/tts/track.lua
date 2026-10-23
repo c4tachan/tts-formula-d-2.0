@@ -251,16 +251,18 @@ function Track.overlay(tile, track, flagged, links)
 end
 
 -- Marks on single spaces, by kind: rings where a move can end, small dots
--- where it only gets by braking. In image pixels.
+-- where it only gets by braking, crosses where it gets but is blocked.
+-- In image pixels.
 local MARKS = {
     free = { colour = { 0.25, 1, 0.35 }, radius = 13 },
     brake = { colour = { 1, 0.75, 0.2 }, radius = 5 },
     overshoot = { colour = { 1, 0.45, 0.1 }, radius = 13 },
     out = { colour = { 1, 0.15, 0.15 }, radius = 13 },
+    blocked = { colour = { 1, 0.15, 0.15 }, radius = 9, cross = true },
 }
 
 --- A mark on each space listed in `marks` ({ id, kind } with a kind from
--- MARKS), as an octagon round its centre.
+-- MARKS), as an octagon round its centre, or a cross turned with the space.
 function Track.marks(tile, track, marks)
     local thickness = THICKNESS / math.max(tile.getScale().x, 0.001)
     local f = Track.frame(tile, track)
@@ -269,7 +271,17 @@ function Track.marks(tile, track, marks)
     local lines = {}
     for _, m in ipairs(marks) do
         local s, style = byId[m.id], MARKS[m.kind]
-        if s and style then
+        if s and style and style.cross then
+            for _, a in ipairs({ 45, 135 }) do
+                local r = math.rad(s.rot + a)
+                local dx, dy = style.radius * math.cos(r), style.radius * math.sin(r)
+                lines[#lines + 1] = {
+                    points = { Track.localIn(f, s.pos[1] - dx, s.pos[2] - dy),
+                               Track.localIn(f, s.pos[1] + dx, s.pos[2] + dy) },
+                    color = style.colour, thickness = thickness,
+                }
+            end
+        elseif s and style then
             local pts = {}
             for i = 0, 8 do
                 local a = i * math.pi / 4

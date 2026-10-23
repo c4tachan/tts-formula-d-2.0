@@ -207,6 +207,35 @@ function Moves.reach(track, fromId, roll, opts)
     return results
 end
 
+--- Every space `roll` steps or fewer along the links from `fromId`, the
+-- rules of a move aside: through other cars and corners alike, and into the
+-- pit lane whether or not it is open. A pit box is still only its own car's
+-- (opts.color), as in Moves.reach. Returns id -> steps, without `fromId`.
+function Moves.steps(track, fromId, roll, opts)
+    opts = opts or {}
+    local byId = index(track)
+    local from = byId[fromId]
+    local out = {}
+    if not from then
+        return out
+    end
+    local ring = { from }
+    for k = 1, roll do
+        local nxt = {}
+        for _, s in ipairs(ring) do
+            for _, nid in ipairs(s.next or {}) do
+                local t = byId[nid]
+                if t and t ~= from and not out[nid] and (not t.box or t.box == opts.color) then
+                    out[nid] = k
+                    nxt[#nxt + 1] = t
+                end
+            end
+        end
+        ring = nxt
+    end
+    return out
+end
+
 -- Moves.ahead answers, keyed by the track's spaces like fd.core.position.
 local aheadCache = setmetatable({}, { __mode = "k" })
 

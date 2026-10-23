@@ -13,6 +13,7 @@ local Track = require("fd.tts.track")
 local Graph = require("fd.core.trackgraph")
 local Moves = require("fd.core.moves")
 local Position = require("fd.core.position")
+local Race = require("fd.core.race")
 local Ghosts = require("fd.tts.ghosts")
 
 local Editor = {}
@@ -40,6 +41,7 @@ local function changed()
     -- kept with its spaces, which an edit changes in place.
     Position.forget()
     Moves.forget()
+    Race.forget()
 end
 
 --- The sector in a space's code, <lane>.<sector>.<n> (with "+n" on the end

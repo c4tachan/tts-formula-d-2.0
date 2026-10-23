@@ -28,9 +28,25 @@ Rules.zones = {
 -- Rolling the top face of these gears strains every engine in 5th or 6th.
 Rules.engineStrain = { [5] = 20, [6] = 30 }
 
--- Whether a car may take the way into the pit lane. What a stop there
--- does, and when it may be made, are the pit stop rules below.
-Rules.pitLane = true
+-- Pit stops (the two-lap race): a car that ends a move in its own pit box
+-- gets back the zones in `pitRestores` and leaves in `pitMaxGear` at most.
+-- No exact roll is needed to get there.
+
+-- The rules that do not apply in the pit lane: a move ending there brakes
+-- for nothing (so a car stuck behind another loses nothing), and a car
+-- there shifts down freely, collides with nothing and is spared engine
+-- strain.
+Rules.pitLaneExempt = { braking = true, downshift = true, collisions = true, engineStrain = true }
+
+-- Cars in the pit lane play after those on the circuit.
+Rules.pitLanePlaysLast = true
+
+--- Whether a car on lap `lap` of `laps` may take the way into the pit lane:
+-- at the end of any lap but the last -- in the two-lap race, between the
+-- first and the second.
+function Rules.mayPit(lap, laps)
+    return lap >= 1 and lap < laps
+end
 
 -- Gear cap on the turn after a pit stop.
 Rules.pitMaxGear = 4

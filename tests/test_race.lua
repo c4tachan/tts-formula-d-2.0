@@ -382,8 +382,10 @@ function T.a_car_may_go_into_its_own_pit_box()
     local brown, white = FDMonaco.pit.boxes[2], FDMonaco.pit.boxes[1]
     eq(brown.player, "Brown")
     local r = started("Brown", "White")
+    r:setLaps(2)
     r:placed("Brown", brown.beside, FDMonaco)
     r:placed("White", FDMonaco.pit.entry[1], FDMonaco)
+    r:car("White").lap = 1
     rollDie(r, "Brown", 1, 1)
     local reach = r:reachable("Brown", FDMonaco)
     assert(reach[brown.space], "into Brown's box from beside it")
@@ -398,6 +400,345 @@ function T.a_car_may_go_into_its_own_pit_box()
     for id in pairs(reach) do
         assert(not FDMonaco.byId[id].box, "White reaches " .. id)
     end
+end
+
+-- Pit stops -------------------------------------------------------------------
+
+--- A race of `laps` laps, `color` on lap `lap` and put down on `id` of Monaco.
+local function onMonaco(laps, color, lap, id)
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local r = started(color)
+    r:setLaps(laps)
+    r:placed(color, id, FDMonaco)
+    r:car(color).lap = lap
+    r:drain()
+    return r, FDMonaco
+end
+
+function T.the_pit_lane_is_open_only_before_the_last_lap()
+    local function canPit(laps, lap)
+        local FDMonaco = require("fd.data.tracks.FDMonaco")
+        local r = onMonaco(laps, "White", lap, FDMonaco.pit.entry[1])
+        rollDie(r, "White", 1, 2)
+        return r:reachable("White", FDMonaco)[FDMonaco.pit.spaces[2]] ~= nil
+    end
+    assert(canPit(2, 1), "at the end of the first of two laps")
+    assert(not canPit(2, 2), "not on the last lap")
+    assert(not canPit(1, 1), "not in a one-lap race")
+end
+
+--- Brown's pit box on Monaco, the pit lane space beside it, and the one two
+-- before that.
+local function brownsBox(FDMonaco)
+    local b = FDMonaco.pit.boxes[2]
+    eq(b.player, "Brown")
+    local before = nil
+    for i, id in ipairs(FDMonaco.pit.spaces) do
+        if id == b.beside then before = FDMonaco.pit.spaces[i - 2] end
+    end
+    return b.space, b.beside, before
+end
+
+function T.overshooting_into_the_pits_is_explained()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    -- Before the last corner: the roll reaches the pit entry only by going
+    -- through the corner without stopping.
+    local r = onMonaco(2, "White", 1, "i.s10.0")
+    rollDie(r, "White", 4, 10)
+    for id in pairs(r:reachable("White", FDMonaco)) do
+        assert(not FDMonaco.byId[id].pit, "no pits overshooting: " .. id)
+    end
+    assert(hasEvent(r, "info", "keep to its lane: no turning into the pits"))
+    -- Stopped in the corner, the pits are open and nothing needs saying.
+    local s = onMonaco(2, "White", 1, "i.c10.0")
+    s:car("White").stops = 1
+    rollDie(s, "White", 2, 4)
+    assert(s:reachable("White", FDMonaco)[FDMonaco.pit.spaces[2]], "into the pit lane")
+    assert(not hasEvent(s, "info", "no turning into the pits"))
+end
+
+function T.pit_spaces_shut_to_a_move_are_blocked()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local entry, first = FDMonaco.pit.entry[1], FDMonaco.pit.spaces[1]
+    -- On the last lap the way in is shut: the pit spaces the roll would
+    -- reach are listed.
+    local r = onMonaco(2, "White", 2, entry)
+    rollDie(r, "White", 1, 2)
+    local shut = r:blockedSpaces("White", FDMonaco, r:reachable("White", FDMonaco))
+    eq(table.concat(shut, ","), first .. "," .. FDMonaco.pit.spaces[2])
+    -- On a lap to pit on, none are.
+    local s = onMonaco(2, "White", 1, entry)
+    rollDie(s, "White", 1, 2)
+    eq(#s:blockedSpaces("White", FDMonaco, s:reachable("White", FDMonaco)), 0)
+    -- In the pit lane, the spaces past a car ahead are.
+    local t = started("White", "Red")
+    t:setLaps(2)
+    t:placed("White", FDMonaco.pit.spaces[3], FDMonaco)
+    t:placed("Red", FDMonaco.pit.spaces[5], FDMonaco)
+    rollDie(t, "White", 2, 4)
+    shut = t:blockedSpaces("White", FDMonaco, t:reachable("White", FDMonaco))
+    eq(table.concat(shut, ","), FDMonaco.pit.spaces[6] .. "," .. FDMonaco.pit.spaces[7],
+        "past Red, and not Red's own space or anybody else's pit box")
+end
+
+function T.spaces_past_a_car_in_the_way_are_blocked()
+    local track = lane(20)
+    local r = started("Red", "Blue")
+    r:placed("Red", "c0", track)
+    r:placed("Blue", "c3", track)
+    rollDie(r, "Red", 3, 6)
+    local blocked = r:blockedSpaces("Red", track, r:reachable("Red", track))
+    table.sort(blocked)
+    eq(table.concat(blocked, ","), "c4,c5,c6", "past Blue, not Blue's own space")
+end
+
+function T.an_overshoot_crosses_out_only_the_pit_lane()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    -- Through the last corner without stopping, on the lap to pit on: the
+    -- car keeps to its lane, so the pit lane is shut to it. The far ends of
+    -- the other lanes, which only cutting across after the corner would
+    -- reach, are no move's: nothing is crossed out there.
+    local r = onMonaco(2, "White", 1, "i.s10.0")
+    rollDie(r, "White", 4, 10)
+    local reach = r:reachable("White", FDMonaco)
+    local blocked = r:blockedSpaces("White", FDMonaco, reach)
+    assert(#blocked > 0)
+    for _, id in ipairs(blocked) do
+        assert(FDMonaco.byId[id].pit, id .. " is off the pit lane")
+        assert(not reach[id], id .. " is reachable")
+    end
+    -- Going no further than the corner, nothing is blocked.
+    local s = onMonaco(2, "White", 1, "i.s10.0")
+    rollDie(s, "White", 1, 2)
+    eq(#s:blockedSpaces("White", FDMonaco, s:reachable("White", FDMonaco)), 0)
+end
+
+function T.out_of_a_corner_with_nobody_about_nothing_is_crossed_out()
+    -- Out of Sainte Devote without stopping, on a long roll, and alone.
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local r = onMonaco(1, "White", 1, "m.s1.0")
+    rollDie(r, "White", 5, 20)
+    eq(#r:blockedSpaces("White", FDMonaco, r:reachable("White", FDMonaco)), 0)
+end
+
+function T.no_overshoot_note_when_the_pits_were_out_of_range()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local Moves = require("fd.core.moves")
+    local d = Moves.steps(FDMonaco, "i.s10.0", 30)[FDMonaco.pit.entry[1]]
+    -- The roll ends on the way in: the pits were one step too far anyway.
+    local r = onMonaco(2, "White", 1, "i.s10.0")
+    rollDie(r, "White", 4, d)
+    assert(not hasEvent(r, "info", "no turning into the pits"))
+    -- A step more, and they were in range.
+    r = onMonaco(2, "White", 1, "i.s10.0")
+    rollDie(r, "White", 4, d + 1)
+    assert(hasEvent(r, "info", "no turning into the pits"))
+end
+
+function T.a_shut_pit_lane_is_no_way_round_for_the_crosses()
+    -- A pit lane that is a short cut: in at c1, out at c6.
+    local spaces = {}
+    for k = 0, 9 do
+        spaces[#spaces + 1] = { id = "c" .. k, lane = 1, next = k < 9 and { "c" .. (k + 1) } or {} }
+    end
+    spaces[2].next = { "c2", "p0" }
+    spaces[#spaces + 1] = { id = "p0", lane = 0, pit = true, next = { "c6" } }
+    local track = { spaces = spaces, corners = {} }
+    local r = started("Red") -- one lap: the pit lane is shut
+    r:placed("Red", "c0", track)
+    r:car("Red").lap = 1
+    rollDie(r, "Red", 2, 4)
+    local blocked = r:blockedSpaces("Red", track, r:reachable("Red", track))
+    eq(table.concat(blocked, ","), "p0", "the pit lane, but not c6 the far side of it")
+end
+
+function T.no_pit_stop_for_an_illegal_move_into_the_box()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local box = brownsBox(FDMonaco)
+    -- The last lap: the pits are shut to a car on the circuit.
+    local r = onMonaco(2, "Brown", 2, FDMonaco.pit.entry[1])
+    r:adjust("Brown", nil, -6)
+    rollDie(r, "Brown", 4, 9)
+    r:drain()
+    putDown(r, "Brown", box, FDMonaco)
+    assert(hasEvent(r, "warn", "no pit stop made"))
+    eq(r:car("Brown").wear.wp, 12)
+    eq(r:car("Brown").maxGear, nil)
+end
+
+function T.off_the_track_out_of_the_box_takes_the_stop_back()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local box, _, before = brownsBox(FDMonaco)
+    local r = onMonaco(2, "Brown", 1, before)
+    r:adjust("Brown", nil, -6)
+    rollDie(r, "Brown", 2, 4)
+    putDown(r, "Brown", box, FDMonaco)
+    eq(r:car("Brown").wear.wp, 18)
+    -- Picked up and put down off the track data.
+    r:placed("Brown", nil)
+    eq(r:car("Brown").wear.wp, 12)
+    eq(r:car("Brown").maxGear, nil)
+end
+
+function T.taking_a_pit_stop_back_keeps_a_correction_made_since()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local box, _, before = brownsBox(FDMonaco)
+    local r = onMonaco(2, "Brown", 1, before)
+    r:adjust("Brown", nil, -6)
+    rollDie(r, "Brown", 2, 4)
+    putDown(r, "Brown", box, FDMonaco)
+    eq(r:car("Brown").wear.wp, 18)
+    r:adjust("Brown", nil, -2)
+    putDown(r, "Brown", FDMonaco.pit.spaces[6], FDMonaco)
+    eq(r:car("Brown").wear.wp, 10, "the 6 the stop gave back taken off the 16 it had")
+end
+
+function T.the_race_finds_spaces_on_a_track_the_editor_changes()
+    local Race = require("fd.core.race")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    -- As the editor hands it over: its own spaces list, and no byId.
+    local spaces = {}
+    for i, s in ipairs(FDMonaco.spaces) do spaces[i] = s end
+    local track = { spaces = spaces, pit = FDMonaco.pit, corners = FDMonaco.corners }
+    local r = newRace("Red")
+    r:useTrack(track)
+    eq(r:space("i.s1.0").id, "i.s1.0")
+    -- A space added in place, and the race told to forget, as the editor does.
+    spaces[#spaces + 1] = { id = "i.s1.0+1", lane = 1, pos = { 0, 0 }, rot = 0, next = {} }
+    Race.forget()
+    eq(r:space("i.s1.0+1").id, "i.s1.0+1")
+end
+
+function T.changing_the_distance_changes_where_an_open_move_can_go()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local r = onMonaco(2, "White", 1, FDMonaco.pit.entry[1])
+    rollDie(r, "White", 1, 2)
+    assert(r:reachable("White", FDMonaco)[FDMonaco.pit.spaces[2]], "the pits, on the first of two laps")
+    r:setLaps(1)
+    eq(r:reachable("White", FDMonaco)[FDMonaco.pit.spaces[2]], nil, "shut in a one-lap race")
+end
+
+function T.a_car_over_the_line_in_the_pit_lane_is_still_on_its_way_in()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local last = FDMonaco.pit.spaces[#FDMonaco.pit.spaces]
+    local r = onMonaco(2, "White", 1, FDMonaco.pit.entry[1])
+    rollDie(r, "White", 5, 19)
+    putDown(r, "White", last, FDMonaco)
+    eq(r:car("White").lap, 2, "over the line in the pit lane")
+    r:drain()
+    -- Put down again on the same move: still a legal move into the pits.
+    putDown(r, "White", FDMonaco.pit.spaces[#FDMonaco.pit.spaces - 3], FDMonaco)
+    assert(not hasEvent(r, "warn", "not a legal"))
+    eq(r:car("White").lap, 1)
+end
+
+function T.stopping_in_its_own_pit_box_is_a_pit_stop()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local box, _, before = brownsBox(FDMonaco)
+    local r = onMonaco(2, "Brown", 1, before)
+    r:adjust("Brown", nil, -6)
+    r:drain()
+    -- Three spaces to the box on a roll of four: no exact roll needed.
+    rollDie(r, "Brown", 2, 4)
+    eq(r:reachable("Brown", FDMonaco)[box].brake, 0, "nothing to brake into the box")
+    putDown(r, "Brown", box, FDMonaco)
+    eq(r:car("Brown").wear.wp, 18, "WP back")
+    eq(r:car("Brown").maxGear, 4, "and out in 4th at most")
+    assert(hasEvent(r, "info", "pits: wear restored"))
+    -- Put down further on instead, it has not stopped: the stop is taken back.
+    local on = FDMonaco.pit.spaces[6]
+    putDown(r, "Brown", on, FDMonaco)
+    eq(r:car("Brown").wear.wp, 12, "the WP it had")
+    eq(r:car("Brown").maxGear, nil)
+    assert(hasEvent(r, "info", "pit stop taken back"))
+    putDown(r, "Brown", box, FDMonaco)
+    eq(r:car("Brown").wear.wp, 18, "stopped again")
+    -- Back where the move started: no stop.
+    putDown(r, "Brown", before, FDMonaco)
+    eq(r:car("Brown").wear.wp, 12)
+end
+
+function T.braking_costs_nothing_in_the_pit_lane()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local r = onMonaco(2, "Brown", 1, FDMonaco.pit.spaces[3])
+    rollDie(r, "Brown", 2, 4)
+    putDown(r, "Brown", FDMonaco.pit.spaces[4], FDMonaco)
+    eq(r:car("Brown").wear.wp, 18, "three short, in the pit lane")
+    -- Stuck behind a car in the pit lane: no cost either.
+    local s = started("Brown", "Red")
+    s:setLaps(2)
+    s:placed("Brown", FDMonaco.pit.spaces[3], FDMonaco)
+    s:placed("Red", FDMonaco.pit.spaces[5], FDMonaco)
+    rollDie(s, "Brown", 2, 4)
+    eq(s:reachable("Brown", FDMonaco)[FDMonaco.pit.spaces[6]], nil, "no way past")
+    putDown(s, "Brown", FDMonaco.pit.spaces[4], FDMonaco)
+    eq(s:car("Brown").wear.wp, 18)
+end
+
+function T.shifting_down_is_free_in_the_pit_lane()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local box = brownsBox(FDMonaco)
+    local r = onMonaco(2, "Brown", 1, box)
+    r:car("Brown").rolledGear = 6
+    r:shift("Brown", 1)
+    assert(not hasEvent(r, "warn", ""), "six to one is no skip in the pits")
+    rollDie(r, "Brown", 1, 1)
+    eq(r:car("Brown").wear.wp, 18)
+    -- On the circuit the rule stands.
+    local s = onMonaco(2, "Brown", 1, "m.s2.5")
+    s:car("Brown").rolledGear = 6
+    s:shift("Brown", 1)
+    assert(hasEvent(s, "warn", "at most 3 gears"))
+end
+
+function T.engine_strain_spares_the_pit_lane()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local r = started("Red", "Blue", "Green")
+    r:setLaps(2)
+    r:placed("Red", FDMonaco.pit.spaces[5], FDMonaco)
+    r:placed("Blue", "m.s2.5", FDMonaco)
+    r:placed("Green", FDMonaco.pit.spaces[8], FDMonaco)
+    r:car("Red").rolledGear = 6
+    r:car("Blue").rolledGear = 4
+    r:car("Green").rolledGear = 4
+    rollDie(r, "Blue", 5, 20)
+    local checks = r:pendingChecks()
+    eq(#checks, 1, "Red is in the pit lane")
+    eq(checks[1].color, "Blue")
+    -- And a roll from the pit lane sets none off.
+    r:blackDie(10, "Blue")
+    rollDie(r, "Green", 5, 20)
+    eq(#r:pendingChecks(), 0)
+end
+
+function T.nothing_collides_in_the_pit_lane()
+    -- A pit lane whose spaces are listed as touching all the same.
+    local spaces = {}
+    for k = 0, 5 do
+        spaces[#spaces + 1] = { id = "p" .. k, lane = 0, pit = true, next = k < 5 and { "p" .. (k + 1) } or {} }
+    end
+    local track = { spaces = spaces, corners = {}, near = { p2 = { "p3" }, p3 = { "p2" } } }
+    local r = started("Red", "Blue")
+    r:placed("Red", "p3", track)
+    r:placed("Blue", "p0", track)
+    rollDie(r, "Blue", 1, 2)
+    putDown(r, "Blue", "p2", track)
+    eq(#r:pendingChecks(), 0)
+end
+
+function T.cars_in_the_pit_lane_play_after_the_circuit()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local box = brownsBox(FDMonaco)
+    local r = started("Brown", "Red")
+    r:setLaps(2)
+    for _, c in ipairs({ "Brown", "Red" }) do r:car(c).lap = 1 end
+    -- Brown in its pit box, near the end of the lap; Red far behind.
+    r:placed("Red", "m.s2.5", FDMonaco)
+    r:placed("Brown", box, FDMonaco)
+    eq(r:turn().color, "Red", "the circuit first")
+    -- On the circuit beside the pit lane, Brown leads again.
+    r:placed("Brown", "i.s11.10", FDMonaco)
+    eq(r:turn().color, "Brown")
 end
 
 function T.a_disputed_move_into_the_pits_still_crosses_the_line()
