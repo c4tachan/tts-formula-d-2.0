@@ -24,7 +24,7 @@ CATEGORY = {
 }
 ORDER = ["formula_d", "formula_de", "custom"]
 # Only these categories reach maps.json; the mod does not support the rest yet.
-SUPPORTED = {"formula_d"}
+SUPPORTED = {"formula_d", "formula_de"}
 
 # maps_custom["Name"] = "https://..."
 RE_ENTRY = re.compile(
