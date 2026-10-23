@@ -40,7 +40,7 @@ local ACTIONS = {
     { fn = "fdDashCar", label = "Car", tip = "Claim the nearest car, or take one from the bag.\nAlso: drop a car on this dashboard." },
     { fn = "fdDashCollision", label = "Collision?", tip = "Ended next to or behind a car: roll the black die" },
     { fn = "fdDashWear", label = "WP -1 / +1", tip = "Left click: lose 1 WP. Right click: gain 1 WP.\nOr just move your WP marker." },
-    { fn = "fdDashPit", label = "Pit stop", tip = "Restore WP; leave in 4th gear or lower" },
+    { fn = "fdDashPit", label = "Pit stop", tip = "Made for you when the car stops in its pit box. By hand: restore WP; leave in 4th gear or lower" },
     { fn = "fdDashLeave", label = "Leave", tip = "Take this car out of the race: its driver, or the host" },
 }
 

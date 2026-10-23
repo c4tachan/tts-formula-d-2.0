@@ -40,7 +40,7 @@ local ACTIONS = {
     { fn = "fdUiRoll", label = "Roll", tip = "Roll the gear die for the gear you are in" },
     { fn = "fdUiCar", label = "Car", tip = "Claim the nearest car, or take one from the bag" },
     { fn = "fdUiCollision", label = "Collision?", tip = "Ended next to or behind a car: roll the black die" },
-    { fn = "fdUiPit", label = "Pit stop", tip = "Restore WP; leave in 4th gear or lower" },
+    { fn = "fdUiPit", label = "Pit stop", tip = "Made for you when the car stops in its pit box. By hand: restore WP; leave in 4th gear or lower" },
     { fn = "fdUiLeave", label = "Leave", tip = "Take your car out of the race" },
 }
 

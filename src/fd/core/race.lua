@@ -35,6 +35,18 @@ local LINE_SEARCH = 60
 -- order. Staggered lanes put the spaces beside each other half a cell apart.
 local LEVEL = 0.25
 
+-- Spaces by id, for a track with no `byId` of its own (one the editor has
+-- edited), and what each open move can reach: keyed by the spaces list,
+-- which the editor changes in place, so Race.forget clears them then.
+local indexes = setmetatable({}, { __mode = "k" })
+local reaches = setmetatable({}, { __mode = "k" })
+
+--- Forget every track worked out: the track editor changes spaces in place.
+function Race.forget()
+    indexes = setmetatable({}, { __mode = "k" })
+    reaches = setmetatable({}, { __mode = "k" })
+end
+
 function Race.new(rules, saved)
     local self = setmetatable({ rules = rules, events = {} }, Race)
     self.state = saved or {}
@@ -206,18 +218,38 @@ end
 --- Where the car of `color` can end the move it has open, as Moves.reach
 -- gives it (space id -> option), with this ruleset's costs; nil if it has
 -- no move open or started off the track data.
+--
+-- The way into the pit lane is open when the ruleset says a car may pit,
+-- and the car's own pit box always. A move that ends in the pit lane brakes
+-- for nothing: no exact roll is needed to reach a pit box, and a car stuck
+-- behind another there loses nothing.
+--
+-- Worked out once per move: nothing it depends on changes while the move
+-- is open (the lap the pit lane goes by is the one it started on).
 function Race:reachable(color, track)
     local car = self:car(color)
     local m = car and car.move
     if not m then
         return nil
     end
+    local done = reaches[m]
+    if done and done.spaces == track.spaces and done.laps == self.state.laps then
+        return done.reach
+    end
     local occupied = {}
     for _, id in ipairs(m.occupied) do occupied[id] = true end
-    return Moves.reach(track, m.from, m.roll, {
-        occupied = occupied, stops = m.stops, pit = self.rules.pitLane, color = color,
+    local reach = Moves.reach(track, m.from, m.roll, {
+        occupied = occupied, stops = m.stops, pit = self:mayPit(car), color = color,
         cost = function(o) return self:moveCost(o) end,
     })
+    self:useTrack(track)
+    local exempt = self.rules.pitLaneExempt
+    for id, o in pairs(reach or {}) do
+        local s = self:space(id)
+        if exempt and exempt.braking and s and s.pit then o.brake = 0 end
+    end
+    reaches[m] = { spaces = track.spaces, laps = self.state.laps, reach = reach }
+    return reach
 end
 
 --- The corner that matters to `car` and how far it is: see Moves.ahead.
@@ -272,32 +304,38 @@ function Race:judgeMove(car, track)
     local m = car.move
     local reach = self:reachable(car.color, track)
     local o = reach and reach[car.space]
-    local who = self:label(car)
-    if not o then
+    local box = self:pitBox(car)
+    -- Out of its pit box again, the stop it made there is taken back first,
+    -- so what the move costs elsewhere is charged on the wear it had.
+    if m.pit and car.space ~= box then
+        self:takeBackPitStop(car)
+    end
+    if o then
+        car.stops = o.stops
+        self:chargeMove(car, "brake", o.brake, string.format("braked %d short", o.brake))
+        self:chargeMove(car, "overshoot", o.overshoot,
+            string.format("overshot corner %s by %d", tostring(o.corner), o.overshoot))
+    else
         self:emit("warn", string.format("%s: that space is not a legal %d from %s -- nothing charged for the move",
-            who, m.roll, m.from), car.color)
+            self:label(car), m.roll, m.from), car.color)
         self:chargeMove(car, "brake", 0)
         self:chargeMove(car, "overshoot", 0)
-        car.crashed = nil
-        self:checkElimination(car)
-        local any = Moves.reach(track, m.from, LINE_SEARCH, { pit = true, color = car.color })
-        local way = any and any[car.space]
-        self:crossLine(car, way and way.crossed or false)
-        self:checkCollisions(car, track)
-        return
     end
-    car.stops = o.stops
-    self:chargeMove(car, "brake", o.brake, string.format("braked %d short", o.brake))
-    self:chargeMove(car, "overshoot", o.overshoot,
-        string.format("overshot corner %s by %d", tostring(o.corner), o.overshoot))
-    local crash = nil
-    if self:moveOut(o) then
-        crash = o.corner
+    -- In its own pit box, it makes its stop -- before it is judged out, as
+    -- the stop gives back what it has lost.
+    if box and car.space == box and not m.pit then
+        self:makePitStop(car)
     end
-    car.crashed = crash
+    car.crashed = o and self:moveOut(o) and o.corner or nil
     self:checkElimination(car)
     -- Last, so a car that goes out on the move does not take the flag.
-    self:crossLine(car, o.crossed)
+    local crossed = o and o.crossed
+    if not o then
+        local any = Moves.reach(track, m.from, LINE_SEARCH, { pit = true, color = car.color })
+        local way = any and any[car.space]
+        crossed = way and way.crossed or false
+    end
+    self:crossLine(car, crossed)
     self:checkCollisions(car, track)
 end
 
@@ -322,6 +360,9 @@ end
 -- turn comes back, so long as the car after it has not rolled.
 function Race:backToStart(car)
     local m, s = car.move, self.state
+    if m.pit then
+        self:takeBackPitStop(car)
+    end
     self:chargeMove(car, "brake", 0, "back where it started")
     self:chargeMove(car, "overshoot", 0, "back where it started")
     car.crashed = nil
@@ -352,7 +393,9 @@ function Race:pack(car, track)
     local near = track.near
     local running = {}
     for _, o in ipairs(self:cars()) do
-        if o.space and not o.eliminated and not o.place then running[#running + 1] = o end
+        if o.space and not o.eliminated and not o.place and not self:pitExempt(o, "collisions") then
+            running[#running + 1] = o
+        end
     end
     local function touching(o)
         local spaces, out = {}, {}
@@ -406,7 +449,7 @@ function Race:checkCollisions(car, track)
     end
     local pack = s.packs[m.pack]
     pack.touching = {}
-    if not car.eliminated and not car.place then
+    if not car.eliminated and not car.place and not self:pitExempt(car, "collisions") then
         pack.touching = self:pack(car, track)
     end
     local wanted = {}
@@ -684,6 +727,9 @@ function Race:setWear(color, zoneId, value, reason)
     end
 end
 
+--- A pit stop: the ruleset's zones restored, and a gear cap for the next
+-- roll. Made when a car ends its move in its own pit box (makePitStop), or
+-- by hand with the Pit stop button.
 function Race:pitStop(color)
     local car = self:car(color)
     if not car then return end
@@ -694,6 +740,27 @@ function Race:pitStop(color)
     self:emit("info", string.format("%s pits: wear restored, leave in %s gear or lower",
         self:label(car), gearName(car.maxGear)), color)
     self:checkElimination(car)
+end
+
+--- `car` has ended its move in its own pit box: it makes its pit stop,
+-- noting what that gave it, in case it is put down somewhere else instead.
+function Race:makePitStop(car)
+    local before, maxGear = {}, car.maxGear
+    for _, id in ipairs(self.rules.pitRestores) do before[id] = car.wear[id] end
+    self:pitStop(car.color)
+    local gained = {}
+    for id, v in pairs(before) do gained[id] = car.wear[id] - v end
+    car.move.pit = { gained = gained, maxGear = maxGear }
+end
+
+--- `car` is no longer in the pit box it stopped in this move: what the stop
+-- gave it is taken back -- only that, so a correction made since stands.
+function Race:takeBackPitStop(car)
+    local was = car.move.pit
+    car.move.pit = nil
+    car.maxGear = was.maxGear
+    self:emit("info", self:label(car) .. " is out of its pit box -- pit stop taken back", car.color)
+    self:applyWear(car, was.gained, "pit stop taken back")
 end
 
 -- Gears ---------------------------------------------------------------------
@@ -716,7 +783,7 @@ function Race:shiftAdvice(car, to)
     elseif to > from + 1 then
         legal = false
         notes[#notes + 1] = "no skipping gears on the way up (was in " .. gearName(from) .. ")"
-    elseif to < from - 1 then
+    elseif to < from - 1 and not self:pitExempt(car, "downshift") then
         local skipped = from - to - 1
         if skipped > rules.maxDownshift then
             legal = false
@@ -814,12 +881,18 @@ function Race:rolled(color, gear, value)
         car.movedRound = self.state.round
     end
     self:emit("roll", string.format("%s rolls %s in %s gear", who, tostring(value), gearName(gear)), color)
+    if car.move then
+        self:notePitOvershoot(car)
+    end
 
-    if self.rules.engineStrain[gear] == value then
+    -- Where the ruleset spares the pit lane, a roll from there sets off no
+    -- engine strain, and a car there is not checked.
+    if self.rules.engineStrain[gear] == value and not self:pitExempt(car, "engineStrain") then
         self:emit("warn", "Engine strain! Every car in top gears rolls the black die", color)
         self:queueCheck(car, "engine")
         for _, other in ipairs(self:cars()) do
-            if other ~= car and not other.eliminated and not other.place and self.rules.engineStrain[other.rolledGear] then
+            if other ~= car and not other.eliminated and not other.place and self.rules.engineStrain[other.rolledGear]
+                and not self:pitExempt(other, "engineStrain") then
                 self:queueCheck(other, "engine")
             end
         end
@@ -1132,10 +1205,116 @@ function Race:settleGrid()
     self:emit("order", "Starting grid: " .. table.concat(names, "  "))
 end
 
---- The track the cars are on, for turn order. Not state: the Global script
--- hands it over after a load, and every car put down on a track brings it.
+--- The track the cars are on, for turn order and the pit lane. Not state:
+-- the Global script hands it over after a load, and every car put down on a
+-- track brings it.
 function Race:useTrack(track)
     self.track = track
+end
+
+--- The space `id` on the track in use, or nil.
+function Race:space(id)
+    local track = self.track
+    if not (track and id) then
+        return nil
+    end
+    local byId = track.byId or indexes[track.spaces]
+    if not byId then
+        byId = {}
+        for _, s in ipairs(track.spaces) do byId[s.id] = s end
+        indexes[track.spaces] = byId
+    end
+    return byId[id]
+end
+
+--- Whether `car` is in the pit lane, its pit box included.
+function Race:inPit(car)
+    local s = self:space(car.space)
+    return s ~= nil and s.pit == true
+end
+
+--- Whether the ruleset lets `car` off `rule` there, being in the pit lane
+-- (Rules.pitLaneExempt).
+function Race:pitExempt(car, rule)
+    local exempt = self.rules.pitLaneExempt
+    return exempt ~= nil and exempt[rule] == true and self:inPit(car)
+end
+
+--- The id of `car`'s own pit box on the track in use, or nil.
+function Race:pitBox(car)
+    local pit = self.track and self.track.pit
+    for _, b in ipairs(pit and pit.boxes or {}) do
+        if b.player == car.color then return b.space end
+    end
+    return nil
+end
+
+--- Whether `car` may take the way into the pit lane on the move it has
+-- open (Rules.mayPit), going by the lap the move started on: one that has
+-- crossed the line in the pit lane is still on its way in.
+function Race:mayPit(car)
+    local lap = car.lap - ((car.move and car.move.crossed) and 1 or 0)
+    return self.rules.mayPit ~= nil and self.rules.mayPit(lap, self.state.laps)
+end
+
+--- The spaces the move `color` has open would get to, counting steps along
+-- the track's links, that it cannot end on: past cars it cannot get round,
+-- in another lane after leaving a corner without its stops, in a pit lane
+-- that is shut to it. `reach` is what Race:reachable gave. Spaces with cars
+-- on are left out, and so is another seat's pit box, never open to it.
+function Race:blockedSpaces(color, track, reach)
+    local car = self:car(color)
+    local m = car and car.move
+    if not (m and track) then
+        return {}
+    end
+    self:useTrack(track)
+    local occupied = {}
+    for _, id in ipairs(m.occupied) do occupied[id] = true end
+    local from = self:space(m.from)
+    local shut = not ((from and from.pit) or self:mayPit(car))
+    local out = {}
+    for id in pairs(Moves.steps(track, m.from, m.roll, { color = color, pitShut = shut })) do
+        if not (reach and reach[id]) and not occupied[id] then
+            out[#out + 1] = id
+        end
+    end
+    table.sort(out)
+    return out
+end
+
+--- After a roll: if the pits are open to `car` and the roll would take it
+-- to them, but only overshooting a corner -- when a car must keep to its
+-- lane -- say so, or the pits just look shut.
+function Race:notePitOvershoot(car)
+    local pit = self.track and self.track.pit
+    local m = car.move
+    local from = self:space(m.from)
+    if not (pit and from) or from.pit or not self:mayPit(car) then
+        return
+    end
+    -- A car on the pit lane's first space shuts it, overshoot or not.
+    for _, id in ipairs(m.occupied) do
+        if id == pit.spaces[1] then return end
+    end
+    local entry = {}
+    for _, id in ipairs(pit.entry) do entry[id] = true end
+    local over = nil
+    for id, o in pairs(self:reachable(car.color, self.track) or {}) do
+        local s = self:space(id)
+        if s and s.pit then
+            return
+        end
+        -- On a way in with a step of the roll left: the pits were in range.
+        for k = 1, math.min(#o.path, m.roll) do
+            if o.overshoot > 0 and entry[o.path[k]] then over = over or o.corner end
+        end
+    end
+    if over then
+        self:emit("info", string.format("%s would go through corner %s without its stops, and an "
+            .. "overshooting car must keep to its lane: no turning into the pits on this move",
+            self:label(car), tostring(over)), car.color)
+    end
 end
 
 --- Put the cars in the order they play this round, by where they are on the
@@ -1143,6 +1322,12 @@ end
 -- higher first, then by which is nearer the inside of the corner they are
 -- in or coming to. Cars it cannot place -- no track data, off the track,
 -- out or finished -- keep their slots, and the rest are sorted round them.
+--
+-- Cars in the pit lane wait until the cars on the circuit have played, and
+-- then go in their own order. (The rule speaks of the circuit between pit
+-- exit and entry; the stretch beside the pit lane is counted in too, as an
+-- order that put a car there both before and after the pit lane would go
+-- round in circles.)
 -- Returns whether the order changed.
 function Race:reorder()
     local s = self.state
@@ -1158,10 +1343,12 @@ function Race:reorder()
         if along and not car.eliminated and not car.place then
             slots[#slots + 1] = i
             ranked[#ranked + 1] = { car = car, was = i, key = car.lap * P.length + along,
-                inside = Position.inside(P, car.space) }
+                inside = Position.inside(P, car.space),
+                pit = self.rules.pitLanePlaysLast == true and self:inPit(car) }
         end
     end
     table.sort(ranked, function(a, b)
+        if a.pit ~= b.pit then return b.pit end
         if a.key ~= b.key then return a.key > b.key end
         return a.was < b.was
     end)
@@ -1169,7 +1356,8 @@ function Race:reorder()
     local i = 1
     while i <= #ranked do
         local j = i
-        while j < #ranked and ranked[i].key - ranked[j + 1].key < LEVEL * P.cell do
+        while j < #ranked and ranked[j + 1].pit == ranked[i].pit
+            and ranked[i].key - ranked[j + 1].key < LEVEL * P.cell do
             j = j + 1
         end
         local group = {}

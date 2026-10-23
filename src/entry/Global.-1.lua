@@ -1668,8 +1668,10 @@ end
 
 --- Mark where the car of `color` can end the move it has just opened: a
 -- green ring for the full roll, amber dots for braking, orange for an
--- overshoot and red for going out. Advisory: nothing stops a car going
--- anywhere else.
+-- overshoot and red for going out; and a red cross on each space the roll
+-- would get to but the move is blocked from -- by cars in the way, an
+-- overshoot that keeps the car to its lane, a pit lane shut to it.
+-- Advisory: nothing stops a car going anywhere else.
 showReach = function(color)
     local tile, track = boardTrack()
     local reach = track and race:reachable(color, track)
@@ -1691,6 +1693,9 @@ showReach = function(color)
             end
             marks[#marks + 1] = { id = id, kind = kind }
         end
+    end
+    for _, id in ipairs(race:blockedSpaces(color, track, reach)) do
+        marks[#marks + 1] = { id = id, kind = "blocked" }
     end
     Track.setLayer("reach", Track.marks(tile, track, marks))
 end

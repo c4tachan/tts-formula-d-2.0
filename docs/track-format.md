@@ -152,10 +152,13 @@ colour (`fd.tts.track`, `Track.pits`).
 
 When a car may take the way into the pit lane is the ruleset's to say:
 `fd.core.moves` leaves it shut unless asked (`opts.pit`), and the race asks
-when the ruleset's `pitLane` is set. What a stop in a pit box does --
-wear restored, a gear cap, no exact roll needed to get there -- and the
-pit lane's own rules (no collisions, no overtaking) are rules (`fd.rules`),
-not track data.
+when the ruleset's `mayPit` says so -- in the basic rules, at the end of
+any lap but the last. The rest is rules too (`fd.rules`, `fd.core.race`),
+not track data: a car that ends its move in its own pit box makes its pit
+stop, with no exact roll needed to get there; braking, shifting down,
+collisions and engine strain do not count in the pit lane
+(`pitLaneExempt`); and cars there play after those on the circuit
+(`pitLanePlaysLast`).
 
 `tools/extract/find_pit.py` finds the pit lane's cells and the garages,
 and writes all of this. The two ends -- the slanted last divisions and the
