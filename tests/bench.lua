@@ -110,7 +110,7 @@ local sp = FDMonaco.spaces[100]
 local here = Track.worldOf(S.board, FDMonaco, sp.pos[1], sp.pos[2])
 measure("editor: pick up spaces", S, function() S.board.rightClick("Pick up spaces here", "Red", here) end)
 local marker = nil
-for _, o in ipairs(S.objects) do if o.name:find("^Space [iom]%.") then marker = o break end end
+for _, o in ipairs(S.objects) do if o.name:find("^Space [iompb]%.") then marker = o break end end
 measure("editor: change a lane", S, function() marker.rightClick("Lane 2", "Red") end)
 measure("editor: apply", S, function() S.board.rightClick("Apply track edits", "Red") end)
 measure("save the game", S, function() onSave() end)

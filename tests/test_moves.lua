@@ -244,7 +244,7 @@ function T.monaco_finish_line()
     local FDMonaco = require("fd.data.tracks.FDMonaco")
     local line = {}
     for _, id in ipairs(FDMonaco.finish.line) do line[id] = true end
-    eq(#FDMonaco.finish.line, 3, "a space past the line in each lane")
+    eq(#FDMonaco.finish.line, 4, "a space past the line in each lane, the pit lane's too")
     -- No link hops over the line: every way into s1 lands on it.
     for _, s in ipairs(FDMonaco.spaces) do
         for _, n in ipairs(s.next) do
@@ -268,6 +268,93 @@ function T.monaco_finish_line()
         end
     end
     eq(Moves.reach(FDMonaco, FDMonaco.start[1], 2)["m.s1.0"].crossed, true, "over it and along it")
+end
+
+function T.monaco_pit_lane()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local pit = FDMonaco.pit
+    eq(#pit.spaces, 18)
+    eq(#pit.boxes, 10, "two pit boxes for each of five teams")
+    -- One way, entry to exit: the track spaces touching the entry merge
+    -- lead into it, and nothing else leads into the pit lane.
+    eq(table.concat(pit.entry, ","), "i.s11.0,i.s11.1")
+    eq(table.concat(pit.exit, ","), "i.s1.1,i.s1.2")
+    local into = {}
+    for _, s in ipairs(FDMonaco.spaces) do
+        for _, n in ipairs(s.next) do
+            if FDMonaco.byId[n].pit and not s.pit then
+                into[#into + 1] = s.id
+                eq(n, pit.spaces[1], s.id .. " leads into the entry merge")
+            end
+        end
+    end
+    table.sort(into)
+    eq(table.concat(into, ","), table.concat(pit.entry, ","), "the only ways in")
+    for i, id in ipairs(pit.spaces) do
+        local s = FDMonaco.byId[id]
+        assert(s.pit and s.lane == 0, id)
+        local on = {}
+        for _, n in ipairs(s.next) do
+            if not FDMonaco.byId[n].box then on[#on + 1] = n end
+        end
+        eq(table.concat(on, ","), pit.spaces[i + 1] or table.concat(pit.exit, ","),
+            id .. " leads on down the pit lane")
+    end
+    -- The way in is only open to a car going into the pits.
+    local first = pit.spaces[1]
+    for _, entry in ipairs(pit.entry) do
+        eq(Moves.reach(FDMonaco, entry, 3)[first], nil, entry .. ": driving past")
+        assert(Moves.reach(FDMonaco, entry, 3, { pit = true })[first], entry .. ": pitting")
+    end
+    -- Out of the pit boxes and over the line, as on the track.
+    local r = Moves.reach(FDMonaco, pit.boxes[#pit.boxes].space, 8)
+    local out = {}
+    for _, id in ipairs(pit.exit) do
+        out[id] = true
+        eq(r[id].crossed, true, "leaving the pits by " .. id .. " crosses the line")
+    end
+    for id in pairs(r) do
+        assert(out[id] or FDMonaco.byId[id].pit or FDMonaco.byId[id].sector == "s1", id)
+    end
+end
+
+function T.monaco_pit_boxes()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local seats = {}
+    for _, b in ipairs(FDMonaco.pit.boxes) do
+        local box, beside = FDMonaco.byId[b.space], FDMonaco.byId[b.beside]
+        assert(not seats[b.player], b.player .. " has one pit box")
+        seats[b.player] = true
+        eq(box.box, b.player, b.space)
+        -- In from the pit lane space beside it, and back out the same way.
+        eq(table.concat(box.next, ","), b.beside, b.space .. " leads out beside it")
+        local into = false
+        for _, n in ipairs(beside.next) do into = into or n == b.space end
+        assert(into, b.beside .. " leads into " .. b.space)
+    end
+end
+
+function T.a_pit_box_is_open_only_to_its_own_car()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local b = FDMonaco.pit.boxes[2]
+    eq(b.player, "Brown")
+    -- From the space beside it, and passing on the way down the pit lane.
+    assert(Moves.reach(FDMonaco, b.beside, 1, { color = "Brown" })[b.space], "Brown goes in")
+    eq(Moves.reach(FDMonaco, b.beside, 1, { color = "Red" })[b.space], nil, "Red does not")
+    eq(Moves.reach(FDMonaco, b.beside, 1)[b.space], nil, "nor a car of no seat")
+    local before = FDMonaco.pit.spaces[3]
+    eq(Moves.reach(FDMonaco, before, 3, { color = "Brown" })[b.space].moved, 3, "on the way past")
+    eq(Moves.reach(FDMonaco, FDMonaco.pit.boxes[1].beside, 3, { color = "Brown" })[FDMonaco.pit.boxes[1].space],
+        nil, "nor White's box to Brown")
+    -- Out of it: to the space beside it, then on down the pit lane.
+    local r = Moves.reach(FDMonaco, b.space, 2, { color = "Brown" })
+    eq(r[b.beside].moved, 1, "back out beside it")
+    local on = nil
+    for _, n in ipairs(FDMonaco.byId[b.beside].next) do
+        if n ~= b.space then on = n end
+    end
+    eq(r[on].moved, 2, "and on")
+    eq(r[b.space].moved, 0, "or stay put")
 end
 
 -- The corner ahead -----------------------------------------------------------

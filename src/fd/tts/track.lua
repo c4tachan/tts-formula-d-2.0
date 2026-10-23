@@ -282,6 +282,43 @@ function Track.marks(tile, track, marks)
     return lines
 end
 
+-- A vector line is only ever a line, so a garage half is filled with
+-- lines laid side by side, each a stripe of it, overlapping a little so no
+-- board shows between them.
+local PIT_STRIPES = 6
+local PIT_OVERLAP = 1.15
+
+--- Each pit box's half of its team's garage, filled in the colour of the
+-- seat the box belongs to (see the track's `pit.boxes`). Nil on a track
+-- without a pit lane.
+function Track.pits(tile, track)
+    local boxes = track.pit and track.pit.boxes
+    if not boxes then return nil end
+    local f = Track.frame(tile, track)
+    local lines = {}
+    for _, b in ipairs(boxes) do
+        local g = b.garage
+        if g and b.player then
+            local a = math.rad(g.rot)
+            local fx, fy = math.cos(a), math.sin(a)
+            local half, deep = g.size[1] / 2, g.size[2]
+            local stripe = deep / PIT_STRIPES
+            local colour = Color.fromString(b.player)
+            for i = 1, PIT_STRIPES do
+                local o = (i - 0.5) * stripe - deep / 2
+                local cx, cy = g.pos[1] - fy * o, g.pos[2] + fx * o
+                lines[#lines + 1] = {
+                    points = { Track.localIn(f, cx - fx * half, cy - fy * half),
+                               Track.localIn(f, cx + fx * half, cy + fy * half) },
+                    color = colour,
+                    thickness = stripe * f.kx * PIT_OVERLAP,
+                }
+            end
+        end
+    end
+    return lines
+end
+
 local GRID_COLOUR = { 1, 1, 1 }
 local GRID_RADIUS = 16
 
@@ -317,9 +354,9 @@ function Track.grid(tile, track, ids)
 end
 
 -- The tile has one set of vector lines, shared by layers drawn in this
--- order: the space overlay, the grid being marked, then the reach
--- highlight on top.
-local LAYERS = { "overlay", "grid", "reach" }
+-- order: the pit boxes' colours, the space overlay, the grid being marked,
+-- then the reach highlight on top.
+local LAYERS = { "pits", "overlay", "grid", "reach" }
 local layers = {}
 
 --- Replace one layer's lines (nil or empty clears it) and redraw the tile.

@@ -98,6 +98,10 @@ def main():
             }
             if s.get("fixed"):
                 space["fixed"] = True        # links set by hand: never recomputed
+            if s.get("pit") or prev.get("pit"):
+                space["pit"] = True          # the pit lane (find_pit.py)
+            if s.get("box") or prev.get("box"):
+                space["box"] = s.get("box") or prev.get("box")   # a pit box, and whose
             spaces.append(space)
         spaces.sort(key=lambda s: str(s["id"]))
         track["spaces"] = spaces

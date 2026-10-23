@@ -53,6 +53,13 @@ local function state()
     return onSave().json.race
 end
 
+--- How many lines paint Monaco's pit boxes in their seats' colours: they
+-- are on the board whenever it shows a map with a pit lane.
+local function pitLines(S)
+    local Track = require("fd.tts.track")
+    return #(Track.pits(S.board, require("fd.data.tracks.FDMonaco")) or {})
+end
+
 --- Red joins at the beginner dashboard and gets the race under way.
 local function redRacing()
     local S = world()
@@ -748,6 +755,27 @@ function T.the_status_line_asks_for_a_car()
     assert(not S.beginner.buttons[1].label:find("no car"))
 end
 
+function T.pit_boxes_are_painted_in_their_seats_colours()
+    local S = world()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local seats = {}
+    for _, b in ipairs(FDMonaco.pit.boxes) do seats[b.player] = (seats[b.player] or 0) + 1 end
+    for _, c in ipairs({ "White", "Brown", "Red", "Orange", "Yellow", "Green", "Teal", "Blue", "Purple", "Pink" }) do
+        eq(seats[c], 1, c .. " has one pit box")
+    end
+    local painted = {}
+    for _, l in ipairs(S.board.getVectorLines()) do
+        if l.color.name then painted[l.color.name] = true end
+    end
+    for c in pairs(seats) do assert(painted[c], c .. "'s garage is painted on load") end
+    assert(pitLines(S) > 0)
+    eq(#S.board.getVectorLines(), pitLines(S), "and nothing else is drawn")
+    -- They stay under the overlay, and when it goes.
+    fdTrack({ color = "Red", steam_name = "RedPlayer" })
+    fdTrack({ color = "Red", steam_name = "RedPlayer" })
+    eq(#S.board.getVectorLines(), pitLines(S))
+end
+
 function T.track_overlay_maps_pixels_onto_the_board()
     local S = world()
     local Track = require("fd.tts.track")
@@ -771,13 +799,14 @@ function T.track_overlay_maps_pixels_onto_the_board()
             if byId[n] and byId[n].lane == s.lane then onDown = onDown + 1 break end
         end
     end
-    eq(#lines, #FDMonaco.outer + onDown, "a line per piece of edge and an arrow on down each lane")
+    eq(#lines, pitLines(S) + #FDMonaco.outer + onDown,
+        "the pit boxes, a line per piece of edge and an arrow on down each lane")
     assert(lines[1].thickness < 0.01, "thickness is in the tile's local space")
     eq(S.count("Space " .. FDMonaco.spaces[1].id .. " (lane " .. FDMonaco.spaces[1].lane .. ")"), 1,
         "a ghost car on the space")
     local ghosts = 0
     for _, o in ipairs(S.objects) do
-        if o.name:find("^Space [iom]%.") then ghosts = ghosts + 1 end
+        if o.name:find("^Space [iompb]%.") then ghosts = ghosts + 1 end
     end
     eq(ghosts, #FDMonaco.spaces, "one on every space")
     local g = S.find("Space " .. FDMonaco.spaces[1].id .. " (lane " .. FDMonaco.spaces[1].lane .. ")")
@@ -785,7 +814,7 @@ function T.track_overlay_maps_pixels_onto_the_board()
     assert(S.logged(FDMonaco.name))
 
     fdTrack({ color = "Red", steam_name = "RedPlayer" })
-    eq(#S.board.getVectorLines(), 0, "toggles back off")
+    eq(#S.board.getVectorLines(), pitLines(S), "toggles back off, to the pit boxes")
     eq(S.count("Space " .. FDMonaco.spaces[1].id .. " (lane " .. FDMonaco.spaces[1].lane .. ")"), 0,
         "and the ghosts go with it")
 end
@@ -935,7 +964,9 @@ local function marksOn(S)
     local n = { free = 0, brake = 0, other = 0 }
     for _, l in ipairs(S.board.lines or {}) do
         local c = l.color
-        if c[1] == 0.25 and c[2] == 1 then
+        if c.name then
+            -- a seat's colour (the stub's Color): the pit boxes, not a mark
+        elseif c[1] == 0.25 and c[2] == 1 then
             n.free = n.free + 1
         elseif c[1] == 1 and c[2] == 0.75 then
             n.brake = n.brake + 1
@@ -956,7 +987,7 @@ function T.a_roll_marks_where_the_car_can_go()
     eq(n.other, 0)
     -- The next shift starts a turn: the marks go.
     dropOn(S, S.find("Gear Stick"), "gear", 2)
-    eq(#S.board.lines, 0)
+    eq(#S.board.lines, pitLines(S), "only the pit boxes are left")
 end
 
 function T.marks_and_the_track_overlay_share_the_board()
@@ -967,9 +998,9 @@ function T.marks_and_the_track_overlay_share_the_board()
     roll(S, 1, 2)
     eq(#S.board.lines, overlay + 6, "marks drawn over the overlay")
     fdTrack({ color = "Red", steam_name = "RedPlayer" })
-    eq(#S.board.lines, 6, "the overlay goes, the marks stay")
+    eq(#S.board.lines, pitLines(S) + 6, "the overlay goes, the marks stay")
     fdUndo({ color = "Red", steam_name = "RedPlayer" })
-    eq(#S.board.lines, 0, "undo clears them")
+    eq(#S.board.lines, pitLines(S), "undo clears them")
 end
 
 function T.undo_keeps_the_cars_where_they_are()
@@ -1106,7 +1137,7 @@ end
 local function markersOut(S)
     local n = 0
     for _, o in ipairs(S.objects) do
-        if o.name:find("^Space [iom]%.") then n = n + 1 end
+        if o.name:find("^Space [iompb]%.") then n = n + 1 end
     end
     return n
 end
@@ -1276,7 +1307,7 @@ function T.editing_draws_every_link_as_an_arrow()
     local lines = S.board.getVectorLines()
     -- The grid is drawn over the links while editing.
     local nGrid = #(Track.grid(S.board, track, track.start) or {})
-    eq(#lines, #(FDMonaco.outer or {}) + nLinks + nGrid)
+    eq(#lines, pitLines(S) + #(FDMonaco.outer or {}) + nLinks + nGrid)
     -- A link's arrow is shaft plus head: five points, the tip twice.
     local last = lines[#lines - nGrid].points
     eq(#last, 5)
@@ -1358,7 +1389,7 @@ function T.the_editor_works_from_right_click_menus()
     eq(m.name, "Space " .. sp.id .. " (lane " .. to .. ")")
     local other = nil
     for _, o in ipairs(S.objects) do
-        if o ~= m and o.name:find("^Space [iom]%.") then other = o break end
+        if o ~= m and o.name:find("^Space [iompb]%.") then other = o break end
     end
     other.rightClick("Delete space", "Red")
     S.board.rightClick("Add a space here", "Red", w)
@@ -1377,7 +1408,7 @@ function T.deleting_every_marker_before_apply_is_still_saved()
     local gone = 0
     for i = #S.objects, 1, -1 do
         local o = S.objects[i]
-        if o.name:find("^Space [iom]%.") then o.destruct() gone = gone + 1 end
+        if o.name:find("^Space [iompb]%.") then o.destruct() gone = gone + 1 end
     end
     assert(gone > 0)
     -- No markers left and no Apply: the deletions must still reach the save.

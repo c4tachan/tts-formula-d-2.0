@@ -54,6 +54,10 @@ def main():
     map_id = sys.argv[1] if len(sys.argv) > 1 else "FDMonaco"
     track = json.loads((ROOT / "tracks" / f"{map_id}.json").read_text(encoding="utf-8"))
     info, im = board_image(map_id)
+    # No arrows in the pit lane: leave it, and the way into it, out.
+    pit = {s["id"] for s in track["spaces"] if s.get("pit")}
+    track["spaces"] = [dict(s, next=[n for n in s["next"] if n not in pit])
+                       for s in track["spaces"] if s["id"] not in pit]
     spaces = track["spaces"]
     pos = np.array([s["pos"] for s in spaces])
     cell = fa.cell_length(track)

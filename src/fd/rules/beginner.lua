@@ -28,6 +28,10 @@ Rules.zones = {
 -- Rolling the top face of these gears strains every engine in 5th or 6th.
 Rules.engineStrain = { [5] = 20, [6] = 30 }
 
+-- Whether a car may take the way into the pit lane. What a stop there
+-- does, and when it may be made, are the pit stop rules below.
+Rules.pitLane = true
+
 -- Gear cap on the turn after a pit stop.
 Rules.pitMaxGear = 4
 

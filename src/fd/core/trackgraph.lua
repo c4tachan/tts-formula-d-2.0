@@ -55,11 +55,25 @@ local function around(g, x, y, r, fn)
     end
 end
 
+--- The lane a space is filed under: the pit lane apart from every other,
+-- whatever its number, so no link is ever worked out across its wall, and
+-- the pit boxes beside it apart again.
+local function laneKey(s)
+    return s.box and "box" or s.pit and "pit" or s.lane
+end
+
+--- Whether the link from `s` to `o` is one relinking cannot make: between
+-- the pit lane and the track, or into or out of a pit box.
+local function setByHand(s, o)
+    return (s.pit or false) ~= (o.pit or false) or s.box or o.box
+end
+
 local function byLane(spaces, size)
     local lanes, grids = {}, {}
     for _, s in ipairs(spaces) do
-        lanes[s.lane] = lanes[s.lane] or {}
-        table.insert(lanes[s.lane], s)
+        local k = laneKey(s)
+        lanes[k] = lanes[k] or {}
+        table.insert(lanes[k], s)
     end
     for l, list in pairs(lanes) do grids[l] = newGrid(list, size) end
     return grids
@@ -74,7 +88,7 @@ function Graph.cellLength(spaces)
     local gaps = {}
     for _, s in ipairs(spaces) do
         local fx, fy = facing(s)
-        local g = grids[s.lane]
+        local g = grids[laneKey(s)]
         local r = 64
         while r <= 1024 do
             local best = nil
@@ -108,6 +122,10 @@ end
 -- of that point are equally near it, and the far one skips a space.) Only
 -- spaces ahead and within reach count, so a missing space leaves a visible
 -- gap rather than a link across the infield.
+--
+-- The pit lane is apart: its spaces link on down it and nowhere else.
+-- The ways in and out of it, and of its pit boxes, are set by hand
+-- (find_pit.py), never worked out, and a space keeps any it has.
 -- Returns the cell length it worked with, for problems() to reuse.
 function Graph.relink(spaces, reachCells)
     local cell = Graph.cellLength(spaces)
@@ -117,6 +135,8 @@ function Graph.relink(spaces, reachCells)
     end
     local reach = cell * (reachCells or 2.2)
     local grids = byLane(spaces, reach)
+    local byId = {}
+    for _, s in ipairs(spaces) do byId[s.id] = s end
     local function nearestAhead(s, fx, fy, g, cone)
         if not g then return nil end
         local best, bestD = nil, nil
@@ -156,13 +176,20 @@ function Graph.relink(spaces, reachCells)
         -- Links set by hand are kept as they are.
         if not s.fixed then
             local fx, fy = facing(s)
-            local straight = nearestAhead(s, fx, fy, grids[s.lane], 0.5)
-                or turningAhead(s, fx, fy, grids[s.lane])
             local nxt = {}
-            if straight then nxt[#nxt + 1] = straight.id end
-            for _, l in ipairs({ s.lane - 1, s.lane + 1 }) do
-                local diag = nearestAhead(s, fx, fy, grids[l], 1.2)
-                if diag then nxt[#nxt + 1] = diag.id end
+            -- A pit box leads nowhere but back out.
+            if not s.box then
+                local own = grids[laneKey(s)]
+                local straight = nearestAhead(s, fx, fy, own, 0.5) or turningAhead(s, fx, fy, own)
+                if straight then nxt[#nxt + 1] = straight.id end
+                for _, l in ipairs(s.pit and {} or { s.lane - 1, s.lane + 1 }) do
+                    local diag = nearestAhead(s, fx, fy, grids[l], 1.2)
+                    if diag then nxt[#nxt + 1] = diag.id end
+                end
+            end
+            for _, n in ipairs(s.next or {}) do
+                local o = byId[n]
+                if o and setByHand(s, o) then nxt[#nxt + 1] = n end
             end
             table.sort(nxt)
             s.next = nxt
@@ -197,16 +224,19 @@ function Graph.problems(spaces, cell)
                 out[#out + 1] = { id = s.id, text = "faces against the spaces around it" }
             end
         end
+        -- The end of the pit lane leads back onto the track, and a pit box
+        -- back out into the pit lane: that is their way on.
         local straight = false
         for _, n in ipairs(s.next or {}) do
             local o = byId[n]
-            if o and o.lane == s.lane then straight = true end
+            if o and (laneKey(o) == laneKey(s) or (s.pit and not o.pit) or s.box) then straight = true end
             if o and dist(s, o) > 2.2 * cell then
                 out[#out + 1] = { id = s.id, text = "link to space " .. n .. " is unusually long" }
             end
         end
         if not straight then
-            out[#out + 1] = { id = s.id, text = "no space ahead in lane " .. s.lane }
+            out[#out + 1] = { id = s.id, text = s.pit and "no space ahead in the pit lane"
+                or "no space ahead in lane " .. s.lane }
         end
         if g then
             around(g, s.pos[1], s.pos[2], close, function(o)

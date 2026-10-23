@@ -19,7 +19,10 @@ T.outer = {
 -- lane i/m/o (inside, middle, outside of the lap), sector cN or sN,
 -- n counting from 0 at the sector's leading edge. `corner`
 -- is the corner a space lies inside; `fixed` marks links set by hand
--- in the editor, which are never recomputed.
+-- in the editor, which are never recomputed. `pit` marks the pit
+-- lane, lane 0 and coded p.<sector>.<n>, and its pit boxes, coded
+-- b.<sector>.<n> after the pit lane space beside them; `box` is the
+-- seat a pit box belongs to.
 T.spaces = {
     { id = "i.c1.0", pos = { 488.5, 391.5 }, rot = 312.1, lane = 1, sector = "c1", next = { "i.c1.1" }, corner = 1, fixed = true },
     { id = "i.c1.1", pos = { 530.4, 362.7 }, rot = 346.3, lane = 1, sector = "c1", next = { "i.c1.2" }, corner = 1, fixed = true },
@@ -97,8 +100,8 @@ T.spaces = {
     { id = "i.s10.4", pos = { 266.1, 1468.7 }, rot = 186.4, lane = 1, sector = "s10", next = { "i.s10.5", "m.s10.4" } },
     { id = "i.s10.5", pos = { 223.1, 1464.3 }, rot = 185.6, lane = 1, sector = "s10", next = { "i.s10.6", "m.s10.5" } },
     { id = "i.s10.6", pos = { 180.1, 1460.3 }, rot = 186.5, lane = 1, sector = "s10", next = { "i.c10.0" }, fixed = true },
-    { id = "i.s11.0", pos = { 161.0, 1354.7 }, rot = 283.6, lane = 1, sector = "s11", next = { "i.s11.1", "m.s11.0" } },
-    { id = "i.s11.1", pos = { 166.5, 1304.4 }, rot = 274.5, lane = 1, sector = "s11", next = { "i.s11.2", "m.s11.1" } },
+    { id = "i.s11.0", pos = { 161.0, 1354.7 }, rot = 283.6, lane = 1, sector = "s11", next = { "i.s11.1", "m.s11.0", "p.s11.0" } },
+    { id = "i.s11.1", pos = { 166.5, 1304.4 }, rot = 274.5, lane = 1, sector = "s11", next = { "i.s11.2", "m.s11.1", "p.s11.0" } },
     { id = "i.s11.10", pos = { 184.9, 893.5 }, rot = 280.4, lane = 1, sector = "s11", next = { "i.s11.11", "m.s11.10" } },
     { id = "i.s11.11", pos = { 196.5, 850.4 }, rot = 286.1, lane = 1, sector = "s11", next = { "i.s11.12", "m.s11.11" } },
     { id = "i.s11.12", pos = { 210.3, 807.6 }, rot = 290.3, lane = 1, sector = "s11", next = { "i.s11.13", "m.s11.12" } },
@@ -518,6 +521,34 @@ T.spaces = {
     { id = "o.s9.1", pos = { 430.5, 1208.9 }, rot = 86.3, lane = 3, sector = "s9", next = { "m.s9.1", "o.s9.2" } },
     { id = "o.s9.2", pos = { 437.4, 1251.9 }, rot = 78.0, lane = 3, sector = "s9", next = { "m.s9.2", "o.s9.3" } },
     { id = "o.s9.3", pos = { 447.9, 1294.9 }, rot = 73.6, lane = 3, sector = "s9", next = { "o.c9.0" }, fixed = true },
+    { id = "p.s11.0", pos = { 200.0, 1318.0 }, rot = 279.1, lane = 0, sector = "s11", next = { "p.s11.1" }, fixed = true, pit = true },
+    { id = "p.s11.1", pos = { 225.9, 1263.0 }, rot = 283.9, lane = 0, sector = "s11", next = { "p.s11.2" }, fixed = true, pit = true },
+    { id = "p.s11.2", pos = { 238.9, 1215.8 }, rot = 272.8, lane = 0, sector = "s11", next = { "p.s11.3" }, fixed = true, pit = true },
+    { id = "p.s11.3", pos = { 239.3, 1171.8 }, rot = 267.8, lane = 0, sector = "s11", next = { "b.s11.3", "p.s11.4" }, fixed = true, pit = true },
+    { id = "p.s11.4", pos = { 238.7, 1131.3 }, rot = 269.3, lane = 0, sector = "s11", next = { "b.s11.4", "p.s11.5" }, fixed = true, pit = true },
+    { id = "p.s11.5", pos = { 243.1, 1090.0 }, rot = 272.0, lane = 0, sector = "s11", next = { "b.s11.5", "p.s11.6" }, fixed = true, pit = true },
+    { id = "p.s11.6", pos = { 244.6, 1048.3 }, rot = 274.9, lane = 0, sector = "s11", next = { "b.s11.6", "p.s11.7" }, fixed = true, pit = true },
+    { id = "p.s11.7", pos = { 248.4, 1006.2 }, rot = 277.2, lane = 0, sector = "s11", next = { "b.s11.7", "p.s11.8" }, fixed = true, pit = true },
+    { id = "p.s11.8", pos = { 250.6, 963.2 }, rot = 279.7, lane = 0, sector = "s11", next = { "b.s11.8", "p.s11.9" }, fixed = true, pit = true },
+    { id = "p.s11.9", pos = { 264.6, 922.3 }, rot = 283.4, lane = 0, sector = "s11", next = { "b.s11.9", "p.s11.10" }, fixed = true, pit = true },
+    { id = "p.s11.10", pos = { 275.2, 881.4 }, rot = 286.2, lane = 0, sector = "s11", next = { "b.s11.10", "p.s11.11" }, fixed = true, pit = true },
+    { id = "p.s11.11", pos = { 286.8, 840.2 }, rot = 288.4, lane = 0, sector = "s11", next = { "b.s11.11", "p.s11.12" }, fixed = true, pit = true },
+    { id = "p.s11.12", pos = { 301.2, 799.8 }, rot = 291.4, lane = 0, sector = "s11", next = { "b.s11.12", "p.s11.13" }, fixed = true, pit = true },
+    { id = "p.s11.13", pos = { 316.0, 760.2 }, rot = 296.0, lane = 0, sector = "s11", next = { "p.s11.14" }, fixed = true, pit = true },
+    { id = "p.s11.14", pos = { 334.7, 722.6 }, rot = 298.2, lane = 0, sector = "s11", next = { "p.s11.15" }, fixed = true, pit = true },
+    { id = "p.s11.15", pos = { 354.3, 684.4 }, rot = 297.6, lane = 0, sector = "s11", next = { "p.s1.0" }, fixed = true, pit = true },
+    { id = "p.s1.0", pos = { 368.1, 642.0 }, rot = 290.8, lane = 0, sector = "s1", next = { "p.s1.1" }, fixed = true, pit = true },
+    { id = "p.s1.1", pos = { 375.0, 588.0 }, rot = 310.5, lane = 0, sector = "s1", next = { "i.s1.1", "i.s1.2" }, fixed = true, pit = true },
+    { id = "b.s11.3", pos = { 207.3, 1172.1 }, rot = 267.3, lane = 0, sector = "s11", next = { "p.s11.3" }, fixed = true, pit = true, box = "White" },
+    { id = "b.s11.4", pos = { 205.3, 1131.0 }, rot = 267.3, lane = 0, sector = "s11", next = { "p.s11.4" }, fixed = true, pit = true, box = "Brown" },
+    { id = "b.s11.5", pos = { 206.6, 1088.8 }, rot = 273.5, lane = 0, sector = "s11", next = { "p.s11.5" }, fixed = true, pit = true, box = "Yellow" },
+    { id = "b.s11.6", pos = { 209.3, 1044.2 }, rot = 273.5, lane = 0, sector = "s11", next = { "p.s11.6" }, fixed = true, pit = true, box = "Orange" },
+    { id = "b.s11.7", pos = { 214.2, 1000.8 }, rot = 278.1, lane = 0, sector = "s11", next = { "p.s11.7" }, fixed = true, pit = true, box = "Green" },
+    { id = "b.s11.8", pos = { 220.5, 956.7 }, rot = 278.1, lane = 0, sector = "s11", next = { "p.s11.8" }, fixed = true, pit = true, box = "Teal" },
+    { id = "b.s11.9", pos = { 229.9, 913.7 }, rot = 284.9, lane = 0, sector = "s11", next = { "p.s11.9" }, fixed = true, pit = true, box = "Red" },
+    { id = "b.s11.10", pos = { 241.4, 870.4 }, rot = 284.9, lane = 0, sector = "s11", next = { "p.s11.10" }, fixed = true, pit = true, box = "Pink" },
+    { id = "b.s11.11", pos = { 255.3, 827.7 }, rot = 290.0, lane = 0, sector = "s11", next = { "p.s11.11" }, fixed = true, pit = true, box = "Blue" },
+    { id = "b.s11.12", pos = { 270.7, 785.6 }, rot = 290.0, lane = 0, sector = "s11", next = { "p.s11.12" }, fixed = true, pit = true, box = "Purple" },
 }
 
 -- Corners in running order from the start. A space inside one carries
@@ -542,7 +573,32 @@ T.start = { "o.s11.15", "i.s11.15", "o.s11.12", "i.s11.12", "o.s11.9", "i.s11.9"
 
 -- The finish line, as the space just past it in each lane: a move
 -- that steps onto one of these has crossed the line.
-T.finish = { line = { "i.s1.0", "m.s1.0", "o.s1.0" } }
+T.finish = { line = { "i.s1.0", "m.s1.0", "o.s1.0", "p.s1.0" } }
+
+-- The pit lane: the track spaces that lead into it and the ones it
+-- leads out to, and its spaces from entry to exit. Then the pit boxes,
+-- where a car stops to make its pit stop: each a space in half of a
+-- team's printed garage, the pit lane space beside it that is its way
+-- in and out, the colour printed there, the seat it belongs to, and
+-- the garage half (centre, facing and length by depth, in pixels) to
+-- paint in that seat's colour. Nil on a track without one.
+T.pit = {
+    entry = { "i.s11.0", "i.s11.1" },
+    exit = { "i.s1.1", "i.s1.2" },
+    spaces = { "p.s11.0", "p.s11.1", "p.s11.2", "p.s11.3", "p.s11.4", "p.s11.5", "p.s11.6", "p.s11.7", "p.s11.8", "p.s11.9", "p.s11.10", "p.s11.11", "p.s11.12", "p.s11.13", "p.s11.14", "p.s11.15", "p.s1.0", "p.s1.1" },
+    boxes = {
+        { space = "b.s11.3", beside = "p.s11.3", colour = "white", player = "White", garage = { pos = { 207.3, 1172.1 }, rot = 267.3, size = { 41.2, 35.6 } } },
+        { space = "b.s11.4", beside = "p.s11.4", colour = "white", player = "Brown", garage = { pos = { 205.3, 1131.0 }, rot = 267.3, size = { 41.2, 35.6 } } },
+        { space = "b.s11.5", beside = "p.s11.5", colour = "yellow", player = "Yellow", garage = { pos = { 206.6, 1088.8 }, rot = 273.5, size = { 44.6, 39.9 } } },
+        { space = "b.s11.6", beside = "p.s11.6", colour = "yellow", player = "Orange", garage = { pos = { 209.3, 1044.2 }, rot = 273.5, size = { 44.6, 39.9 } } },
+        { space = "b.s11.7", beside = "p.s11.7", colour = "green", player = "Green", garage = { pos = { 214.2, 1000.8 }, rot = 278.1, size = { 44.5, 39.0 } } },
+        { space = "b.s11.8", beside = "p.s11.8", colour = "green", player = "Teal", garage = { pos = { 220.5, 956.7 }, rot = 278.1, size = { 44.5, 39.0 } } },
+        { space = "b.s11.9", beside = "p.s11.9", colour = "red", player = "Red", garage = { pos = { 229.9, 913.7 }, rot = 284.9, size = { 44.8, 39.7 } } },
+        { space = "b.s11.10", beside = "p.s11.10", colour = "red", player = "Pink", garage = { pos = { 241.4, 870.4 }, rot = 284.9, size = { 44.8, 39.7 } } },
+        { space = "b.s11.11", beside = "p.s11.11", colour = "blue", player = "Blue", garage = { pos = { 255.3, 827.7 }, rot = 290.0, size = { 44.9, 39.2 } } },
+        { space = "b.s11.12", beside = "p.s11.12", colour = "blue", player = "Purple", garage = { pos = { 270.7, 785.6 }, rot = 290.0, size = { 44.9, 39.2 } } },
+    },
+}
 
 -- Where the dice sit (image pixels): on the map's name panel, clear of
 -- the track. Without it they sit in the middle of the board.

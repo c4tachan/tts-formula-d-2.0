@@ -167,6 +167,79 @@ function T.corner_links_across_a_lane_do_not_double_up()
     eq(flagged(s, "and so does"), "2", "the second space to claim 6 is flagged")
 end
 
+--- The straight with a pit lane beside its inside lane, past a wall: lane 0,
+-- cells 101.. in a row, the way in from space 1 set by hand.
+local function withPit(cells)
+    local s = straight(cells)
+    for c = 1, cells do
+        s[#s + 1] = { id = 100 + c, lane = 0, pit = true, rot = 0, pos = { c * 40 + 20, 0 } }
+    end
+    byId(s, 1).next = { 101 }
+    return s
+end
+
+function T.the_pit_lane_links_only_down_itself()
+    local s = withPit(5)
+    Graph.relink(s)
+    eq(table.concat(byId(s, 102).next, ","), "103", "no link out across the wall")
+    eq(table.concat(byId(s, 3).next, ","), "4,9", "nor in: the inside lane's lane below is not the pit lane")
+    eq(table.concat(byId(s, 1).next, ","), "2,7,101", "the way in, set by hand, is kept")
+end
+
+function T.the_pit_lane_end_leads_back_onto_the_track()
+    local s = withPit(5)
+    Graph.relink(s)
+    byId(s, 105).next, byId(s, 105).fixed = { 5 }, true
+    eq(flagged(s, "no space ahead"), "5,10,15", "only the track's own ends")
+    byId(s, 105).next = {}
+    eq(flagged(s, "no space ahead in the pit lane"), "105")
+end
+
+function T.relinking_a_pit_space_keeps_its_ways_in_and_out()
+    local s = withPit(5)
+    -- The last pit space leads back onto the track, and the one before it
+    -- into a pit box beside it; none of them fixed.
+    s[#s + 1] = { id = 200, lane = 0, pit = true, box = "Brown", rot = 0, pos = { 180, -30 }, next = { 104 } }
+    byId(s, 104).next = { 105, 200 }
+    byId(s, 105).next = { 5 }
+    Graph.relink(s)
+    eq(table.concat(byId(s, 105).next, ","), "5", "the way out is kept")
+    eq(table.concat(byId(s, 104).next, ","), "105,200", "on down the pit lane, and into the box")
+    eq(table.concat(byId(s, 200).next, ","), "104", "the box leads back out, and nowhere else")
+    eq(table.concat(byId(s, 103).next, ","), "104", "not into a box it is not beside")
+    eq(flagged(s, "no space ahead"), "5,10,15", "a box's way out is its way on")
+end
+
+function T.monaco_pit_lane_is_sound()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local spaces = {}
+    for i, s in ipairs(FDMonaco.spaces) do
+        local nxt = {}
+        for k, n in ipairs(s.next) do nxt[k] = n end
+        spaces[i] = { id = s.id, pos = s.pos, rot = s.rot, lane = s.lane, next = nxt,
+                      fixed = s.fixed, corner = s.corner, pit = s.pit, box = s.box }
+    end
+    -- As the editor opens it: relinked, then checked.
+    local cell = Graph.relink(spaces)
+    local pit = {}
+    for _, list in ipairs({ FDMonaco.pit.entry, FDMonaco.pit.exit, FDMonaco.pit.spaces }) do
+        for _, id in ipairs(list) do pit[id] = true end
+    end
+    for _, b in ipairs(FDMonaco.pit.boxes) do pit[b.space] = true end
+    for _, p in ipairs(Graph.problems(spaces, cell)) do
+        assert(not pit[p.id], p.id .. ": " .. p.text)
+    end
+    local byIdM = {}
+    for _, s in ipairs(spaces) do byIdM[s.id] = s end
+    for _, entry in ipairs(FDMonaco.pit.entry) do
+        local found = false
+        for _, n in ipairs(byIdM[entry].next) do
+            if n == FDMonaco.pit.spaces[1] then found = true end
+        end
+        assert(found, "relinking keeps the way into the pits from " .. entry)
+    end
+end
+
 function T.nearest_finds_the_closest_space()
     local s = straight(4)
     local n, d = Graph.nearest(s, 81, 51)

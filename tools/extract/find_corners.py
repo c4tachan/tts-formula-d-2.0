@@ -241,7 +241,10 @@ def recode(track, codes, arrows_path):
     spaces = track["spaces"]
     for s in spaces:
         s["next"] = [codes.get(n, n) for n in s["next"]]
-        s["id"] = codes[s["id"]]
+        s["id"] = codes.get(s["id"], s["id"])   # the pit lane keeps its own codes
+    if track.get("pit"):
+        for end in ("entry", "exit"):
+            track["pit"][end] = [codes.get(i, i) for i in track["pit"][end]]
     lane_of = {"i": 0, "m": 1, "o": 2}
     def key(s):
         lane, sector, n = s["id"].split(".")
@@ -297,7 +300,8 @@ def main():
     main_road = track_proper(road, line, width)
 
     lab, n_lines = pieces(im, main_road)
-    spaces = track["spaces"]
+    # The pit lane is no part of the ring: find_pit.py codes it.
+    spaces = [s for s in track["spaces"] if not s.get("pit")]
     where = {s["id"]: piece_at(lab, *s["pos"]) for s in spaces}
     used = sorted(set(where.values()) - {0})
     print("1. %d red lines cut the road into %d pieces holding spaces" % (n_lines, len(used)))
