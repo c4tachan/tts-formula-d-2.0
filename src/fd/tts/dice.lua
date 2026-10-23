@@ -28,12 +28,26 @@ local known = {}
 
 --- Give a gear die its rotation values. The models ship without any, so TTS
 -- cannot read them until this runs; it is idempotent and cheap.
+--
+-- Most of the models also ship with a non-convex collider, which only holds
+-- up on a locked object: thrown, such a die can fall straight through the
+-- board. One is made convex here, which takes a reload; the reloaded die
+-- comes back through here (onObjectSpawn). Returns the object to go on
+-- using -- the reloaded one, if it was.
 function Dice.prepare(obj)
     local gear = Dice.gearOf(obj)
-    if gear then
-        obj.setRotationValues(DiceData[gear])
-        known[gear] = obj.getGUID()
+    if not gear then
+        return obj
     end
+    known[gear] = obj.getGUID()
+    local custom = obj.getCustomObject()
+    if custom and custom.convex == false then
+        custom.convex = true
+        obj.setCustomObject(custom)
+        return obj.reload()
+    end
+    obj.setRotationValues(DiceData[gear])
+    return obj
 end
 
 function Dice.prepareAll()
@@ -66,6 +80,9 @@ end
 local SPACING = 2.2   -- world units between neighbouring parked dice
 local LIFT = 0.6      -- above the board face, so a die sits on it
 local PARK_GAP = 1.5  -- between the tray's wall and the parked row
+-- How high the die in play is let go above the tray's floor: well clear of
+-- the board, as a die put down inside the board's face falls through it.
+local DROP = 2
 
 -- Where the dice were last laid out: the tray's centre, and which way the
 -- parked row lies from it (along X or Z, towards the board's middle).
@@ -203,7 +220,11 @@ function Dice.activate(gear)
         return nil
     end
     if gear == active then
-        return active and Dice.find(active)
+        local die = active and Dice.find(active)
+        if die or not active then
+            return die
+        end
+        active = nil -- it has gone: fall through, to bring in another
     end
     local was = active and Dice.find(active)
     if was then
@@ -215,7 +236,7 @@ function Dice.activate(gear)
         return nil
     end
     local c = place.center
-    fix(die, { x = c.x, y = c.y + LIFT, z = c.z }, true)
+    fix(die, { x = c.x, y = c.y + DROP, z = c.z }, true)
     active = gear
     return die
 end
@@ -268,8 +289,7 @@ local function takeFrom(bag, missing)
             bag.takeObject({
                 guid = item.guid, position = pos, smooth = false,
                 callback_function = function(obj)
-                    Dice.prepare(obj)
-                    fix(obj, pos)
+                    fix(Dice.prepare(obj), pos)
                 end,
             })
             n = n + 1
@@ -278,11 +298,10 @@ local function takeFrom(bag, missing)
     return n
 end
 
---- Make sure all seven dice are out, parked by a tray at `center` (see
--- Dice.layout), fetching any that are not: from the setup board's bag, else
--- from a spare set. `onDone(n)` is told how many were fetched, once they are.
-function Dice.setOut(center, middle, onDone)
-    Dice.layout(center, middle)
+--- Fetch whichever of the seven dice are not on the table, parking each by
+-- the tray: from the setup board's bag, else from a spare set. `onDone(n)`
+-- is told how many were fetched.
+local function fetchMissing(onDone)
     local onTable = {}
     for _, o in ipairs(getObjects()) do onTable[o.getName()] = true end
     local missing, count = {}, 0
@@ -309,6 +328,32 @@ function Dice.setOut(center, middle, onDone)
             onDone(fetched)
         end,
     })
+end
+
+--- Make sure all seven dice are out, parked by a tray at `center` (see
+-- Dice.layout), fetching any that are not. `onDone(n)` is told how many
+-- were fetched.
+function Dice.setOut(center, middle, onDone)
+    Dice.layout(center, middle)
+    fetchMissing(onDone)
+end
+
+local restocking = false
+
+--- Mid-race, fetch any die that has gone -- fallen off the table, say --
+-- and park it by the tray. Does nothing before the dice are laid out, or
+-- while a fetch is already on its way. `onDone(n)` is told how many came.
+function Dice.restock(onDone)
+    if not place or restocking then
+        return
+    end
+    restocking = true
+    -- Should the bags never hand anything over, a later try is not held up.
+    Wait.time(function() restocking = false end, 10)
+    fetchMissing(function(n)
+        restocking = false
+        onDone(n)
+    end)
 end
 
 local watching = {}

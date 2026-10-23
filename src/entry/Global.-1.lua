@@ -39,7 +39,7 @@ local useBoardTrack -- likewise
 local joinAt -- with the dashboard buttons, below
 local deliver, dealInSeated, dropDashless, bench -- likewise
 local isAdmin -- with the race controls, below
-local layDice, activateDie -- with the track, below
+local layDice, activateDie, restockDice -- with the track, below
 -- What syncTurns last told TTS's Turns, as { on, order, color }; nil until
 -- it has, so the first sync after a load sets every part.
 local turnsSet = nil
@@ -1076,7 +1076,9 @@ function fdUiRoll(player)
     local gear = car.gear
     local die = Dice.throw(gear)
     if not die then
-        broadcastToColor("The " .. Race.gearName(gear) .. " gear die is not on the table.", player.color, LEVEL_RGB.warn)
+        broadcastToColor("The " .. Race.gearName(gear) .. " gear die has gone: another is on its way -- click Roll again in a moment.",
+            player.color, LEVEL_RGB.warn)
+        restockDice()
         return
     end
     die.highlightOn(player.color, 3)
@@ -1353,11 +1355,26 @@ local function diceCenter()
     return middle, middle
 end
 
+--- Fetch any die that has gone missing in the race, then put the die in
+-- play in the tray.
+restockDice = function()
+    Dice.restock(function(n)
+        if n > 0 then
+            printToAll(string.format("Put %d missing dice back out", n), LEVEL_RGB.info)
+            -- A moment for them to come out of the bag.
+            Wait.time(function() activateDie() end, 1)
+        end
+    end)
+end
+
 --- The die in play: the gear of the car to play, if it has one; with
--- none, the tray stays empty.
+-- none, the tray stays empty. A die that has gone is fetched again.
 activateDie = function()
     local due = race:turn()
-    Dice.activate(due and due.gear or nil)
+    local gear = due and due.gear or 0
+    if not Dice.activate(gear) and gear > 0 and not Dice.find(gear) then
+        restockDice()
+    end
 end
 
 --- Lay the dice out by their tray, then put the die in play in it. With

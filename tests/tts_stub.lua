@@ -99,6 +99,14 @@ function Stub.object(name, props)
         return { center = o.pos, size = o.size or vec(1, 1, 1), offset = vec(0, 0, 0) }
     end
     o.getCustomObject = function() return o.custom or {} end
+    o.setCustomObject = function(c) o.custom = c end
+    -- Reloading keeps the object, as far as the tests go: TTS spawns it
+    -- afresh, under the same guid.
+    o.reload = function()
+        o.reloads = (o.reloads or 0) + 1
+        if onObjectSpawn then onObjectSpawn(o) end
+        return o
+    end
     o.setVectorLines = function(l) o.lines = l end
     o.getVectorLines = function() return o.lines or {} end
     o.getTransformUp = function() return o.up end

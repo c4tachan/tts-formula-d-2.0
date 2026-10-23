@@ -2030,4 +2030,46 @@ function T.the_host_can_remove_a_driver_who_dropped_out()
     assert(host.color == "Orange", "the host stays where they are")
 end
 
+function T.a_die_lost_in_the_race_is_fetched_again()
+    local S = redRacing()
+    local names = {}
+    for i, n in ipairs({ "First", "Second", "Third", "Fourth", "Fifth", "Sixth" }) do
+        names[i] = { name = n .. " Gear Dice", guid = "d" .. i }
+    end
+    names[7] = { name = "Damage Dice", guid = "d7" }
+    S.object("Dice Set Bag", { guid = "ac4939", spawns = "Dice Set", spawnContents = names })
+    fdUiShift(Player.Red, "1")
+    -- Thrown, it falls through the table and is gone.
+    S.find("First Gear Dice").destruct()
+    fdUiRoll(Player.Red)
+    assert(S.logged("1st gear die has gone"), "Red is told")
+    assert(S.logged("Put 1 missing dice back out"))
+    local die = S.find("First Gear Dice")
+    assert(die, "a new one is out")
+    eq(S.count("First Gear Dice"), 1, "just the one")
+    eq(S.count("Second Gear Dice"), 1, "and nothing else doubled")
+    assert(inTray(S, die), "in the tray, as it is the die in play")
+    die.value = 2
+    fdUiRoll(Player.Red)
+    eq(state().cars.Red.lastRoll, 2, "and it rolls")
+end
+
+function T.the_die_in_play_is_let_go_above_the_tray()
+    local S = redRacing()
+    fdUiShift(Player.Red, "1")
+    local loose, parked = S.find("First Gear Dice"), S.find("Second Gear Dice")
+    assert(loose.pos.y > parked.pos.y + 1, "dropped in from well above the board")
+end
+
+function T.a_gear_die_is_given_a_convex_collider()
+    local S = world()
+    local die = S.object("First Gear Dice", { custom = { mesh = "m", collider = "c", convex = false } })
+    onObjectSpawn(die)
+    eq(die.custom.convex, true, "convex, so it cannot fall through the board")
+    eq(die.reloads, 1, "reloaded to take it")
+    eq(#die.rotationValues, 4, "and taught its faces once back")
+    onObjectSpawn(die)
+    eq(die.reloads, 1, "only once")
+end
+
 return T
