@@ -3,8 +3,10 @@
 -- host has picked, and holds the one button that starts the race -- the grid
 -- is rolled and the race begun in the same click (see fdSetupStart).
 --
--- Everyone sees it; the rule buttons and Start are for the host and promoted
--- players. It comes back if the race is reset to setup.
+-- Everyone sees it; the buttons are for the host and promoted players: the
+-- rules, Start race, and the track tools. It comes back once the race is
+-- over, and stays up while the track editor is open, so the editor can
+-- always be closed.
 
 local Ui = require("fd.tts.ui")
 
@@ -23,6 +25,8 @@ local PICKED = "#2E7D32|#388E3C|#1B5E20|#2E7D3280"
 local LAPS = { 1, 2 }
 
 local ready = false
+local editorText = ""
+local noRace = true -- whether the last refresh found no race on
 
 local function el(tag, attrs, children, value)
     return { tag = tag, attributes = attrs or {}, children = children or {}, value = value }
@@ -41,7 +45,7 @@ local function button(id, label, onClick, extra)
 end
 
 local STEPS = table.concat({
-    "<b>1.</b> Take a coloured seat: you are dealt a dashboard and a car.",
+    "<b>1.</b> Take a coloured seat. Everyone seated is dealt a dashboard and a car when the race starts.",
     "<b>2.</b> The host picks a map (Choose map, below) and the rules.",
     "<b>3.</b> The host presses <b>Start race</b>: the grid is rolled, the cars put on it, and the race begins.",
     "<b>4.</b> On your turn: click a gear on your screen dashboard, press <b>Roll</b>, then move your car. "
@@ -56,11 +60,18 @@ function Setup.panel()
         choices[#choices + 1] = button("fds_laps" .. n, n == 1 and "1 lap" or (n .. " laps"),
             "fdSetupLaps(" .. n .. ")", { preferredWidth = "80" })
     end
+    local tools = {
+        button("fds_track", "Track", "fdTrack", { tooltip = "Show or hide the detected spaces on the board" }),
+        button("fds_edit", "Edit track", "fdEdit", { tooltip = "Open or close the track editor for the map on the board" }),
+        button("fds_apply", "Apply", "fdApply", { tooltip = "Put the space markers back into the track" }),
+        button("fds_export", "Export", "fdExport", { tooltip = "How to get your edits into the repo" }),
+        button("fds_reset", "Reset", "fdReset", { tooltip = "Back to setup, keeping the drivers (Undo restores it)" }),
+    }
     return el("Panel", {
         -- Hidden until the first refresh says the race has not started, so a
         -- rebuild during the race does not flash it up.
         id = "fds", active = "false",
-        rectAlignment = "MiddleCenter", width = "560", height = "500", color = PANEL_BG,
+        rectAlignment = "MiddleCenter", width = "560", height = "580", color = PANEL_BG,
         allowDragging = "true", returnToOriginalPositionWhenReleased = "false",
     }, {
         el("VerticalLayout", { padding = "16 16 12 12", spacing = "6", childForceExpandHeight = "false" }, {
@@ -78,6 +89,8 @@ function Setup.panel()
             }),
             text("fds_wait", "The host starts the race once everyone has a seat.",
                 { preferredHeight = "20", color = DIM }),
+            el("HorizontalLayout", { spacing = "4", preferredHeight = "28", visibility = ADMIN }, tools),
+            text("fds_editor", "", { preferredHeight = "34", fontSize = "12", color = "#9FD3FF", visibility = ADMIN }),
             text(nil, "Found a bug, or have an idea? Report it here (select the link to copy it):",
                 { preferredHeight = "20", fontSize = "12", color = DIM }),
             el("InputField", { id = "fds_link", readOnly = "true", preferredHeight = "26", fontSize = "13" }, nil, REPO),
@@ -89,10 +102,26 @@ function Setup.setReady(on)
     ready = on ~= false
 end
 
-local function driverList(race)
+--- The track editor's status line; nil while the editor is closed. The
+-- menu stays up while there is one.
+function Setup.setEditor(textValue)
+    editorText = textValue or ""
+    if not ready then
+        return
+    end
+    Ui.value("fds_editor", editorText)
+    Ui.set("fds", "active", tostring(noRace or editorText ~= ""))
+end
+
+--- Who will race: the drivers already in, and the names of the players
+-- seated but not yet dealt in.
+local function driverList(race, seated)
     local names = {}
     for _, car in ipairs(race:cars()) do
         names[#names + 1] = race:label(car)
+    end
+    for _, name in ipairs(seated or {}) do
+        names[#names + 1] = name
     end
     if #names == 0 then
         return "Drivers: none yet -- take a coloured seat to join."
@@ -100,16 +129,24 @@ local function driverList(race)
     return "Drivers (" .. #names .. "): " .. table.concat(names, ", ")
 end
 
---- Show the menu until the race starts, filled in from `race`. `map` is the
--- map on the board ({ name, hasTrack }), or nil if it is not one we know;
+--- Whether the menu shows for a race in `phase`: whenever no race is on.
+function Setup.shows(phase)
+    return phase ~= "race"
+end
+
+--- Show the menu while no race is on, filled in from `race`. `map` is the
+-- map on the board ({ name, hasTrack }), or nil if it is not one we know,
+-- and `seated` the names of the players seated but not yet dealt in; both
 -- only looked at while the menu shows.
-function Setup.refresh(race, map)
+function Setup.refresh(race, map, seated)
     if not ready then
         return
     end
     local s = race:serialize()
-    local open = s.phase == "setup" or s.phase == "grid"
+    noRace = Setup.shows(s.phase)
+    local open = noRace or editorText ~= ""
     Ui.set("fds", "active", tostring(open))
+    Ui.value("fds_editor", editorText)
     if not open then
         return
     end
@@ -122,7 +159,7 @@ function Setup.refresh(race, map)
             .. "  <color=#FFB74D>(no track data yet: place the cars and judge moves by hand)</color>")
     end
     Ui.value("fds_rules", "Rules: " .. race.rules.name .. ", " .. (s.laps == 1 and "1 lap" or (s.laps .. " laps")))
-    Ui.value("fds_drivers", driverList(race))
+    Ui.value("fds_drivers", driverList(race, seated))
     for _, n in ipairs(LAPS) do
         Ui.set("fds_laps" .. n, "colors", n == s.laps and PICKED or COLORS)
     end

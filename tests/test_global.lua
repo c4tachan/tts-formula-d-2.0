@@ -105,9 +105,15 @@ function T.the_big_box_menu_is_packed_away_for_the_race()
     eq(#menuBag.calls, 2, "nothing out to pack the second time")
 end
 
-function T.sitting_down_deals_you_in_at_the_dashboard_there()
+-- The script's die always comes up 10 unless a test loads it, so with two or
+-- more drivers Start race deals them in but leaves the grid tied: the cars
+-- stay where they were dealt.
+
+function T.start_race_deals_you_in_at_the_dashboard_there()
     local S = world()
     onPlayerChangeColor("Red")
+    eq(state().cars.Red, nil, "sitting down deals nobody in")
+    fdSetupStart(Player.Red)
     local red = state().cars.Red
     assert(red, "Red is in the race")
     eq(red.tts.dash, S.beginner.guid, "at the free dashboard in front of the seat")
@@ -118,8 +124,8 @@ function T.sitting_down_deals_you_in_at_the_dashboard_there()
         "beside the dashboard")
     assert(S.logged("dealt in"))
 
-    -- Sitting down again changes nothing.
-    onPlayerChangeColor("Red")
+    -- Pressing it again deals nobody twice.
+    fdSetupStart(Player.Red)
     eq(state().cars.Red.tts.car, red.tts.car)
     eq(S.count("Formula 1 Solid") + S.count("RedPlayer (Red)"), 1)
 end
@@ -129,6 +135,7 @@ function T.a_seat_with_no_dashboard_gets_one_from_the_bag()
     S.object("Beginner Dashboard Bag", { guid = "edfadc", spawns = "Beginner Dashboard" })
     S.player("Green", S.vec(-24, 1, -38))
     onPlayerChangeColor("Green")
+    fdSetupStart(Player.Red)
     local green = state().cars.Green
     assert(green, "Green is in the race")
     local dash = getObjectFromGUID(green.tts.dash)
@@ -139,7 +146,7 @@ function T.a_seat_with_no_dashboard_gets_one_from_the_bag()
     assert(dash.pos.y > 1, "on the table")
     eq(dash.buttons[1].click_function, "fdNoop", "its status label is drawn")
     assert(getObjectFromGUID(green.tts.car), "and a car")
-    eq(S.count("Gear Stick"), 1, "with its gear stick")
+    assert(getObjectFromGUID(green.tts.markers.gear), "with its gear stick")
 end
 
 function T.nobody_is_dealt_in_once_the_race_has_started()
@@ -150,9 +157,12 @@ function T.nobody_is_dealt_in_once_the_race_has_started()
     eq(state().cars.Grey, nil, "spectators never")
 end
 
-function T.players_seated_at_load_are_dealt_in()
+function T.players_seated_at_load_wait_for_start_race()
     local S = world()
     onLoad("")
+    eq(state().cars.Red, nil, "nobody is dealt in at load")
+    eq(S.ui.fds_drivers.value, "Drivers (2): BluePlayer, RedPlayer", "but the menu lists who is seated")
+    fdSetupStart(Player.Red)
     eq(state().cars.Red.tts.dash, S.beginner.guid)
     eq(state().cars.Blue.tts.dash, S.advanced.guid)
     assert(getObjectFromGUID(state().cars.Red.tts.car), "with a car")
@@ -170,7 +180,9 @@ function T.a_newcomer_is_moved_to_the_spectators_to_pick_a_colour()
     assert(S.logged("broadcast to Grey: Pick a colour"), "told what to do")
 
     green.changeColor("Green")
-    assert(state().cars.Green, "the seat they pick deals them in")
+    eq(state().cars.Green, nil, "not until the race starts")
+    fdSetupStart(Player.Red)
+    assert(state().cars.Green, "then the seat they picked is dealt in")
     assert(getObjectFromGUID(state().cars.Green.tts.car), "with a car")
 end
 
@@ -225,6 +237,8 @@ function T.a_save_whose_dashboard_was_deleted_deals_the_seat_in_again()
     onObjectDestroy = hook
 
     onLoad(saved)
+    eq(state().cars.Red, nil, "Red is out")
+    fdSetupStart(Player.Red)
     local red = state().cars.Red
     assert(red, "Red is dealt in again")
     local dash = getObjectFromGUID(red.tts.dash)
@@ -1304,7 +1318,7 @@ function T.the_grid_key_marks_the_grid_in_order()
     -- Three rings, a second on pole, and the line through them.
     eq(#S.board.getVectorLines(), before + 5)
     assert(S.find("Space " .. b.id .. " (lane " .. b.lane .. ") - grid 2"), "its marker says its place")
-    assert(S.ui.fdr_editor.value:find("3 on the grid"), S.ui.fdr_editor.value)
+    assert(S.ui.fds_editor.value:find("3 on the grid"), S.ui.fds_editor.value)
 
     -- Pressed again on one: it comes off, and those behind move up.
     S.press(key, "Red", nil, at(a))
@@ -1354,9 +1368,9 @@ end
 function T.problems_are_counted_on_the_panel()
     local S = world()
     editor(S)
-    assert(S.ui.fdr_editor.value:find("problem"), S.ui.fdr_editor.value)
+    assert(S.ui.fds_editor.value:find("problem"), S.ui.fds_editor.value)
     fdEdit({ color = "Red", steam_name = "RedPlayer" })
-    eq(S.ui.fdr_editor.value, "", "status cleared when the editor closes")
+    eq(S.ui.fds_editor.value, "", "status cleared when the editor closes")
 end
 
 function T.track_overlay_refuses_another_map()
@@ -1369,6 +1383,7 @@ end
 function T.a_late_joiner_gets_the_panels_again()
     local S = redRacing()
     S.xml = {}
+    S.board.xml = {}
     S.ui = {}
     onPlayerConnect({ color = "Grey" })
     onPlayerChangeColor("Blue")
@@ -1376,7 +1391,11 @@ function T.a_late_joiner_gets_the_panels_again()
     for _, node in ipairs(S.xml) do
         ids[node.attributes.id or ""] = (ids[node.attributes.id or ""] or 0) + 1
     end
+    for _, node in ipairs(S.board.xml) do
+        ids[node.attributes.id or ""] = (ids[node.attributes.id or ""] or 0) + 1
+    end
     eq(ids.fdr, 1, "race panel sent once")
+    eq(ids.fds, 1, "setup menu sent once")
     eq(ids.fdm_Red, 1, "screen dashboards sent once")
     eq(S.ui.fdm_Red.active, "true", "filled in again")
     assert(S.ui.fdr_title, "race panel refreshed")
@@ -1436,10 +1455,8 @@ end
 
 function T.laps_button_sets_the_distance_and_undo_puts_it_back()
     local S = redRacing()
-    eq(S.ui.fdr_laps.value, "1 lap")
-    fdLaps({ steam_name = "host", color = "Red" })
+    fdSetupLaps({ steam_name = "host", color = "Red" }, "2")
     eq(state().laps, 2)
-    eq(S.ui.fdr_laps.value, "2 laps")
     assert(S.logged("The race is 2 laps"))
     fdUndo({ steam_name = "host", color = "Red" })
     eq(state().laps, 1)
@@ -1666,8 +1683,9 @@ function T.only_the_host_can_use_the_race_controls()
         for _, c in ipairs(node.children or {}) do walk(c, panel) end
     end
     for _, node in ipairs(S.xml) do walk(node, node.attributes.id) end
-    eq(rows.fdr, 2, "both button rows are the host's")
-    eq(rows.fds, 2, "as are the setup menu's choices and Start race")
+    for _, node in ipairs(S.board.xml) do walk(node, node.attributes.id) end
+    eq(rows.fdr, 1, "Undo, on the race panel, is the host's")
+    eq(rows.fds, 4, "as are the setup menu's choices, Start race, the track tools and the editor line")
 
     -- A click that gets through anyway does nothing.
     S.advanced.click("fdDashJoin", "Blue")
@@ -1675,14 +1693,14 @@ function T.only_the_host_can_use_the_race_controls()
     fdReset(blue)
     eq(state().phase, "race", "not reset")
     assert(S.logged("Only the host"))
-    fdLaps(blue)
+    fdSetupLaps(blue, "2")
     eq(state().laps, 1)
     fdEdit(blue)
     eq(require("fd.tts.track_editor").isOpen(), false)
     S.press("Track editor: apply", "Blue")
     -- The host can, promoted players too.
     blue.admin = true
-    fdLaps(blue)
+    fdSetupLaps(blue, "2")
     eq(state().laps, 2)
 end
 
@@ -1713,9 +1731,12 @@ function T.the_setup_menu_shows_from_the_load()
     eq(S.ui.fds.active, "true", "everyone sees it at load")
     eq(S.ui.fds_map.value, "Map: Formula D: Monaco")
     eq(S.ui.fds_rules.value, "Rules: Formula D basic rules, 1 lap")
+    refresh() -- world() seats them without telling the script
+    eq(S.ui.fds_drivers.value, "Drivers (2): BluePlayer, RedPlayer", "everyone seated")
+    Player.Blue.changeColor("Grey")
+    eq(S.ui.fds_drivers.value, "Drivers (1): RedPlayer", "spectators are not")
+    Player.Red.changeColor("Grey")
     assert(S.ui.fds_drivers.value:find("none yet"), S.ui.fds_drivers.value)
-    S.beginner.click("fdDashJoin", "Red")
-    eq(S.ui.fds_drivers.value, "Drivers (1): RedPlayer")
 end
 
 function T.the_setup_menu_sets_the_distance()
@@ -1756,13 +1777,52 @@ end
 
 function T.start_race_needs_drivers_and_the_host()
     local S = world()
-    fdSetupStart(Player.Red)
-    eq(state().phase, "setup")
-    assert(S.logged("Nobody is racing yet"))
-    S.beginner.click("fdDashJoin", "Red")
     fdSetupStart(Player.Blue)
     eq(state().phase, "setup", "a player who is not the host cannot start")
+    eq(state().cars.Red, nil, "nor deal anyone in")
     assert(S.logged("Only the host"))
+    local host = Player.Red
+    Player.Blue.changeColor("Grey")
+    host.changeColor("Grey")
+    fdSetupStart(host)
+    eq(state().phase, "setup")
+    assert(S.logged("Nobody is seated yet"))
+end
+
+function T.the_race_panel_lies_beside_the_board()
+    local S = world()
+    eq(S.board.xml[1].attributes.id, "fdr", "drawn on the board tile")
+    for _, node in ipairs(S.xml) do
+        assert(node.attributes.id ~= "fdr", "not on the screen")
+    end
+    -- Scaled back by the tile's scale (44): 0.04 world units per UI unit.
+    eq(S.board.xml[1].attributes.scale, "0.0909 0.0909 1")
+    -- A new map reloads the tile, which loses its UI: it is drawn again.
+    S.board.xml = {}
+    fdMapChanged()
+    eq(S.board.xml[1].attributes.id, "fdr")
+end
+
+function T.the_setup_menu_comes_back_after_the_flag()
+    local S = redRacing()
+    eq(S.ui.fds.active, "false")
+    local saved = onSave()
+    saved.json.race.phase = "finished"
+    onLoad(saved)
+    eq(S.ui.fds.active, "true", "back once the race is over")
+    withRolls({ 12 }, function() fdSetupStart(Player.Red) end)
+    eq(state().phase, "race", "Start race begins the next one")
+    eq(state().round, 1)
+    eq(S.ui.fds.active, "false")
+end
+
+function T.the_setup_menu_stays_up_while_the_editor_is_open()
+    local S = redRacing()
+    eq(S.ui.fds.active, "false")
+    fdEdit({ color = "Red", steam_name = "RedPlayer" })
+    eq(S.ui.fds.active, "true", "so the editor can be closed")
+    fdEdit({ color = "Red", steam_name = "RedPlayer" })
+    eq(S.ui.fds.active, "false")
 end
 
 return T
