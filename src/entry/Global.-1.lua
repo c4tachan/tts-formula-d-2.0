@@ -76,29 +76,55 @@ local SEATS = {
 }
 
 -- Setup ---------------------------------------------------------------------
+-- The table holds the board and nothing else to set up: the map and rules
+-- are chosen on the setup menu (fd.tts.setup). The Big Box menu board stays
+-- packed in its bag, and the setup board and everything on it are stowed
+-- out of sight under the table -- where the script still reaches the bags
+-- it deals dashboards, cars and markers from.
 
 local MOD_MENU_BAG = "a57988"
 local SETUP_BAG = "0fde3b"
+-- Under the table: out of sight, and locked, so nothing there falls.
+local STOW = { x = 0, y = -6, z = 0 }
 
---- The Big Box menu button: there while the menu is packed away, but not
--- during a race -- the map is chosen before the start or after the flag.
--- Global so the menu board can call it when it closes.
-function applyModMenuButton()
-    local racing = race and race.state.phase == "race"
-    Ui.set("showModMenuButton", "active", tostring(mod_packed and not racing))
+--- Stow everything the setup board's memory bag keeps but the dice, which
+-- sit by their tray: locked under the table, where nobody can pick it up.
+-- Packed away, the board is put out first: the bags it holds are the ones
+-- the script deals from, and cannot be reached inside it. `onDone` runs once
+-- it is all stowed.
+local function stowSetup(onDone)
+    local bag = getObjectFromGUID(SETUP_BAG)
+    if not bag then
+        return onDone()
+    end
+    local function stow()
+        for guid in pairs(bag.getTable("memoryList") or {}) do
+            local obj = getObjectFromGUID(guid)
+            if obj and not Dice.gearOf(obj) and not Dice.isBlack(obj) then
+                obj.setLock(true)
+                obj.interactable = false
+                obj.setPosition(STOW)
+            end
+        end
+        onDone()
+    end
+    if setup_packed then
+        bag.call("buttonClick_place", {})
+        setup_packed = false
+        -- A moment for its objects to come out of the bag.
+        Wait.time(stow, 1.5)
+    else
+        stow()
+    end
 end
 
---- At the start, put the Big Box menu and the setup board back in their bags.
-local function packTable()
-    local bags = { { MOD_MENU_BAG, mod_packed }, { SETUP_BAG, setup_packed } }
-    for _, b in ipairs(bags) do
-        local bag = not b[2] and getObjectFromGUID(b[1])
-        if bag then
-            bag.call("buttonClick_recall", {})
-        end
+--- Put the Big Box menu board back in its bag, if it is out.
+local function packModMenu()
+    local bag = not mod_packed and getObjectFromGUID(MOD_MENU_BAG)
+    if bag then
+        bag.call("buttonClick_recall", {})
     end
-    -- The bags say so themselves (Global.setVar); this is in case they did not.
-    mod_packed, setup_packed = true, true
+    mod_packed = true
 end
 
 --- The map on the board tile, from Maps.list, or nil if it is none we know.
@@ -126,7 +152,6 @@ function onLoad(saved_data)
         mod_packed = true
         setup_packed = true
     end
-    applyModMenuButton()
 
     race = Race.new(Rules, saved.race)
     race.autoRolls = true
@@ -143,7 +168,8 @@ function onLoad(saved_data)
     Wait.time(function()
         Dashboard.scan()
         dropDashless()
-        layDice()
+        packModMenu()
+        stowSetup(function() layDice() end)
     end, 1)
 end
 
@@ -155,10 +181,13 @@ function buildUi()
     Mini.setReady(false)
     Setup.setReady(false)
     local panels = Mini.panels(Rules)
-    panels[#panels + 1] = Setup.panel()
     local map = mapOnBoard()
+    local maps = {}
+    for _, m in ipairs(Maps.list) do
+        maps[#maps + 1] = { id = m.id, name = m.name, ready = TRACKS[m.id] ~= nil, current = map ~= nil and map.id == m.id }
+    end
+    panels[#panels + 1] = Setup.panel(maps)
     Hud.build(Rules, panels, Track.tile(), map and TRACKS[map.id], function()
-        applyModMenuButton()
         Mini.setReady()
         Setup.setReady()
         refresh()
@@ -217,15 +246,6 @@ function onSave()
             return out
         end)(),
     })
-end
-
-function showModMenu()
-    local memoryBagModMenu = getObjectFromGUID(MOD_MENU_BAG)
-    if memoryBagModMenu then
-        memoryBagModMenu.call("buttonClick_place", {})
-    end
-    mod_packed = false
-    applyModMenuButton()
 end
 
 -- Plumbing ------------------------------------------------------------------
@@ -430,7 +450,6 @@ function refresh(announce)
     Setup.refresh(race, map and { name = map.name, hasTrack = TRACKS[map.id] ~= nil }, seated)
     renderDashboards()
     showTurn(announce)
-    applyModMenuButton()
 end
 
 --- Run a change to the race: snapshot for undo, apply, then publish.
@@ -1138,10 +1157,8 @@ end
 local function startRace(player)
     printToAll(player.steam_name .. " starts the race", LEVEL_RGB.info)
     clearReach()
-    packTable()
     act(function() race:startRace() end)
-    -- Packing the setup board sweeps up the loose dice with it: once it has,
-    -- put out again whatever is missing, and the lot in the middle of the board.
+    -- The dice set out by their tray again, any gone missing fetched.
     Wait.time(function()
         layDice(function(n)
             if n > 0 then
@@ -1200,6 +1217,30 @@ function fdSetupStart(player)
     end)
 end
 
+--- The map list on the setup menu: put the chosen map on the board.
+function fdSetupMap(player, value)
+    if not admin(player) or race.state.phase == "race" then
+        return
+    end
+    local map = Maps.byId[Setup.mapFor(value) or ""]
+    local tile = Track.tile()
+    if not map or not tile then
+        return
+    end
+    local now = mapOnBoard()
+    if now and now.id == map.id then
+        return
+    end
+    local custom = tile.getCustomObject()
+    custom.image = map.url
+    custom.secondary_image = map.url
+    tile.setCustomObject(custom)
+    tile.reload()
+    printToAll(player.steam_name .. " puts " .. map.name .. " on the board", LEVEL_RGB.info)
+    -- Once the tile is back: the race panel, the menu and the dice follow it.
+    Wait.time(function() fdMapChanged() end, 1)
+end
+
 --- The race distance buttons on the setup menu.
 function fdSetupLaps(player, value)
     if not admin(player) then return end
@@ -1211,10 +1252,9 @@ function fdSetupLaps(player, value)
     act(function() race:setLaps(laps) end)
 end
 
---- The Big Box menu put a new map on the board. Reloading the tile took
--- the race panel with it, so it is drawn again; the setup menu says which
--- map it is, turn order goes by its track, and the dice move to its name
--- panel.
+--- A new map is on the board. Reloading the tile took the race panel with
+-- it, so it is drawn again; the setup menu says which map it is, turn order
+-- goes by its track, and the dice move to its name panel.
 function fdMapChanged()
     useBoardTrack()
     buildUi()

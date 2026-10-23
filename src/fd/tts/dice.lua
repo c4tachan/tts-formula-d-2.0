@@ -271,10 +271,7 @@ end
 
 -- Fetching the set --------------------------------------------------------------
 
--- The setup board's memory bag keeps the loose dice with the board, so
--- packing the board away takes them too; the Dice Set Bag hands out a spare
--- set, in a bag of its own.
-local SETUP_BAG = "0fde3b"
+-- The Dice Set Bag hands out a spare set, in a bag of its own.
 local DICE_SET_BAG = "ac4939"
 
 --- Take whichever of `missing` (name -> place in the row) `bag` holds,
@@ -299,8 +296,7 @@ local function takeFrom(bag, missing)
 end
 
 --- Fetch whichever of the seven dice are not on the table, parking each by
--- the tray: from the setup board's bag, else from a spare set. `onDone(n)`
--- is told how many were fetched.
+-- the tray, from a spare set. `onDone(n)` is told how many were fetched.
 local function fetchMissing(onDone)
     local onTable = {}
     for _, o in ipairs(getObjects()) do onTable[o.getName()] = true end
@@ -311,9 +307,8 @@ local function fetchMissing(onDone)
     if count == 0 then
         return onDone(0)
     end
-    local setup = getObjectFromGUID(SETUP_BAG)
-    local fetched = setup and takeFrom(setup, missing) or 0
-    local spare = fetched < count and getObjectFromGUID(DICE_SET_BAG)
+    local fetched = 0
+    local spare = getObjectFromGUID(DICE_SET_BAG)
     if not spare then
         return onDone(fetched)
     end

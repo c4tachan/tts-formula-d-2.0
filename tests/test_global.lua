@@ -103,30 +103,48 @@ local T = {}
 function T.load_builds_the_panel_and_teaches_the_dice()
     local S = world()
     assert(S.ui.fdr_title, "race panel refreshed")
-    eq(S.ui.showModMenuButton.active, "true", "mod menu button kept")
     eq(#S.find("Sixth Gear Dice").rotationValues, 30)
     eq(#S.find("First Gear Dice").rotationValues, 4)
 end
 
-function T.the_big_box_menu_is_packed_away_for_the_race()
+function T.the_setup_board_is_stowed_under_the_table()
+    local S = world()
+    local carBag = getObjectFromGUID("1bb99e") -- the world's, the one cars come from
+    local rulebook = S.object("Beginner Rulebook Bag", { guid = "98b2d2", pos = S.vec(72, 0, -26) })
+    local die = S.find("First Gear Dice")
+    S.object("Memory Bag - Setup Board", { guid = "0fde3b", tables = { memoryList = {
+        [carBag.guid] = {}, [rulebook.guid] = {}, [die.guid] = {},
+    } } })
+    onLoad("")
+    for _, obj in ipairs({ carBag, rulebook }) do
+        assert(obj.pos.y < -1, obj.name .. " under the table")
+        eq(obj.locked, true, obj.name .. " locked")
+        eq(obj.interactable, false, obj.name .. " out of reach")
+    end
+    assert(die.pos.y > 0, "the dice stay by their tray")
+    -- The bags under the table still deal: a driver gets a car from it.
+    joinRace("Red", S.beginner)
+    S.beginner.click("fdDashCar", "Red")
+    assert(getObjectFromGUID(state().cars.Red.tts.car), "a car out of the stowed bag")
+end
+
+function T.a_packed_setup_board_is_put_out_and_stowed()
+    local S = world()
+    local bag = S.object("Memory Bag - Setup Board", { guid = "0fde3b", tables = { memoryList = {} } })
+    local saved = onSave()
+    saved.json.sp = true -- packed away when saved
+    onLoad(saved)
+    eq(bag.calls[1], "buttonClick_place", "put out, so its bags can be reached")
+end
+
+function T.the_big_box_menu_stays_in_its_bag()
     local S = world()
     local menuBag = S.object("Memory Bag - Mod Menu", { guid = "a57988" })
-    local setupBag = S.object("Memory Bag - Setup Board", { guid = "0fde3b" })
-    showModMenu()
-    eq(menuBag.calls[1], "buttonClick_place")
-    eq(S.ui.showModMenuButton.active, "false", "the menu is out")
-    setup_packed = false -- the setup board is out too
-
-    joinRace("Red", S.beginner)
-    fdStart(Player.Red)
-    eq(menuBag.calls[2], "buttonClick_recall", "the menu goes back in its bag")
-    eq(setupBag.calls[1], "buttonClick_recall", "and the setup board")
-    eq(S.ui.showModMenuButton.active, "false", "no menu button during the race")
-
-    fdReset(Player.Red)
-    eq(S.ui.showModMenuButton.active, "true", "back for choosing the next map")
-    fdStart(Player.Red)
-    eq(#menuBag.calls, 2, "nothing out to pack the second time")
+    local saved = onSave()
+    saved.json.mp = false -- left out when saved
+    onLoad(saved)
+    eq(menuBag.calls[1], "buttonClick_recall", "packed away")
+    eq(S.ui.showModMenuButton, nil, "and no button to bring it out")
 end
 
 -- The script's die always comes up 10 unless a test loads it, so with two or
@@ -280,25 +298,32 @@ local function packDice(S)
     return gone
 end
 
-function T.the_start_fetches_dice_swept_up_with_the_setup_board()
+function T.the_setup_menu_chooses_the_map()
     local S = world()
-    S.find("First Gear Dice").destruct()
-    S.find("Damage Dice").destruct()
-    S.object("Memory Bag - Setup Board", { guid = "0fde3b", contents = {
-        { name = "Setup Board", guid = "632ae8" },
-        { name = "First Gear Dice", guid = "a8062d" },
-        { name = "Damage Dice", guid = "6e3283" },
-    } })
-    joinRace("Red", S.beginner)
-    fdStart(Player.Red)
-    local first = S.find("First Gear Dice")
-    assert(first, "the 1st gear die is back")
-    eq(first.guid, "a8062d", "the same die, out of the bag")
-    eq(#first.rotationValues, 4, "and taught its faces")
-    assert(first.pos.y > 1, "on the table")
-    assert(S.find("Damage Dice"), "the black die too")
-    eq(S.count("Setup Board"), 0, "the setup board stays packed")
-    assert(S.logged("Put 2 dice out"))
+    local Maps = require("fd.data.maps")
+    -- The list: Monaco first, as it has track data, then the rest, marked.
+    local list = nil
+    for _, node in ipairs(S.xml) do
+        if node.attributes.id == "fds" then
+            local function find(n)
+                if n.attributes.id == "fds_maps" then list = n end
+                for _, c in ipairs(n.children or {}) do find(c) end
+            end
+            find(node)
+        end
+    end
+    assert(list, "a map list on the setup menu")
+    eq(list.children[1].value, "Formula D: Monaco")
+    eq(list.children[1].attributes.selected, "true", "showing the map on the board")
+    eq(list.children[2].value:match("%(no track data%)$"), "(no track data)")
+
+    fdSetupMap(Player.Blue, "Formula D: Austin  (no track data)")
+    eq(S.board.custom.image, Maps.byId.FDMonaco.url, "only the host chooses")
+    fdSetupMap(Player.Red, "Formula D: Austin  (no track data)")
+    eq(S.board.custom.image, Maps.byId.FDAustin.url, "the host's choice goes on the board")
+    eq(S.board.reloads, 1, "reloaded to show it")
+    assert(S.logged("puts Formula D: Austin on the board"))
+    assert(S.ui.fds_map.value:find("Austin"), "and the menu says so")
 end
 
 function T.the_start_falls_back_on_the_spare_dice_set()

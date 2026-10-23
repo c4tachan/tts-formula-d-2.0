@@ -99,6 +99,8 @@ function Stub.object(name, props)
         return { center = o.pos, size = o.size or vec(1, 1, 1), offset = vec(0, 0, 0) }
     end
     o.getCustomObject = function() return o.custom or {} end
+    -- A global table of the object's own script, as `tables` has it.
+    o.getTable = function(name) return (o.tables or {})[name] end
     o.setCustomObject = function(c) o.custom = c end
     -- Reloading keeps the object, as far as the tests go: TTS spawns it
     -- afresh, under the same guid.
