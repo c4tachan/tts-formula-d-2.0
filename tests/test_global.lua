@@ -150,15 +150,12 @@ function T.nobody_is_dealt_in_once_the_race_has_started()
     eq(state().cars.Grey, nil, "spectators never")
 end
 
-function T.players_seated_at_load_pick_a_colour_to_be_dealt_in()
+function T.players_seated_at_load_are_dealt_in()
     local S = world()
     onLoad("")
-    eq(state().cars.Red, nil, "not for the seat they happen to be in")
-    eq(state().cars.Blue, nil)
-    local red = Player.Red
-    red.changeColor("Grey")
-    red.changeColor("Red")
-    eq(state().cars.Red.tts.dash, S.beginner.guid, "picking a seat deals them in there")
+    eq(state().cars.Red.tts.dash, S.beginner.guid)
+    eq(state().cars.Blue.tts.dash, S.advanced.guid)
+    assert(getObjectFromGUID(state().cars.Red.tts.car), "with a car")
 end
 
 function T.a_newcomer_is_moved_to_the_spectators_to_pick_a_colour()
@@ -191,21 +188,6 @@ function T.a_newcomer_who_leaves_at_once_is_left_alone()
     green.steam_id = nil -- and their old object knows nothing
     later()
     eq(moved, false, "not moved, and nothing thrown")
-end
-
-function T.players_seated_at_load_are_told_how_to_join()
-    local S = world()
-    onLoad("")
-    assert(S.logged("To race, press Join race"), "told what to do")
-    S.beginner.click("fdDashJoin", "Red")
-    S.log = {}
-    onLoad(onSave())
-    -- Red is racing; only Blue is told.
-    local told = 0
-    for _, line in ipairs(S.log) do
-        if line:find("To race, press Join race") then told = told + 1 end
-    end
-    eq(told, 1)
 end
 
 function T.a_driver_reconnecting_keeps_their_seat()
@@ -243,10 +225,8 @@ function T.a_save_whose_dashboard_was_deleted_deals_the_seat_in_again()
     onObjectDestroy = hook
 
     onLoad(saved)
-    eq(state().cars.Red, nil, "Red has left")
-    onPlayerChangeColor("Red")
     local red = state().cars.Red
-    assert(red, "Red is dealt in again on picking the seat")
+    assert(red, "Red is dealt in again")
     local dash = getObjectFromGUID(red.tts.dash)
     assert(dash and dash ~= S.beginner, "at a fresh dashboard")
 end
