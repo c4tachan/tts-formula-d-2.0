@@ -224,32 +224,38 @@ end
 -- for nothing: no exact roll is needed to reach a pit box, and a car stuck
 -- behind another there loses nothing.
 --
+-- With `alone`, where it could end if no other car were on the track.
+--
 -- Worked out once per move: nothing it depends on changes while the move
 -- is open (the lap the pit lane goes by is the one it started on).
-function Race:reachable(color, track)
+function Race:reachable(color, track, alone)
     local car = self:car(color)
     local m = car and car.move
     if not m then
         return nil
     end
     local done = reaches[m]
-    if done and done.spaces == track.spaces and done.laps == self.state.laps then
-        return done.reach
+    if not (done and done.spaces == track.spaces and done.laps == self.state.laps) then
+        done = { spaces = track.spaces, laps = self.state.laps }
+        reaches[m] = done
     end
-    local occupied = {}
-    for _, id in ipairs(m.occupied) do occupied[id] = true end
-    local reach = Moves.reach(track, m.from, m.roll, {
-        occupied = occupied, stops = m.stops, pit = self:mayPit(car), color = color,
-        cost = function(o) return self:moveCost(o) end,
-    })
-    self:useTrack(track)
-    local exempt = self.rules.pitLaneExempt
-    for id, o in pairs(reach or {}) do
-        local s = self:space(id)
-        if exempt and exempt.braking and s and s.pit then o.brake = 0 end
+    local key = alone and "alone" or "reach"
+    if done[key] == nil then
+        local occupied = {}
+        for _, id in ipairs(alone and {} or m.occupied) do occupied[id] = true end
+        local reach = Moves.reach(track, m.from, m.roll, {
+            occupied = occupied, stops = m.stops, pit = self:mayPit(car), color = color,
+            cost = function(o) return self:moveCost(o) end,
+        })
+        self:useTrack(track)
+        local exempt = self.rules.pitLaneExempt
+        for id, o in pairs(reach or {}) do
+            local s = self:space(id)
+            if exempt and exempt.braking and s and s.pit then o.brake = 0 end
+        end
+        done[key] = reach or false
     end
-    reaches[m] = { spaces = track.spaces, laps = self.state.laps, reach = reach }
-    return reach
+    return done[key] or nil
 end
 
 --- The corner that matters to `car` and how far it is: see Moves.ahead.
@@ -638,6 +644,11 @@ function Race:setLaps(laps)
     end
     for _, car in ipairs(self:cars()) do
         self:settleFinish(car)
+        -- Whether the pit lane is open goes by the distance: a move still
+        -- open is shown again (not state, as in startMove).
+        if car.move and car.rolledRound == s.round and car.movedRound ~= s.round then
+            self.opened = car.color
+        end
     end
 end
 
@@ -1257,11 +1268,15 @@ function Race:mayPit(car)
     return self.rules.mayPit ~= nil and self.rules.mayPit(lap, self.state.laps)
 end
 
---- The spaces the move `color` has open would get to, counting steps along
--- the track's links, that it cannot end on: past cars it cannot get round,
--- in another lane after leaving a corner without its stops, in a pit lane
--- that is shut to it. `reach` is what Race:reachable gave. Spaces with cars
--- on are left out, and so is another seat's pit box, never open to it.
+--- The spaces the move `color` has open is blocked from: where it could
+-- end if no other car were on the track, but cannot with them there; and
+-- any pit space the roll gets to, counting steps along the links, that it
+-- cannot end on -- the pit lane shut for the lap, or to a car overshooting
+-- a corner. (Not every space the count gets to off the pit lane: coming
+-- out of a corner, it cuts across lanes no move may, and would cross out
+-- the far end of every lane but one.) `reach` is what Race:reachable gave.
+-- Spaces with cars on are left out, and so is another seat's pit box,
+-- never open to it.
 function Race:blockedSpaces(color, track, reach)
     local car = self:car(color)
     local m = car and car.move
@@ -1271,13 +1286,19 @@ function Race:blockedSpaces(color, track, reach)
     self:useTrack(track)
     local occupied = {}
     for _, id in ipairs(m.occupied) do occupied[id] = true end
-    local from = self:space(m.from)
-    local shut = not ((from and from.pit) or self:mayPit(car))
-    local out = {}
-    for id in pairs(Moves.steps(track, m.from, m.roll, { color = color, pitShut = shut })) do
-        if not (reach and reach[id]) and not occupied[id] then
+    local out, seen = {}, {}
+    local function blocked(id)
+        if not seen[id] and not (reach and reach[id]) and not occupied[id] then
+            seen[id] = true
             out[#out + 1] = id
         end
+    end
+    for id in pairs(self:reachable(color, track, true) or {}) do
+        blocked(id)
+    end
+    for id in pairs(Moves.steps(track, m.from, m.roll, { color = color })) do
+        local s = self:space(id)
+        if s and s.pit then blocked(id) end
     end
     table.sort(out)
     return out

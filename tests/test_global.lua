@@ -1025,6 +1025,17 @@ function T.a_blocked_space_is_crossed_out()
     end
 end
 
+function T.changing_the_distance_redraws_the_marks()
+    local S = redRacing()
+    redOn(S, "m.s2.5")
+    roll(S, 1, 2)
+    local before = S.board.lines
+    assert(marksOn(S).free > 0)
+    fdSetupLaps({ color = "Red", steam_name = "host" }, "2")
+    assert(S.board.lines ~= before, "drawn again")
+    eq(marksOn(S).free, 3)
+end
+
 function T.marks_and_the_track_overlay_share_the_board()
     local S = redRacing()
     redOn(S, "m.s2.5")

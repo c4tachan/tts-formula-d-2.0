@@ -210,10 +210,7 @@ end
 --- Every space `roll` steps or fewer along the links from `fromId`, the
 -- rules of a move aside: through other cars and corners alike, and into the
 -- pit lane whether or not it is open. A pit box is still only its own car's
--- (opts.color), as in Moves.reach. With `opts.pitShut` a walk into the pit
--- lane does not come back out onto the track: round the circuit is the only
--- way there for a car the pit lane is shut to. Returns id -> steps, without
--- `fromId`.
+-- (opts.color), as in Moves.reach. Returns id -> steps, without `fromId`.
 function Moves.steps(track, fromId, roll, opts)
     opts = opts or {}
     local byId = index(track)
@@ -228,8 +225,7 @@ function Moves.steps(track, fromId, roll, opts)
         for _, s in ipairs(ring) do
             for _, nid in ipairs(s.next or {}) do
                 local t = byId[nid]
-                if t and t ~= from and not out[nid] and (not t.box or t.box == opts.color)
-                    and not (opts.pitShut and s.pit and not t.pit) then
+                if t and t ~= from and not out[nid] and (not t.box or t.box == opts.color) then
                     out[nid] = k
                     nxt[#nxt + 1] = t
                 end

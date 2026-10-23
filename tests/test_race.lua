@@ -492,25 +492,33 @@ function T.spaces_past_a_car_in_the_way_are_blocked()
     eq(table.concat(blocked, ","), "c4,c5,c6", "past Blue, not Blue's own space")
 end
 
-function T.lanes_shut_by_an_overshoot_are_blocked()
+function T.an_overshoot_crosses_out_only_the_pit_lane()
     local FDMonaco = require("fd.data.tracks.FDMonaco")
-    -- Through the last corner without stopping: the car keeps to the inside
-    -- lane, and the lanes beside it are blocked.
-    local r = onMonaco(1, "White", 1, "i.s10.0")
+    -- Through the last corner without stopping, on the lap to pit on: the
+    -- car keeps to its lane, so the pit lane is shut to it. The far ends of
+    -- the other lanes, which only cutting across after the corner would
+    -- reach, are no move's: nothing is crossed out there.
+    local r = onMonaco(2, "White", 1, "i.s10.0")
     rollDie(r, "White", 4, 10)
     local reach = r:reachable("White", FDMonaco)
     local blocked = r:blockedSpaces("White", FDMonaco, reach)
-    local lanes = {}
+    assert(#blocked > 0)
     for _, id in ipairs(blocked) do
+        assert(FDMonaco.byId[id].pit, id .. " is off the pit lane")
         assert(not reach[id], id .. " is reachable")
-        lanes[FDMonaco.byId[id].lane] = true
     end
-    assert(lanes[2] and lanes[0], "the middle lane and the pit lane, past the corner")
-    assert(not lanes[1], "not the lane it keeps to")
     -- Going no further than the corner, nothing is blocked.
-    local s = onMonaco(1, "White", 1, "i.s10.0")
+    local s = onMonaco(2, "White", 1, "i.s10.0")
     rollDie(s, "White", 1, 2)
     eq(#s:blockedSpaces("White", FDMonaco, s:reachable("White", FDMonaco)), 0)
+end
+
+function T.out_of_a_corner_with_nobody_about_nothing_is_crossed_out()
+    -- Out of Sainte Devote without stopping, on a long roll, and alone.
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local r = onMonaco(1, "White", 1, "m.s1.0")
+    rollDie(r, "White", 5, 20)
+    eq(#r:blockedSpaces("White", FDMonaco, r:reachable("White", FDMonaco)), 0)
 end
 
 function T.no_overshoot_note_when_the_pits_were_out_of_range()
@@ -571,6 +579,22 @@ function T.the_race_finds_spaces_on_a_track_the_editor_changes()
     spaces[#spaces + 1] = { id = "i.s1.0+1", lane = 1, pos = { 0, 0 }, rot = 0, next = {} }
     Race.forget()
     eq(r:space("i.s1.0+1").id, "i.s1.0+1")
+end
+
+function T.changing_the_distance_reopens_a_move_to_show_it_again()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local r = onMonaco(2, "White", 1, FDMonaco.pit.entry[1])
+    rollDie(r, "White", 1, 2)
+    assert(r:reachable("White", FDMonaco)[FDMonaco.pit.spaces[2]], "the pits, on the first of two laps")
+    r.opened = nil
+    r:setLaps(1)
+    eq(r.opened, "White", "the move is shown again")
+    eq(r:reachable("White", FDMonaco)[FDMonaco.pit.spaces[2]], nil, "shut in a one-lap race")
+    -- Once the move is over, nothing is.
+    putDown(r, "White", "i.s11.2", FDMonaco)
+    r.opened = nil
+    r:setLaps(2)
+    eq(r.opened, nil)
 end
 
 function T.a_car_over_the_line_in_the_pit_lane_is_still_on_its_way_in()
