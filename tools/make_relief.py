@@ -15,6 +15,10 @@ The model keeps the board's pixel layout, so track files still place spaces
 on it; only their height is new. TTS mirrors X when importing OBJ, so X is
 written negated, as for the dice and dashboard.
 
+TTS refuses a mesh that is too big ("Failed to load Model (.obj)", nothing
+more): 41k vertices / 81k triangles failed, 10k / 20k loaded, and Blender
+meshes of 26k / 52k load. The grid `step` in the relief file keeps under that.
+
 Run:  python tools/make_relief.py fetch FDMonaco   real profile -> tracks/FDMonaco.profile.json
       python tools/make_relief.py build FDMonaco   -> assets/models/FDMonaco_relief.obj
 """

@@ -39,7 +39,7 @@
   "model": {
     "width": 44,
     "base": 0.3,
-    "step": 10,
+    "step": 14,
     "exaggerate": 1.0
   }
 }
