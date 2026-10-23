@@ -39,6 +39,7 @@ local useBoardTrack -- likewise
 local joinAt -- with the dashboard buttons, below
 local deliver, dealInSeated, dropDashless, bench -- likewise
 local isAdmin -- with the race controls, below
+local boardCenter -- with the dice, below
 -- What syncTurns last told TTS's Turns, as { on, order, color }; nil until
 -- it has, so the first sync after a load sets every part.
 local turnsSet = nil
@@ -48,9 +49,11 @@ local UNDO_LIMIT = 30
 
 --- One roll of the black die, made by the script: the grid, starts,
 -- collisions and engine strain are all rolled this way, the result told in
--- the chat. (The die on the table still counts if somebody throws it.)
+-- the chat and shown on the black die in the middle of the board.
 local function rollBlack()
-    return math.random(20)
+    local value = math.random(20)
+    Dice.showBlack(value)
+    return value
 end
 
 -- The colour of each kind of message in chat. A roll is shown in the colour
@@ -140,6 +143,10 @@ function onLoad(saved_data)
     Wait.time(function()
         Dashboard.scan()
         dropDashless()
+        local center = boardCenter()
+        if center then
+            Dice.layout(center)
+        end
     end, 1)
 end
 
@@ -455,21 +462,14 @@ local function handPosition(color)
     return hand and hand.position or nil
 end
 
---- Where to put a die for `color`: just past their dashboard (or hand),
--- towards the middle of the table.
-local function dicePosition(color)
-    local car = race:car(color)
-    local dash = car and car.tts and car.tts.dash and getObjectFromGUID(car.tts.dash)
-    local base = dash and dash.getPosition() or handPosition(color)
-    if not base then
+--- The middle of the board face, where the dice sit; nil without a board.
+boardCenter = function()
+    local tile = Track.tile()
+    if not tile then
         return nil
     end
-    local len = math.sqrt(base.x ^ 2 + base.z ^ 2)
-    local reach = dash and 6 or 8
-    if len < 1 then
-        return { x = base.x, y = base.y + 2, z = base.z }
-    end
-    return { x = base.x - base.x / len * reach, y = base.y + 2, z = base.z - base.z / len * reach }
+    local b = tile.getBounds()
+    return { x = b.center.x, y = b.center.y + b.size.y / 2, z = b.center.z }
 end
 
 --- Which way is across the table from `pos` towards its middle (x, z), or
@@ -664,10 +664,7 @@ local function shiftTo(color, gear)
     -- A shift starts somebody's turn: the last move's options are done with.
     clearReach()
     act(function() race:shift(color, gear) end)
-    local pos = dicePosition(color)
-    if pos then
-        Dice.bring(gear, pos, color)
-    end
+    Dice.highlight(gear, color)
 end
 
 --- A dashboard may have been moved or flipped: redraw it and pull its markers along.
@@ -1075,8 +1072,8 @@ function fdUiCollision(player) runAction(mine(player), "collision") end
 function fdUiPit(player) runAction(mine(player), "pit") end
 function fdUiLeave(player) runAction(mine(player), "leave") end
 
---- Roll the gear die for the player's gear, fetching it first if it is
--- elsewhere: the same die, read the same way, as throwing it by hand.
+--- Roll the gear die for the player's gear, where it sits in the middle of
+-- the board: the only way to roll one, as the dice are out of reach.
 function fdUiRoll(player)
     local car = mine(player)
     if not car then
@@ -1086,25 +1083,15 @@ function fdUiRoll(player)
         broadcastToColor("Shift into a gear first: click one on your dashboard.", player.color, LEVEL_RGB.warn)
         return
     end
-    local pos = dicePosition(player.color)
-    local die = pos and Dice.bring(car.gear, pos, player.color) or Dice.find(car.gear)
-    if not die then
-        broadcastToColor("The " .. Race.gearName(car.gear) .. " gear die is not on the table.", player.color, LEVEL_RGB.warn)
-        return
-    end
-    if die.held_by_color then
-        broadcastToColor("Someone is holding the " .. Race.gearName(car.gear) .. " gear die.", player.color, LEVEL_RGB.warn)
-        return
-    end
     local gear = car.gear
-    Wait.condition(function()
-        if die == nil then return end
-        die.roll()
-        watchGearDie(die, player.color, gear)
-    end, function() return die == nil or not die.isSmoothMoving() end, 5, function()
-        broadcastToColor("The " .. Race.gearName(gear) .. " gear die did not arrive -- click Roll again.",
-            player.color, LEVEL_RGB.warn)
-    end)
+    local value, die = Dice.roll(gear)
+    if not value then
+        broadcastToColor("The " .. Race.gearName(gear) .. " gear die is not on the table.", player.color, LEVEL_RGB.warn)
+        return
+    end
+    die.highlightOn(player.color, 3)
+    clearReach()
+    act(function() race:rolled(car.color, gear, value) end)
 end
 
 function fdUiShift(player, value)
@@ -1163,9 +1150,13 @@ local function startRace(player)
     packTable()
     act(function() race:startRace() end)
     -- Packing the setup board sweeps up the loose dice with it: once it has,
-    -- put out again whatever is missing.
+    -- put out again whatever is missing, and the lot in the middle of the board.
     Wait.time(function()
-        Dice.ensureAll(function(n)
+        local center = boardCenter()
+        if not center then
+            return
+        end
+        Dice.setOut(center, function(n)
             if n > 0 then
                 printToAll(string.format("Put %d dice out for the race", n), LEVEL_RGB.info)
             end

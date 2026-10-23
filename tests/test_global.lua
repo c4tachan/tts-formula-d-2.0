@@ -22,7 +22,8 @@ local function world()
     S.realRandom = random
     math.random = function(m, n)
         if m == 20 and n == nil then return 10 end
-        return random(m, n)
+        if n then return random(m, n) end
+        return random(m)
     end
     S.object("Gear Stick Bag", { guid = "71d89b", spawns = "Gear Stick" })
     S.object("Wear Tracker Bag", { guid = "a845cd", spawns = "Wear Tracker" })
@@ -290,10 +291,13 @@ function T.the_start_falls_back_on_the_spare_dice_set()
     end
     eq(S.count("Dice Set"), 0, "the spare set's bag is put away")
     assert(S.logged("Put 7 dice out"))
-    -- And the fetched dice are the ones the race uses.
-    dropOn(S, S.find("Gear Stick"), "gear", 1)
+    -- In the row in the middle of the board, and the ones the race uses.
     local die = S.find("First Gear Dice")
-    assert(die.pos.z < 0, "brought to Red on the shift")
+    eq(die.locked, true, "locked in place")
+    eq(die.interactable, false, "out of reach")
+    assert(math.abs(die.pos.x) < 8 and math.abs(die.pos.z) < 1, "in the middle of the board")
+    dropOn(S, S.find("Gear Stick"), "gear", 1)
+    eq(die.highlight[1], "Red")
 end
 
 function T.no_dice_fetched_when_all_are_out()
@@ -369,12 +373,14 @@ function T.advanced_face_warns_instead_of_placing_wear()
     eq(S.advanced.buttons[1].position[2], 0.7)
 end
 
-function T.dropping_the_gear_stick_shifts_and_brings_the_die()
+function T.dropping_the_gear_stick_shifts_and_lights_the_die()
     local S = redRacing()
+    local die = S.find("First Gear Dice")
+    local at = die.pos
     dropOn(S, S.find("Gear Stick"), "gear", 1)
     eq(state().cars.Red.gear, 1)
-    local die = S.find("First Gear Dice")
-    assert(die.pos.z > -30 and die.pos.z < 0, "die moved towards the table centre from the dashboard")
+    eq(die.highlight[1], "Red", "the die for the gear is lit")
+    eq(die.pos, at, "and stays in the middle of the board")
     roll(S, 1, 2)
     eq(state().cars.Red.lastRoll, 2)
     eq(state().round, 2)
@@ -518,16 +524,39 @@ function T.the_roll_button_rolls_the_die_for_your_gear()
 
     fdUiShift(Player.Red, "2")
     local die = S.find("Second Gear Dice")
-    die.pos = S.vec(40, 1, 40) -- wandered off after the shift
-    die.value = 4
+    local at = die.pos
+    -- The 2nd gear die's faces are 3 3 4 4 4 2: the third comes up.
+    local random = math.random
+    math.random = function(m, n)
+        if m == 6 and n == nil then return 3 end
+        return random(m, n)
+    end
     fdUiRoll(Player.Red)
-    eq(die.rolls, 1, "thrown once")
-    assert(die.pos.z < 0, "fetched to Red's side first")
-    eq(state().cars.Red.lastRoll, 4, "read like a roll by hand")
+    math.random = random
+    eq(state().cars.Red.lastRoll, 4, "the face turned up is the roll")
+    eq(die.rot[3], 90, "and the die shows it")
+    eq(die.rolls, nil, "turned, not thrown")
+    eq(die.pos, at, "where it sits")
 
     -- Someone else's button rolls nothing for Red.
     fdUiRoll(Player.Blue)
-    eq(die.rolls, 1)
+    eq(state().cars.Red.lastRoll, 4)
+end
+
+function T.the_dice_sit_in_the_middle_of_the_board_out_of_reach()
+    local S = world()
+    for _, name in ipairs({ "First Gear Dice", "Sixth Gear Dice", "Damage Dice" }) do
+        local die = S.find(name)
+        eq(die.locked, true, name .. " locked")
+        eq(die.interactable, false, name .. " cannot be picked up")
+        assert(math.abs(die.pos.z) < 1e-6 and math.abs(die.pos.x) < 8, name .. " in the row at the middle")
+    end
+    assert(S.find("First Gear Dice").pos.x < S.find("Sixth Gear Dice").pos.x, "in gear order")
+end
+
+function T.the_black_die_shows_the_scripts_roll()
+    local S = redRacing()
+    eq(S.find("Damage Dice").value, 10, "Red's start, rolled by the script")
 end
 
 function T.screen_buttons_act_on_the_clickers_car()

@@ -149,6 +149,7 @@ function Stub.object(name, props)
     o.call = function(fn) o.calls[#o.calls + 1] = fn end
     o.setLock = function(l) o.locked = l end
     o.setPositionSmooth = function(p) o.pos = vec(p.x, p.y, p.z) end
+    o.setPosition = function(p) o.pos = vec(p.x, p.y, p.z) end
     o.setRotationSmooth = function(r) o.rot = r end
     o.isSmoothMoving = function() return false end
     -- A roll leaves `value` as the test set it; it only counts the throws.
@@ -161,6 +162,7 @@ function Stub.object(name, props)
     -- `value` is what the face that is up shows. As in TTS, getValue() on an
     -- object with rotation values is that face's index, not its value.
     o.getRotationValue = function() return o.value end
+    o.setRotationValue = function(v) o.value = v end
     o.getValue = function()
         for i, rv in ipairs(o.rotationValues or {}) do
             if rv.value == o.value then return i end

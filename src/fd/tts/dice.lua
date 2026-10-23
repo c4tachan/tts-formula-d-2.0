@@ -1,5 +1,7 @@
--- The shared dice set: finding the gear dice, teaching them their faces, moving
--- the right one to whoever shifts, and reading results once a roll settles.
+-- The shared dice set: finding the dice, teaching the gear dice their faces,
+-- keeping them in a row in the middle of the board, and rolling them there.
+-- A die thrown by hand anyway (only the host can unlock one) is still read
+-- once it settles (Dice.watch).
 
 local DiceData = require("fd.data.dice")
 
@@ -57,18 +59,91 @@ function Dice.find(gear)
     return nil
 end
 
---- Move a gear die to `pos` and highlight it for `color`. Leaves a die alone
--- while someone is holding it.
-function Dice.bring(gear, pos, color)
+-- The dice sit in a row in the middle of the board, locked and out of
+-- players' hands: they are rolled with the Roll button only (Dice.roll),
+-- which turns a face up rather than throwing the die, so nothing tumbles into
+-- the cars on the track.
+
+local SPACING = 2.2 -- world units between neighbouring dice
+local LIFT = 0.6    -- above the board face, so a die sits on it
+
+--- Where die `i` of the row (gears 1 to 6, then the black die) goes, in a
+-- row centred on `center`, the middle of the board face.
+local function spot(i, center)
+    return { x = center.x + (i - 4) * SPACING, y = center.y + LIFT, z = center.z }
+end
+
+--- Lock `obj` at `pos`, where players cannot pick it up.
+local function fix(obj, pos)
+    obj.interactable = false
+    obj.setLock(true)
+    obj.setPosition(pos)
+end
+
+local function findBlack()
+    local obj = known.black and getObjectFromGUID(known.black)
+    if obj then
+        return obj
+    end
+    for _, o in ipairs(getObjects()) do
+        if Dice.isBlack(o) then
+            known.black = o.getGUID()
+            return o
+        end
+    end
+    return nil
+end
+
+local function allNames()
+    local out = {}
+    for i, n in ipairs(DiceData.names) do out[i] = n end
+    out[#out + 1] = Dice.BLACK_DIE
+    return out
+end
+
+--- Put the dice that are out in their row at `center`.
+function Dice.layout(center)
+    for i in ipairs(allNames()) do
+        local obj = nil
+        if i <= #DiceData.names then
+            obj = Dice.find(i)
+        else
+            obj = findBlack()
+        end
+        if obj then
+            fix(obj, spot(i, center))
+        end
+    end
+end
+
+--- Light up the die for `gear` for `color`, who has just shifted into it.
+function Dice.highlight(gear, color)
     local die = Dice.find(gear)
-    if not die then
+    if die then
+        die.highlightOn(color, 4)
+    end
+    return die
+end
+
+--- Roll the die for `gear` where it sits: a face picked at random and turned
+-- up. Returns the value it shows and the die, or nil if the die is not out.
+function Dice.roll(gear)
+    local die = Dice.find(gear)
+    local faces = DiceData[gear]
+    if not die or not faces then
         return nil
     end
-    if not die.held_by_color then
-        die.setPositionSmooth(pos, false, true)
+    local face = faces[math.random(#faces)]
+    die.setRotationSmooth(face.rotation, false, true)
+    return face.value, die
+end
+
+--- Turn the black die to show `value`, rolled by the script.
+function Dice.showBlack(value)
+    local die = findBlack()
+    if die then
+        die.setRotationValue(value)
     end
-    die.highlightOn(color, 4)
-    return die
 end
 
 -- Fetching the set --------------------------------------------------------------
@@ -79,32 +154,22 @@ end
 local SETUP_BAG = "0fde3b"
 local DICE_SET_BAG = "ac4939"
 
--- Where a fetched die is set down: the row the setup board lays them out in,
--- gears 1 to 6, then the black die.
-local HOME = {
-    { 57.6, -13.7 }, { 60.9, -13.7 }, { 63.6, -13.7 }, { 66.7, -13.7 }, { 69.9, -13.7 }, { 72.7, -13.7 },
-    { 72.2, -10.8 },
-}
-local DROP_Y = 3
-
-local function allNames()
-    local out = {}
-    for i, n in ipairs(DiceData.names) do out[i] = n end
-    out[#out + 1] = Dice.BLACK_DIE
-    return out
-end
-
---- Take whichever of `missing` (name -> home index) `bag` holds, setting each
--- down at home. Returns how many came out.
-local function takeFrom(bag, missing)
+--- Take whichever of `missing` (name -> place in the row) `bag` holds,
+-- setting each down in its place in the row at `center`. Returns how many
+-- came out.
+local function takeFrom(bag, missing, center)
     local n = 0
     for _, item in ipairs(bag.getObjects()) do
-        local home = HOME[missing[item.name] or 0]
-        if home then
+        local i = missing[item.name]
+        if i then
             missing[item.name] = nil
+            local pos = spot(i, center)
             bag.takeObject({
-                guid = item.guid, position = { x = home[1], y = DROP_Y, z = home[2] }, smooth = false,
-                callback_function = function(obj) Dice.prepare(obj) end,
+                guid = item.guid, position = pos, smooth = false,
+                callback_function = function(obj)
+                    Dice.prepare(obj)
+                    fix(obj, pos)
+                end,
             })
             n = n + 1
         end
@@ -112,10 +177,11 @@ local function takeFrom(bag, missing)
     return n
 end
 
---- Make sure all seven dice are out on the table, fetching any that are not:
--- from the setup board's bag, else from a spare set. `onDone(n)` is told how
--- many were fetched, once they are.
-function Dice.ensureAll(onDone)
+--- Make sure all seven dice are out, in their row at `center`, fetching any
+-- that are not: from the setup board's bag, else from a spare set.
+-- `onDone(n)` is told how many were fetched, once they are.
+function Dice.setOut(center, onDone)
+    Dice.layout(center)
     local onTable = {}
     for _, o in ipairs(getObjects()) do onTable[o.getName()] = true end
     local missing, count = {}, 0
@@ -126,17 +192,18 @@ function Dice.ensureAll(onDone)
         return onDone(0)
     end
     local setup = getObjectFromGUID(SETUP_BAG)
-    local fetched = setup and takeFrom(setup, missing) or 0
+    local fetched = setup and takeFrom(setup, missing, center) or 0
     local spare = fetched < count and getObjectFromGUID(DICE_SET_BAG)
     if not spare then
         return onDone(fetched)
     end
     -- The infinite bag hands out a whole set in a bag: take what is still
     -- missing and put the rest away.
+    local beside = spot(#DiceData.names + 3, center)
     spare.takeObject({
-        position = { x = HOME[7][1] + 5, y = DROP_Y, z = HOME[7][2] }, smooth = false,
+        position = { x = beside.x, y = beside.y + 3, z = beside.z }, smooth = false,
         callback_function = function(set)
-            fetched = fetched + takeFrom(set, missing)
+            fetched = fetched + takeFrom(set, missing, center)
             set.destruct()
             onDone(fetched)
         end,
