@@ -358,6 +358,11 @@ end
 
 local watching = {}
 
+--- Whether any die is still being watched to settle.
+function Dice.rolling()
+    return next(watching) ~= nil
+end
+
 --- Call onResult(value, color) once a rolled die comes to rest; with no value
 -- if it never does, or is gone first. Rolling fires the randomize event
 -- repeatedly while a die is shaken, so a die already being watched just

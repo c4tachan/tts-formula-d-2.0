@@ -215,6 +215,13 @@ function Hud.build(rules, extras, tile, track, onReady)
     end)
 end
 
+--- Hold the race panel's updates, its tile about to be reloaded: until
+-- Hud.build draws it again, there is nothing to send them to.
+function Hud.hold()
+    ready = false
+    Ui.route("fdr", nil)
+end
+
 local function wearSummary(race, car)
     local parts = {}
     for _, z in ipairs(race.rules.zones) do

@@ -2204,4 +2204,28 @@ function T.the_panels_go_up_even_if_the_ui_never_says_it_has_loaded()
     eq(S.ui.fds.active, "true", "and shown")
 end
 
+function T.the_start_ghost_is_cleared_on_load()
+    local S, red, blue = twoCars()
+    gridRoll(S, { Red = 4, Blue = 15 })
+    fdStart(Player.Red)
+    local ghost = startGhost(S)
+    assert(ghost, "out")
+    local saved = onSave()
+    local listed = false
+    for _, g in ipairs(saved.json.markers or {}) do
+        if g == ghost.guid then listed = true end
+    end
+    assert(listed, "saved among the markers a load clears")
+end
+
+function T.the_map_cannot_change_during_the_grid_roll()
+    local S = twoCars()
+    local Maps = require("fd.data.maps")
+    local saved = onSave()
+    saved.json.race.phase = "grid"
+    onLoad(saved)
+    fdSetupMap(Player.Red, "Formula D: Austin  (no track data)")
+    eq(S.board.custom.image, Maps.byId.FDMonaco.url)
+end
+
 return T

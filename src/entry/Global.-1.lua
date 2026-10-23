@@ -43,6 +43,10 @@ local layDice, activateDie, restockDice -- with the track, below
 local throwChecks -- with the dice, below
 local startRace -- with the race controls, below
 local pendingStart = nil -- who pressed Start race, while the grid is rolled
+-- The ghost marking where the car to play started its move: its guid, and
+-- which car and space it stands for (see markStart).
+local startGhost = nil
+local startKey = nil
 -- What syncTurns last told TTS's Turns, as { on, order, color }; nil until
 -- it has, so the first sync after a load sets every part.
 local turnsSet = nil
@@ -431,11 +435,6 @@ local function syncTurns(due)
     turnsSet = { on = true, order = key, color = due.color }
 end
 
--- The ghost marking where the car to play started its move: its guid, and
--- which car and space it stands for.
-local startGhost = nil
-local startKey = nil
-
 --- Put the ghost on the space the car to play started its move from (where
 -- it stands, before it rolls), in its colour; none outside a race. Put back
 -- on it, the car has not moved (Race:backToStart).
@@ -639,7 +638,9 @@ end
 -- result is applied when the die settles, through act, which throws for the
 -- one after. Without the die on the table, the script rolls for them at once.
 throwChecks = function()
-    if throwing then
+    -- One die in the air at a time: bringing in another would park this one
+    -- mid-throw. A gear die settling calls for this again (through act).
+    if throwing or Dice.rolling() then
         return
     end
     local c = nextCheck()
@@ -657,7 +658,15 @@ throwChecks = function()
     throwing = c
     local die = Dice.throw(Dice.BLACK, c.color, function(value)
         throwing = nil
-        act(function() race:blackDie(value or rollBlack(), c.color, c) end, true)
+        act(function()
+            -- Undone or reset while it was in the air: nothing left to decide.
+            for _, x in ipairs(race.state.checks) do
+                if x == c then
+                    race:blackDie(value or rollBlack(), c.color, c)
+                    return
+                end
+            end
+        end, true)
     end)
     if die then
         return
@@ -1224,8 +1233,8 @@ function fdUiRoll(player)
         broadcastToColor("Shift into a gear first: click one on your dashboard.", player.color, LEVEL_RGB.warn)
         return
     end
-    if throwing then
-        broadcastToColor("The black die is in the tray -- roll once it has settled.", player.color, LEVEL_RGB.warn)
+    if throwing or Dice.rolling() then
+        broadcastToColor("A die is still rolling in the tray -- roll once it has settled.", player.color, LEVEL_RGB.warn)
         return
     end
     local gear = car.gear
@@ -1354,7 +1363,8 @@ end
 
 --- The map list on the setup menu: put the chosen map on the board.
 function fdSetupMap(player, value)
-    if not admin(player) or race.state.phase == "race" then
+    local phase = race.state.phase
+    if not admin(player) or phase == "race" or phase == "grid" then
         return
     end
     local map = Maps.byId[Setup.mapFor(value) or ""]
@@ -1370,6 +1380,9 @@ function fdSetupMap(player, value)
     custom.image = map.url
     custom.secondary_image = map.url
     tile.setCustomObject(custom)
+    -- Reloading takes the race panel with the tile: hold its updates until
+    -- it is drawn again (fdMapChanged).
+    Hud.hold()
     tile.reload()
     printToAll(player.steam_name .. " puts " .. map.name .. " on the board", LEVEL_RGB.info)
     -- Once the tile is back: the race panel, the menu and the dice follow it.
