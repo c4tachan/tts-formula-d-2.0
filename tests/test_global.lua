@@ -144,6 +144,15 @@ function T.the_setup_board_is_stowed_under_the_table()
     assert(getObjectFromGUID(state().cars.Red.tts.car), "a car out of the stowed bag")
 end
 
+function T.the_source_bags_are_stowed_without_the_setup_board()
+    local S = world()
+    local carBag = getObjectFromGUID("1bb99e")
+    carBag.pos = S.vec(66, 0, -1)
+    onLoad("") -- no setup board's memory bag: deleted from the table
+    assert(carBag.pos.y < -1, "the car bag under the table all the same")
+    eq(carBag.locked, true)
+end
+
 function T.a_packed_setup_board_is_put_out_and_stowed()
     local S = world()
     local bag = S.object("Memory Bag - Setup Board", { guid = "0fde3b", tables = { memoryList = {} } })

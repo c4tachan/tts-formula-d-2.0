@@ -89,27 +89,46 @@ local MOD_MENU_BAG = "a57988"
 local SETUP_BAG = "0fde3b"
 -- Under the table: out of sight, and locked, so nothing there falls.
 local STOW = { x = 0, y = -6, z = 0 }
+-- The bags the script deals from, which must stay on the table (stowed),
+-- never inside another bag: everything else of the setup board can go.
+local SOURCE_BAGS = {
+    "1bb99e", -- Formula 1 Black Bag: cars (CAR_BAG, below)
+    "edfadc", -- Beginner Dashboard Bag (DASHBOARD_BAGS, below)
+    "4eb678", -- Advanced Dashboard Bag
+    "71d89b", -- Gear Stick Bag (fd.tts.dashboard)
+    "a845cd", -- Wear Tracker Bag (fd.tts.dashboard)
+    "ac4939", -- Dice Set Bag: spare dice (fd.tts.dice)
+}
 
---- Stow everything the setup board's memory bag keeps but the dice, which
--- sit by their tray: locked under the table, where nobody can pick it up.
--- Packed away, the board is put out first: the bags it holds are the ones
--- the script deals from, and cannot be reached inside it. `onDone` runs once
--- it is all stowed.
+local function stowObject(obj)
+    obj.setLock(true)
+    obj.interactable = false
+    obj.setPosition(STOW)
+end
+
+--- Stow the bags the script deals from, and whatever is left of the setup
+-- board, but the dice, which sit by their tray: locked under the table,
+-- where nobody can pick them up. The setup board, packed away, is put out
+-- first: the bags it holds cannot be reached inside it. Without it -- once
+-- deleted from the table -- only the bags are stowed. `onDone` runs once it
+-- is all stowed.
 local function stowSetup(onDone)
     local bag = getObjectFromGUID(SETUP_BAG)
-    if not bag then
-        return onDone()
-    end
     local function stow()
-        for guid in pairs(bag.getTable("memoryList") or {}) do
+        for _, guid in ipairs(SOURCE_BAGS) do
+            local obj = getObjectFromGUID(guid)
+            if obj then stowObject(obj) end
+        end
+        for guid in pairs(bag and bag.getTable("memoryList") or {}) do
             local obj = getObjectFromGUID(guid)
             if obj and not Dice.gearOf(obj) and not Dice.isBlack(obj) then
-                obj.setLock(true)
-                obj.interactable = false
-                obj.setPosition(STOW)
+                stowObject(obj)
             end
         end
         onDone()
+    end
+    if not bag then
+        return stow()
     end
     if setup_packed then
         bag.call("buttonClick_place", {})
