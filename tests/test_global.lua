@@ -1835,12 +1835,13 @@ function T.the_race_panel_lies_on_the_board_where_the_track_says()
     for _, node in ipairs(S.xml) do
         assert(node.attributes.id ~= "fdr", "not on the screen")
     end
-    -- Monaco's spot: centred on (1290, 1090) of the 2474 x 1616 image, which
-    -- is local (-53 / 2474, 282 / 1616) on a 1-unit tile; 380 pixels wide.
+    -- Monaco's spot, on the Formula D logo: centred on (2172, 1410) of the
+    -- 2474 x 1616 image, which is local (-935 / 2474, 602 / 1616) on a
+    -- 1-unit tile; 400 pixels wide.
     local x, y = panel.position:match("^(%S+) (%S+)")
-    eq(x, "-2.1")
-    eq(y, "17.5")
-    eq(panel.scale, "0.0404 0.0404 1", "380 UI units across 380 pixels")
+    eq(x, "-37.8")
+    eq(y, "37.3")
+    eq(panel.scale, "0.0425 0.0425 1", "380 UI units across 400 pixels")
     eq(panel.rotation, "0 0 180", "the same way up as the picture")
     -- A new map reloads the tile, which loses its UI: it is drawn again.
     S.board.xml = {}

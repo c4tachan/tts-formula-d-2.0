@@ -550,7 +550,7 @@ T.dice = { 1505, 1468 }
 
 -- Where the race panel lies (image pixels): its centre and width, on an
 -- empty patch of the board. Without it the panel is on the screen.
-T.panel = { pos = { 1290, 1090 }, width = 380 }
+T.panel = { pos = { 2172, 1410 }, width = 400 }
 
 -- The spaces touching each one, in any direction and whatever the
 -- arrows say: from tracks/<id>.adjacency.json (find_adjacency.py).
