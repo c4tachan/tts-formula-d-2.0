@@ -17,6 +17,11 @@ local Position = {}
 -- a track shares with it.
 local cache = setmetatable({}, { __mode = "k" })
 
+--- Forget every track worked out: the track editor changes spaces in place.
+function Position.forget()
+    cache = setmetatable({}, { __mode = "k" })
+end
+
 local function wrap(deg)
     deg = deg % 360
     if deg > 180 then deg = deg - 360 end

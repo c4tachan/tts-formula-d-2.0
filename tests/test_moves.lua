@@ -297,6 +297,18 @@ function T.a_corner_owing_stops_is_the_one_that_matters()
     eq(b.entry, 5)
 end
 
+function T.an_edit_in_place_is_seen_once_forgotten()
+    local track = road(12, { { 5, 4, 6, 1 } })
+    eq(Moves.ahead(track, "i0").entry, 4)
+    -- Move the corner a cell nearer, as the track editor would: in place.
+    for _, s in ipairs(track.spaces) do
+        if s.id == "i3" or s.id == "o3" then s.corner = 5 end
+    end
+    eq(Moves.ahead(track, "i0").entry, 4, "kept until told")
+    Moves.forget()
+    eq(Moves.ahead(track, "i0").entry, 3)
+end
+
 function T.no_corner_ahead()
     eq(Moves.ahead(road(12), "i0"), nil)
     eq(Moves.ahead(road(12, { { 5, 4, 6, 1 } }), "nowhere"), nil)
