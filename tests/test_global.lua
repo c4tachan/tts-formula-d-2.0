@@ -1660,13 +1660,14 @@ end
 function T.only_the_host_can_use_the_race_controls()
     local S = redRacing()
     -- Shown only to the host and promoted players.
-    local rows = 0
-    local function walk(node)
-        if node.attributes.visibility == "Host|Admin" then rows = rows + 1 end
-        for _, c in ipairs(node.children or {}) do walk(c) end
+    local rows = {}
+    local function walk(node, panel)
+        if node.attributes.visibility == "Host|Admin" then rows[panel] = (rows[panel] or 0) + 1 end
+        for _, c in ipairs(node.children or {}) do walk(c, panel) end
     end
-    for _, node in ipairs(S.xml) do walk(node) end
-    eq(rows, 2, "both button rows are the host's")
+    for _, node in ipairs(S.xml) do walk(node, node.attributes.id) end
+    eq(rows.fdr, 2, "both button rows are the host's")
+    eq(rows.fds, 2, "as are the setup menu's choices and Start race")
 
     -- A click that gets through anyway does nothing.
     S.advanced.click("fdDashJoin", "Blue")
@@ -1690,6 +1691,78 @@ function T.spectator_roll_goes_to_the_car_in_that_gear()
     dropOn(S, S.find("Gear Stick"), "gear", 1)
     roll(S, 1, 1, "Grey")
     eq(state().cars.Red.lastRoll, 1)
+end
+
+--- Call `fn` with the script's black die coming up `values` in turn.
+local function withRolls(values, fn)
+    local random, i = math.random, 0
+    math.random = function(m, n)
+        if m == 20 and n == nil then
+            i = i + 1
+            return values[i] or 10
+        end
+        return random(m, n)
+    end
+    local ok, err = pcall(fn)
+    math.random = random
+    assert(ok, err)
+end
+
+function T.the_setup_menu_shows_from_the_load()
+    local S = world()
+    eq(S.ui.fds.active, "true", "everyone sees it at load")
+    eq(S.ui.fds_map.value, "Map: Formula D: Monaco")
+    eq(S.ui.fds_rules.value, "Rules: Formula D basic rules, 1 lap")
+    assert(S.ui.fds_drivers.value:find("none yet"), S.ui.fds_drivers.value)
+    S.beginner.click("fdDashJoin", "Red")
+    eq(S.ui.fds_drivers.value, "Drivers (1): RedPlayer")
+end
+
+function T.the_setup_menu_sets_the_distance()
+    local S = world()
+    fdSetupLaps(Player.Red, "2")
+    eq(state().laps, 2)
+    eq(S.ui.fds_rules.value, "Rules: Formula D basic rules, 2 laps")
+    assert(S.ui.fds_laps2.colors:find("#2E7D32"), "the picked distance stands out")
+    assert(not S.ui.fds_laps1.colors:find("#2E7D32"))
+    fdSetupLaps(Player.Blue, "1")
+    eq(state().laps, 2, "only the host chooses")
+end
+
+function T.start_race_rolls_the_grid_and_starts()
+    local S, red, blue = twoCars()
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    -- In join order: Red rolls 4, Blue 15; then the starts.
+    withRolls({ 4, 15 }, function() fdSetupStart(Player.Red) end)
+    eq(state().phase, "race")
+    eq(state().round, 1)
+    eq(state().cars.Blue.space, FDMonaco.start[1], "the higher roll takes pole")
+    eq(state().cars.Red.space, FDMonaco.start[2])
+    assert(onSpace(S, blue, FDMonaco.byId[FDMonaco.start[1]]))
+    eq(S.ui.fds.active, "false", "the menu goes once the race starts")
+    -- Reset brings it back for the next race.
+    fdReset(Player.Red)
+    eq(S.ui.fds.active, "true")
+end
+
+function T.start_race_waits_on_an_unsettled_grid()
+    local S = twoCars()
+    -- The script's die always comes up 10: a tie it cannot break.
+    fdSetupStart(Player.Red)
+    eq(state().phase, "grid")
+    assert(S.logged("press Start race again"))
+    eq(S.ui.fds.active, "true")
+end
+
+function T.start_race_needs_drivers_and_the_host()
+    local S = world()
+    fdSetupStart(Player.Red)
+    eq(state().phase, "setup")
+    assert(S.logged("Nobody is racing yet"))
+    S.beginner.click("fdDashJoin", "Red")
+    fdSetupStart(Player.Blue)
+    eq(state().phase, "setup", "a player who is not the host cannot start")
+    assert(S.logged("Only the host"))
 end
 
 return T

@@ -22,6 +22,7 @@ local Mini = require("fd.tts.minidash")
 local Track = require("fd.tts.track")
 local Editor = require("fd.tts.track_editor")
 local Ghosts = require("fd.tts.ghosts")
+local Setup = require("fd.tts.setup")
 local TRACKS = { FDMonaco = require("fd.data.tracks.FDMonaco") }
 
 mod_packed = false
@@ -96,6 +97,21 @@ local function packTable()
     mod_packed, setup_packed = true, true
 end
 
+--- The map on the board tile, from Maps.list, or nil if it is none we know.
+local function mapOnBoard()
+    local tile = Track.tile()
+    local custom = tile and tile.getCustomObject()
+    if not custom then
+        return nil
+    end
+    for _, map in ipairs(Maps.list) do
+        if custom.image == map.url then
+            return map
+        end
+    end
+    return nil
+end
+
 function onLoad(saved_data)
     local saved = {}
     if saved_data and saved_data ~= "" then
@@ -130,9 +146,13 @@ function buildUi()
     -- Until the new XML has loaded, updates would go to elements on their way
     -- out and then be skipped as repeats once it has (see fd.tts.ui).
     Mini.setReady(false)
-    Hud.build(Rules, Mini.panels(Rules), function()
+    Setup.setReady(false)
+    local panels = Mini.panels(Rules)
+    panels[#panels + 1] = Setup.panel()
+    Hud.build(Rules, panels, function()
         applyModMenuButton()
         Mini.setReady()
+        Setup.setReady()
         refresh()
     end)
 end
@@ -375,6 +395,10 @@ function refresh(announce)
     syncCars()
     Hud.refresh(race)
     Mini.refresh(race)
+    -- The map is only looked up while the setup menu shows it.
+    local phase = race.state.phase
+    local map = (phase == "setup" or phase == "grid") and mapOnBoard() or nil
+    Setup.refresh(race, map and { name = map.name, hasTrack = TRACKS[map.id] ~= nil })
     renderDashboards()
     showTurn(announce)
     applyModMenuButton()
@@ -1020,8 +1044,7 @@ function fdGrid(player)
     act(function() race:rollForGrid(rollBlack) end)
 end
 
-function fdStart(player)
-    if not admin(player) then return end
+local function startRace(player)
     printToAll(player.steam_name .. " starts the race", LEVEL_RGB.info)
     clearReach()
     packTable()
@@ -1035,6 +1058,51 @@ function fdStart(player)
             end
         end)
     end, 1)
+end
+
+function fdStart(player)
+    if not admin(player) then return end
+    startRace(player)
+end
+
+--- Start race, on the setup menu: the grid roll and the start in one go.
+-- The grid roll settles its own ties, so the race only waits if it could
+-- not; Grid roll and Start on the race panel still do each half alone.
+function fdSetupStart(player)
+    if not admin(player) then return end
+    local phase = race.state.phase
+    if phase ~= "setup" and phase ~= "grid" then
+        return
+    end
+    if #race:cars() == 0 then
+        broadcastToColor("Nobody is racing yet: players join by taking a coloured seat.", player.color, LEVEL_RGB.warn)
+        return
+    end
+    printToAll(player.steam_name .. " calls the grid roll", LEVEL_RGB.info)
+    act(function() race:rollForGrid(rollBlack) end)
+    if race.state.phase ~= "setup" then
+        broadcastToColor("The grid is not settled yet -- press Start race again.", player.color, LEVEL_RGB.warn)
+        return
+    end
+    startRace(player)
+end
+
+--- The race distance buttons on the setup menu.
+function fdSetupLaps(player, value)
+    if not admin(player) then return end
+    local laps = tonumber(value)
+    if not laps or laps == race:serialize().laps then
+        return
+    end
+    printToAll(player.steam_name .. " sets the race distance", LEVEL_RGB.info)
+    act(function() race:setLaps(laps) end)
+end
+
+--- The Big Box menu put a new map on the board: the menu says which, and
+-- turn order goes by its track.
+function fdMapChanged()
+    useBoardTrack()
+    refresh()
 end
 
 function fdReset(player)
@@ -1088,15 +1156,8 @@ local trackShown = nil
 
 --- The track data for the map on the board, if there is any.
 local function trackOnBoard()
-    local tile = Track.tile()
-    local custom = tile and tile.getCustomObject()
-    for id, track in pairs(TRACKS) do
-        local map = Maps and Maps.byId and Maps.byId[id]
-        if custom and map and custom.image == map.url then
-            return track
-        end
-    end
-    return nil
+    local map = mapOnBoard()
+    return map and TRACKS[map.id]
 end
 
 local function editorStatus()
