@@ -807,18 +807,14 @@ end
 
 function fdNoop() end
 
-function fdDashJoin(dash, color)
-    if not SEATS[color] then
-        broadcastToColor("Take a coloured seat to join the race.", color, LEVEL_RGB.warn)
-        return
-    end
-    local holder = carOnDash(dash.getGUID())
-    if holder and holder.color ~= color then
-        broadcastToColor(race:label(holder) .. " is already using this dashboard.", color, LEVEL_RGB.warn)
+--- Put `color` in the race at dashboard `dash`, with no car yet: the first
+-- half of dealing them in. On no button -- Start race deals everybody in --
+-- but global, so the tests can seat a driver at a given dashboard.
+function joinRace(color, dash)
+    if not SEATS[color] or race:car(color) or carOnDash(dash.getGUID()) then
         return
     end
     act(function() joinAt(dash, color) end)
-    dash.highlightOn(color, 3)
 end
 
 --- Put `color` in the race at dashboard `dash`. Called inside act.

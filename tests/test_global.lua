@@ -55,7 +55,7 @@ end
 --- Red joins at the beginner dashboard and gets the race under way.
 local function redRacing()
     local S = world()
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
     fdStart({ steam_name = "host", color = "Red" }) -- Red's start is rolled at once
     return S
 end
@@ -93,7 +93,7 @@ function T.the_big_box_menu_is_packed_away_for_the_race()
     eq(S.ui.showModMenuButton.active, "false", "the menu is out")
     setup_packed = false -- the setup board is out too
 
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
     fdStart(Player.Red)
     eq(menuBag.calls[2], "buttonClick_recall", "the menu goes back in its bag")
     eq(setupBag.calls[1], "buttonClick_recall", "and the setup board")
@@ -204,7 +204,7 @@ end
 
 function T.a_driver_reconnecting_keeps_their_seat()
     local S = world()
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
     onPlayerConnect(Player.Red)
     eq(Player.Red.color, "Red")
     assert(state().cars.Red)
@@ -219,7 +219,7 @@ end
 
 function T.deleting_a_dashboard_before_the_start_takes_its_driver_out()
     local S = world()
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
     S.beginner.destruct()
     eq(state().cars.Red, nil, "Red has left")
     eq(S.count("Gear Stick"), 0, "and their gear stick went with them")
@@ -228,7 +228,7 @@ end
 function T.a_save_whose_dashboard_was_deleted_deals_the_seat_in_again()
     local S = world()
     S.object("Beginner Dashboard Bag", { guid = "edfadc", spawns = "Beginner Dashboard" })
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
     local saved = onSave()
     -- Deleted without the script hearing of it, as when cleaning up a save.
     local hook = onObjectDestroy
@@ -265,7 +265,7 @@ function T.the_start_fetches_dice_swept_up_with_the_setup_board()
         { name = "First Gear Dice", guid = "a8062d" },
         { name = "Damage Dice", guid = "6e3283" },
     } })
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
     fdStart(Player.Red)
     local first = S.find("First Gear Dice")
     assert(first, "the 1st gear die is back")
@@ -283,7 +283,7 @@ function T.the_start_falls_back_on_the_spare_dice_set()
     local set = {}
     for i, name in ipairs(names) do set[i] = { name = name, guid = "d" .. i } end
     S.object("Dice Set Bag", { guid = "ac4939", spawns = "Dice Set", spawnContents = set })
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
     fdStart(Player.Red)
     for _, name in ipairs(names) do
         eq(S.count(name), 1, name)
@@ -298,21 +298,20 @@ end
 
 function T.no_dice_fetched_when_all_are_out()
     local S = world()
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
     fdStart(Player.Red)
     assert(not S.logged("dice out"))
 end
 
-function T.free_dashboards_offer_join()
+function T.free_dashboards_have_no_buttons()
     local S = world()
-    eq(#S.beginner.buttons, 1)
-    eq(S.beginner.buttons[1].click_function, "fdDashJoin")
-    eq(S.advanced.buttons[1].click_function, "fdDashJoin")
+    eq(#S.beginner.buttons, 0, "players are dealt in at Start race, not by joining")
+    eq(#S.advanced.buttons, 0)
 end
 
 function T.joining_from_a_dashboard_claims_it_and_places_markers()
     local S = world()
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
     eq(state().cars.Red.tts.dash, S.beginner.guid)
     eq(S.count("Gear Stick"), 1)
     eq(S.count("Wear Tracker"), 1)
@@ -323,8 +322,8 @@ end
 
 function T.buttons_read_the_same_way_as_the_printed_art()
     local S = world()
-    S.beginner.click("fdDashJoin", "Red")
-    S.advanced.click("fdDashJoin", "Blue")
+    joinRace("Red", S.beginner)
+    joinRace("Blue", S.advanced)
     local function row(dash)
         local out = {}
         for _, b in ipairs(dash.buttons) do
@@ -351,22 +350,20 @@ end
 
 function T.a_claimed_dashboard_cannot_be_taken()
     local S = world()
-    S.beginner.click("fdDashJoin", "Red")
-    eq(S.beginner.buttons[1].click_function, "fdNoop", "join button gone")
-    fdDashJoin(S.beginner, "Blue") -- a click that raced the redraw
+    joinRace("Red", S.beginner)
+    joinRace("Blue", S.beginner)
     eq(state().cars.Blue, nil)
-    assert(S.logged("already using"))
 end
 
 function T.spectators_cannot_join()
     local S = world()
-    S.beginner.click("fdDashJoin", "Grey")
+    joinRace("Grey", S.beginner)
     eq(state().cars.Grey, nil)
 end
 
 function T.advanced_face_warns_instead_of_placing_wear()
     local S = world()
-    S.advanced.click("fdDashJoin", "Blue")
+    joinRace("Blue", S.advanced)
     eq(S.count("Wear Tracker"), 0)
     assert(S.logged("beginner side"))
     eq(S.advanced.buttons[1].position[2], 0.7)
@@ -441,7 +438,7 @@ function T.leaving_clears_markers_and_frees_the_dashboard()
     eq(state().cars.Red, nil)
     eq(S.count("Gear Stick"), 0)
     eq(S.count("Wear Tracker"), 0)
-    eq(S.beginner.buttons[1].click_function, "fdDashJoin")
+    eq(#S.beginner.buttons, 0, "its buttons go with the car")
 end
 
 function T.flipping_a_dashboard_redraws_its_buttons()
@@ -573,7 +570,7 @@ end
 function T.a_car_claimed_by_someone_else_is_left_alone()
     local S = redRacing()
     local blues = S.object("Formula 1 Solid", { pos = S.vec(1, 1, 34) })
-    S.advanced.click("fdDashJoin", "Blue")
+    joinRace("Blue", S.advanced)
     S.advanced.click("fdDashCar", "Blue")
     eq(state().cars.Blue.tts.car, blues.guid)
     -- Even parked right next to Red, a claimed car is not up for grabs.
@@ -858,8 +855,8 @@ end
 --- Red and Blue in the race, each with a car parked off the board.
 local function twoCars()
     local S = world()
-    S.beginner.click("fdDashJoin", "Red")
-    S.advanced.click("fdDashJoin", "Blue")
+    joinRace("Red", S.beginner)
+    joinRace("Blue", S.advanced)
     S.beginner.click("fdDashCar", "Red")
     S.advanced.click("fdDashCar", "Blue")
     return S, getObjectFromGUID(state().cars.Red.tts.car), getObjectFromGUID(state().cars.Blue.tts.car)
@@ -921,7 +918,7 @@ end
 
 function T.a_driver_without_a_car_is_told_at_the_grid()
     local S = world()
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
     gridRoll(S, { Red = 7 })
     assert(S.logged("no car to put on the grid"))
     eq(state().cars.Red.space, nil)
@@ -1415,10 +1412,10 @@ function T.a_dashboard_taken_out_later_gets_its_buttons()
     local S = world()
     local late = S.object("Beginner Dashboard", { pos = S.vec(0, 1, -60), up = S.vec(0, -1, 0) })
     onObjectSpawn(late)
-    eq(late.buttons[1] and late.buttons[1].click_function, "fdDashJoin")
+    eq(#late.buttons, 0, "free, so no buttons")
     -- And into a bag: no longer drawn, and no error.
     late.destruct()
-    S.beginner.click("fdDashJoin", "Red")
+    joinRace("Red", S.beginner)
 end
 
 function T.unchanged_ui_is_not_sent_again()
@@ -1490,8 +1487,8 @@ function T.the_standings_are_a_table()
     local S = world()
     eq(S.ui.fdr_empty.active, "true", "an empty race says how to join")
     eq(S.ui.fdr_r1.active, "false")
-    S.beginner.click("fdDashJoin", "Red")
-    S.advanced.click("fdDashJoin", "Blue")
+    joinRace("Red", S.beginner)
+    joinRace("Blue", S.advanced)
     eq(S.ui.fdr_empty.active, "false")
     eq(S.ui.fdr_r1.active, "true")
     eq(S.ui.fdr_r2.active, "true")
@@ -1688,7 +1685,7 @@ function T.only_the_host_can_use_the_race_controls()
     eq(rows.fds, 4, "as are the setup menu's choices, Start race, the track tools and the editor line")
 
     -- A click that gets through anyway does nothing.
-    S.advanced.click("fdDashJoin", "Blue")
+    joinRace("Blue", S.advanced)
     local blue = Player.Blue
     fdReset(blue)
     eq(state().phase, "race", "not reset")

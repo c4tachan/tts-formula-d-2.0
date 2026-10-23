@@ -1,6 +1,7 @@
--- Buttons attached to the player dashboards. An unclaimed dashboard offers
--- "Join race"; a claimed one shows its car's status and the actions that are
--- not already covered by moving pieces (gear stick, wear marker) on it.
+-- Buttons attached to the player dashboards. A claimed one shows its car's
+-- status and the actions that are not already covered by moving pieces (gear
+-- stick, wear marker) on it. An unclaimed one has none: players are dealt in
+-- at Start race, onto a dashboard in front of their seat.
 --
 -- The buttons sit in a strip just past the printed bottom edge of whichever
 -- face is up. Their click functions live in the Global script, which TTS calls
@@ -54,14 +55,6 @@ local function button(dash, params, face)
     dash.createButton(params)
 end
 
-local function drawJoin(dash, face)
-    button(dash, {
-        click_function = "fdDashJoin", label = "Join race", tooltip = "Race with this dashboard",
-        x = 0, z = rowZ(face, BUTTON_GAP + 0.1), width = 1400, height = 260, font_size = 150,
-        color = { 0.18, 0.49, 0.2 }, font_color = { 1, 1, 1 },
-    }, face)
-end
-
 local function drawCar(dash, face, tint)
     -- Label first so it is button index 0 for editButton.
     button(dash, {
@@ -102,8 +95,6 @@ function Controls.render(dash, car, label)
         dash.clearButtons()
         if car then
             drawCar(dash, face, Color.fromString(car.color))
-        else
-            drawJoin(dash, face)
         end
         rendered[guid] = key
         labels[guid] = nil
