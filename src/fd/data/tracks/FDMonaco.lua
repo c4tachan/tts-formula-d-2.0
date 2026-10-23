@@ -544,6 +544,14 @@ T.start = { "o.s11.15", "i.s11.15", "o.s11.12", "i.s11.12", "o.s11.9", "i.s11.9"
 -- that steps onto one of these has crossed the line.
 T.finish = { line = { "i.s1.0", "m.s1.0", "o.s1.0" } }
 
+-- Where the dice sit (image pixels): on the map's name panel, clear of
+-- the track. Without it they sit in the middle of the board.
+T.dice = { 1505, 1468 }
+
+-- Where the race panel lies (image pixels): its centre and width, on an
+-- empty patch of the board. Without it the panel is on the screen.
+T.panel = { pos = { 2172, 1410 }, width = 400 }
+
 -- The spaces touching each one, in any direction and whatever the
 -- arrows say: from tracks/<id>.adjacency.json (find_adjacency.py).
 -- A car ending its move rolls for a collision with each car in one.

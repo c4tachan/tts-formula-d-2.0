@@ -1,5 +1,6 @@
--- The shared dice set: finding the gear dice, teaching them their faces, moving
--- the right one to whoever shifts, and reading results once a roll settles.
+-- The shared dice set: finding the dice, teaching the gear dice their faces,
+-- keeping them in a walled tray on the board, rolling them there, and reading
+-- a die once it settles (Dice.watch).
 
 local DiceData = require("fd.data.dice")
 
@@ -27,12 +28,26 @@ local known = {}
 
 --- Give a gear die its rotation values. The models ship without any, so TTS
 -- cannot read them until this runs; it is idempotent and cheap.
+--
+-- Most of the models also ship with a non-convex collider, which only holds
+-- up on a locked object: thrown, such a die can fall straight through the
+-- board. One is made convex here, which takes a reload; the reloaded die
+-- comes back through here (onObjectSpawn). Returns the object to go on
+-- using -- the reloaded one, if it was.
 function Dice.prepare(obj)
     local gear = Dice.gearOf(obj)
-    if gear then
-        obj.setRotationValues(DiceData[gear])
-        known[gear] = obj.getGUID()
+    if not gear then
+        return obj
     end
+    known[gear] = obj.getGUID()
+    local custom = obj.getCustomObject()
+    if custom and custom.convex == false then
+        custom.convex = true
+        obj.setCustomObject(custom)
+        return obj.reload()
+    end
+    obj.setRotationValues(DiceData[gear])
+    return obj
 end
 
 function Dice.prepareAll()
@@ -57,18 +72,201 @@ function Dice.find(gear)
     return nil
 end
 
---- Move a gear die to `pos` and highlight it for `color`. Leaves a die alone
--- while someone is holding it.
-function Dice.bring(gear, pos, color)
-    local die = Dice.find(gear)
+-- Only the die in play sits in the tray on the board, unlocked, to be
+-- thrown with the Roll button (Dice.throw); the rest are parked in a row
+-- beside it, locked. None can be picked up. Four low walls round the tray
+-- keep a throw from tumbling into the cars.
+
+local SPACING = 2.2   -- world units between neighbouring parked dice
+local LIFT = 0.6      -- above the board face, so a die sits on it
+local PARK_GAP = 1.5  -- between the tray's wall and the parked row
+-- How high the die in play is let go above the tray's floor: well clear of
+-- the board, as a die put down inside the board's face falls through it.
+local DROP = 2
+
+-- Where the dice were last laid out: the tray's centre, and which way the
+-- parked row lies from it (along X or Z, towards the board's middle).
+local place = nil
+local active = nil -- the gear whose die is in the tray
+
+--- Where die `i` (gears 1 to 6, then the black die) is parked: in a row
+-- along the tray's side that faces the board's middle.
+local function parking(i)
+    local c = place.center
+    local along = (i - 4) * SPACING
+    if place.axis == "z" then
+        return { x = c.x + along, y = c.y + LIFT, z = c.z + place.side * place.reach }
+    end
+    return { x = c.x + place.side * place.reach, y = c.y + LIFT, z = c.z + along }
+end
+
+--- Set die `obj` down at `pos`, where players cannot pick it up: locked when
+-- parked, loose in the tray, to roll.
+local function fix(obj, pos, loose)
+    obj.interactable = false
+    obj.setLock(not loose)
+    obj.setPosition(pos)
+end
+
+-- The tray: its inside, and its walls. Spawned afresh wherever the dice are
+-- laid out, and found again by name after a load.
+local TRAY = "Dice tray"
+local TRAY_WIDTH = 11   -- inside, world units: room for a throw
+local TRAY_DEPTH = 7
+local WALL_HEIGHT = 2     -- a throw goes up a little way: high enough to keep it in
+local WALL_THICKNESS = 0.3
+local TRAY_TINT = { 0.12, 0.13, 0.15 }
+
+local trayGuids = nil -- the walls put out, once known
+
+local function clearTray()
+    if not trayGuids then
+        trayGuids = {}
+        for _, o in ipairs(getObjects()) do
+            if o.getName() == TRAY then trayGuids[#trayGuids + 1] = o.getGUID() end
+        end
+    end
+    for _, g in ipairs(trayGuids) do
+        local o = getObjectFromGUID(g)
+        if o then o.destruct() end
+    end
+    trayGuids = {}
+end
+
+--- One wall, centred on `pos`, `size` across in world units. The block's own
+-- size is only known once it is out, so it is scaled to fit then.
+local function wall(pos, size)
+    local obj = spawnObject({
+        type = "BlockRectangle", position = pos, sound = false,
+        callback_function = function(o)
+            local s = o.getBoundsNormalized().size
+            o.setScale({ size.x / s.x, size.y / s.y, size.z / s.z })
+            o.setName(TRAY)
+            o.setColorTint(TRAY_TINT)
+            o.setLock(true)
+            o.interactable = false
+        end,
+    })
+    trayGuids[#trayGuids + 1] = obj.getGUID()
+end
+
+--- Four walls round the rows at `center`, standing on the board face.
+function Dice.tray(center)
+    clearTray()
+    local y = center.y + WALL_HEIGHT / 2
+    local w, d, t = TRAY_WIDTH, TRAY_DEPTH, WALL_THICKNESS
+    wall({ x = center.x, y = y, z = center.z - (d + t) / 2 }, { x = w + 2 * t, y = WALL_HEIGHT, z = t })
+    wall({ x = center.x, y = y, z = center.z + (d + t) / 2 }, { x = w + 2 * t, y = WALL_HEIGHT, z = t })
+    wall({ x = center.x - (w + t) / 2, y = y, z = center.z }, { x = t, y = WALL_HEIGHT, z = d })
+    wall({ x = center.x + (w + t) / 2, y = y, z = center.z }, { x = t, y = WALL_HEIGHT, z = d })
+end
+
+local function findBlack()
+    local obj = known.black and getObjectFromGUID(known.black)
+    if obj then
+        return obj
+    end
+    for _, o in ipairs(getObjects()) do
+        if Dice.isBlack(o) then
+            known.black = o.getGUID()
+            return o
+        end
+    end
+    return nil
+end
+
+local function allNames()
+    local out = {}
+    for i, n in ipairs(DiceData.names) do out[i] = n end
+    out[#out + 1] = Dice.BLACK_DIE
+    return out
+end
+
+local function dieAt(i)
+    if i <= #DiceData.names then
+        return Dice.find(i)
+    end
+    return findBlack()
+end
+
+--- Put a tray at `center` and park every die that is out beside it, on the
+-- side towards `middle` (the middle of the board). No die is in play until
+-- Dice.activate says which.
+function Dice.layout(center, middle)
+    local dx, dz = middle.x - center.x, middle.z - center.z
+    if math.abs(dz) >= math.abs(dx) then
+        place = { center = center, axis = "z", side = dz < 0 and -1 or 1,
+            reach = TRAY_DEPTH / 2 + WALL_THICKNESS + PARK_GAP }
+    else
+        place = { center = center, axis = "x", side = dx < 0 and -1 or 1,
+            reach = TRAY_WIDTH / 2 + WALL_THICKNESS + PARK_GAP }
+    end
+    active = nil
+    Dice.tray(center)
+    for i in ipairs(allNames()) do
+        local obj = dieAt(i)
+        if obj then
+            fix(obj, parking(i))
+        end
+    end
+end
+
+--- Put the die for `gear` in the tray, parking the one that was there; with
+-- no gear (0 or nil), park it and leave the tray empty. Does nothing until
+-- the dice have been laid out, or if that die is in already. Returns the
+-- die in the tray.
+function Dice.activate(gear)
+    if not place then
+        return nil
+    end
+    if gear == active then
+        local die = active and Dice.find(active)
+        if die or not active then
+            return die
+        end
+        active = nil -- it has gone: fall through, to bring in another
+    end
+    local was = active and Dice.find(active)
+    if was then
+        fix(was, parking(active))
+    end
+    active = nil
+    local die = gear and gear > 0 and Dice.find(gear)
     if not die then
         return nil
     end
-    if not die.held_by_color then
-        die.setPositionSmooth(pos, false, true)
-    end
-    die.highlightOn(color, 4)
+    local c = place.center
+    fix(die, { x = c.x, y = c.y + DROP, z = c.z }, true)
+    active = gear
     return die
+end
+
+--- Light up the die for `gear` for `color`, who has just shifted into it.
+function Dice.highlight(gear, color)
+    local die = Dice.find(gear)
+    if die then
+        die.highlightOn(color, 4)
+    end
+    return die
+end
+
+--- Throw the die for `gear` in the tray, bringing it in first if another
+-- is there. Returns the die, or nil if it is not out; read it with
+-- Dice.watch.
+function Dice.throw(gear)
+    local die = Dice.activate(gear) or Dice.find(gear)
+    if die then
+        die.roll()
+    end
+    return die
+end
+
+--- Turn the black die to show `value`, rolled by the script.
+function Dice.showBlack(value)
+    local die = findBlack()
+    if die then
+        die.setRotationValue(value)
+    end
 end
 
 -- Fetching the set --------------------------------------------------------------
@@ -79,32 +277,20 @@ end
 local SETUP_BAG = "0fde3b"
 local DICE_SET_BAG = "ac4939"
 
--- Where a fetched die is set down: the row the setup board lays them out in,
--- gears 1 to 6, then the black die.
-local HOME = {
-    { 57.6, -13.7 }, { 60.9, -13.7 }, { 63.6, -13.7 }, { 66.7, -13.7 }, { 69.9, -13.7 }, { 72.7, -13.7 },
-    { 72.2, -10.8 },
-}
-local DROP_Y = 3
-
-local function allNames()
-    local out = {}
-    for i, n in ipairs(DiceData.names) do out[i] = n end
-    out[#out + 1] = Dice.BLACK_DIE
-    return out
-end
-
---- Take whichever of `missing` (name -> home index) `bag` holds, setting each
--- down at home. Returns how many came out.
+--- Take whichever of `missing` (name -> place in the row) `bag` holds,
+-- parking each by the tray. Returns how many came out.
 local function takeFrom(bag, missing)
     local n = 0
     for _, item in ipairs(bag.getObjects()) do
-        local home = HOME[missing[item.name] or 0]
-        if home then
+        local i = missing[item.name]
+        if i then
             missing[item.name] = nil
+            local pos = parking(i)
             bag.takeObject({
-                guid = item.guid, position = { x = home[1], y = DROP_Y, z = home[2] }, smooth = false,
-                callback_function = function(obj) Dice.prepare(obj) end,
+                guid = item.guid, position = pos, smooth = false,
+                callback_function = function(obj)
+                    fix(Dice.prepare(obj), pos)
+                end,
             })
             n = n + 1
         end
@@ -112,10 +298,10 @@ local function takeFrom(bag, missing)
     return n
 end
 
---- Make sure all seven dice are out on the table, fetching any that are not:
--- from the setup board's bag, else from a spare set. `onDone(n)` is told how
--- many were fetched, once they are.
-function Dice.ensureAll(onDone)
+--- Fetch whichever of the seven dice are not on the table, parking each by
+-- the tray: from the setup board's bag, else from a spare set. `onDone(n)`
+-- is told how many were fetched.
+local function fetchMissing(onDone)
     local onTable = {}
     for _, o in ipairs(getObjects()) do onTable[o.getName()] = true end
     local missing, count = {}, 0
@@ -133,14 +319,41 @@ function Dice.ensureAll(onDone)
     end
     -- The infinite bag hands out a whole set in a bag: take what is still
     -- missing and put the rest away.
+    local beside = parking(#DiceData.names + 3)
     spare.takeObject({
-        position = { x = HOME[7][1] + 5, y = DROP_Y, z = HOME[7][2] }, smooth = false,
+        position = { x = beside.x, y = beside.y + 3, z = beside.z }, smooth = false,
         callback_function = function(set)
             fetched = fetched + takeFrom(set, missing)
             set.destruct()
             onDone(fetched)
         end,
     })
+end
+
+--- Make sure all seven dice are out, parked by a tray at `center` (see
+-- Dice.layout), fetching any that are not. `onDone(n)` is told how many
+-- were fetched.
+function Dice.setOut(center, middle, onDone)
+    Dice.layout(center, middle)
+    fetchMissing(onDone)
+end
+
+local restocking = false
+
+--- Mid-race, fetch any die that has gone -- fallen off the table, say --
+-- and park it by the tray. Does nothing before the dice are laid out, or
+-- while a fetch is already on its way. `onDone(n)` is told how many came.
+function Dice.restock(onDone)
+    if not place or restocking then
+        return
+    end
+    restocking = true
+    -- Should the bags never hand anything over, a later try is not held up.
+    Wait.time(function() restocking = false end, 10)
+    fetchMissing(function(n)
+        restocking = false
+        onDone(n)
+    end)
 end
 
 local watching = {}

@@ -99,6 +99,14 @@ function Stub.object(name, props)
         return { center = o.pos, size = o.size or vec(1, 1, 1), offset = vec(0, 0, 0) }
     end
     o.getCustomObject = function() return o.custom or {} end
+    o.setCustomObject = function(c) o.custom = c end
+    -- Reloading keeps the object, as far as the tests go: TTS spawns it
+    -- afresh, under the same guid.
+    o.reload = function()
+        o.reloads = (o.reloads or 0) + 1
+        if onObjectSpawn then onObjectSpawn(o) end
+        return o
+    end
     o.setVectorLines = function(l) o.lines = l end
     o.getVectorLines = function() return o.lines or {} end
     o.getTransformUp = function() return o.up end
@@ -149,6 +157,7 @@ function Stub.object(name, props)
     o.call = function(fn) o.calls[#o.calls + 1] = fn end
     o.setLock = function(l) o.locked = l end
     o.setPositionSmooth = function(p) o.pos = vec(p.x, p.y, p.z) end
+    o.setPosition = function(p) o.pos = vec(p.x, p.y, p.z) end
     o.setRotationSmooth = function(r) o.rot = r end
     o.isSmoothMoving = function() return false end
     -- A roll leaves `value` as the test set it; it only counts the throws.
@@ -157,10 +166,12 @@ function Stub.object(name, props)
     o.highlightOn = function(c, d) o.highlight = { c, d } end
     o.highlightOff = function() o.highlight = nil end
     o.setColorTint = function(c) o.tint = c end
+    o.setScale = function(s) o.scale = vec(s.x or s[1], s.y or s[2], s.z or s[3]) end
     o.setRotationValues = function(v) o.rotationValues = v end
     -- `value` is what the face that is up shows. As in TTS, getValue() on an
     -- object with rotation values is that face's index, not its value.
     o.getRotationValue = function() return o.value end
+    o.setRotationValue = function(v) o.value = v end
     o.getValue = function()
         for i, rv in ipairs(o.rotationValues or {}) do
             if rv.value == o.value then return i end
@@ -245,11 +256,13 @@ end
 function spawnObject(params)
     local p = params.position
     local r = params.rotation or vec(0, 0, 0)
-    return Stub.object(params.type, {
+    local o = Stub.object(params.type, {
         pos = vec(p.x or p[1], p.y or p[2], p.z or p[3]),
         rot = vec(r.x or r[1] or 0, r.y or r[2] or 0, r.z or r[3] or 0),
         scale = params.scale,
     })
+    if params.callback_function then params.callback_function(o) end
+    return o
 end
 
 function spawnObjectData(params)

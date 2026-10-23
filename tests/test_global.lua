@@ -22,7 +22,8 @@ local function world()
     S.realRandom = random
     math.random = function(m, n)
         if m == 20 and n == nil then return 10 end
-        return random(m, n)
+        if n then return random(m, n) end
+        return random(m)
     end
     S.object("Gear Stick Bag", { guid = "71d89b", spawns = "Gear Stick" })
     S.object("Wear Tracker Bag", { guid = "a845cd", spawns = "Wear Tracker" })
@@ -72,6 +73,29 @@ local function roll(S, gear, value, color)
     local die = S.find(NAMES[gear] .. " Gear Dice")
     die.value = value
     onObjectRandomize(die, color or "Red")
+end
+
+--- The dice tray's walls, and the middle of them.
+local function tray(S)
+    local walls, x, z = {}, 0, 0
+    for _, o in ipairs(S.objects) do
+        if o.name == "Dice tray" then
+            walls[#walls + 1] = o
+            x, z = x + o.pos.x, z + o.pos.z
+        end
+    end
+    return walls, { x = x / #walls, z = z / #walls }
+end
+
+--- Whether `die` lies inside the tray's walls.
+local function inTray(S, die)
+    local walls = tray(S)
+    local x0, x1, z0, z1 = math.huge, -math.huge, math.huge, -math.huge
+    for _, w in ipairs(walls) do
+        x0, x1 = math.min(x0, w.pos.x), math.max(x1, w.pos.x)
+        z0, z1 = math.min(z0, w.pos.z), math.max(z1, w.pos.z)
+    end
+    return die.pos.x > x0 and die.pos.x < x1 and die.pos.z > z0 and die.pos.z < z1
 end
 
 local T = {}
@@ -290,10 +314,11 @@ function T.the_start_falls_back_on_the_spare_dice_set()
     end
     eq(S.count("Dice Set"), 0, "the spare set's bag is put away")
     assert(S.logged("Put 7 dice out"))
-    -- And the fetched dice are the ones the race uses.
-    dropOn(S, S.find("Gear Stick"), "gear", 1)
+    -- In the row in the middle of the board, and the ones the race uses.
     local die = S.find("First Gear Dice")
-    assert(die.pos.z < 0, "brought to Red on the shift")
+    eq(die.interactable, false, "out of reach")
+    dropOn(S, S.find("Gear Stick"), "gear", 1)
+    eq(die.highlight[1], "Red")
 end
 
 function T.no_dice_fetched_when_all_are_out()
@@ -369,12 +394,13 @@ function T.advanced_face_warns_instead_of_placing_wear()
     eq(S.advanced.buttons[1].position[2], 0.7)
 end
 
-function T.dropping_the_gear_stick_shifts_and_brings_the_die()
+function T.dropping_the_gear_stick_shifts_and_lights_the_die()
     local S = redRacing()
+    local die = S.find("First Gear Dice")
     dropOn(S, S.find("Gear Stick"), "gear", 1)
     eq(state().cars.Red.gear, 1)
-    local die = S.find("First Gear Dice")
-    assert(die.pos.z > -30 and die.pos.z < 0, "die moved towards the table centre from the dashboard")
+    eq(die.highlight[1], "Red", "the die for the gear is lit")
+    assert(inTray(S, die), "and in the tray")
     roll(S, 1, 2)
     eq(state().cars.Red.lastRoll, 2)
     eq(state().round, 2)
@@ -518,16 +544,85 @@ function T.the_roll_button_rolls_the_die_for_your_gear()
 
     fdUiShift(Player.Red, "2")
     local die = S.find("Second Gear Dice")
-    die.pos = S.vec(40, 1, 40) -- wandered off after the shift
     die.value = 4
     fdUiRoll(Player.Red)
     eq(die.rolls, 1, "thrown once")
-    assert(die.pos.z < 0, "fetched to Red's side first")
-    eq(state().cars.Red.lastRoll, 4, "read like a roll by hand")
+    eq(state().cars.Red.lastRoll, 4, "and read once it settles")
 
     -- Someone else's button rolls nothing for Red.
     fdUiRoll(Player.Blue)
     eq(die.rolls, 1)
+end
+
+function T.the_tray_sits_on_the_map_name_panel_with_the_dice_parked_beside_it()
+    local S = world()
+    local Track = require("fd.tts.track")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local spot = Track.worldOf(S.board, FDMonaco, FDMonaco.dice[1], FDMonaco.dice[2])
+    local walls, middle = tray(S)
+    eq(#walls, 4)
+    assert(math.abs(middle.x - spot.x) < 1e-6 and math.abs(middle.z - spot.z) < 1e-6, "the tray on the panel")
+    -- Before the race no die is in play: all parked, locked, in gear order,
+    -- on the side of the tray towards the middle of the board.
+    local last = nil
+    for _, name in ipairs({ "First Gear Dice", "Second Gear Dice", "Sixth Gear Dice", "Damage Dice" }) do
+        local die = S.find(name)
+        eq(die.locked, true, name .. " parked")
+        eq(die.interactable, false, name .. " cannot be picked up")
+        assert(not inTray(S, die), name .. " outside the tray")
+        assert(math.abs(die.pos.z) < math.abs(spot.z), name .. " towards the middle of the board")
+        if last then
+            eq(die.pos.z, last.pos.z, "in one row")
+            assert(die.pos.x > last.pos.x, "in gear order")
+        end
+        last = die
+    end
+end
+
+function T.only_the_die_in_play_is_in_the_tray()
+    local S = redRacing()
+    local first, second = S.find("First Gear Dice"), S.find("Second Gear Dice")
+    assert(not inTray(S, first), "Red has no gear yet: the tray is empty")
+    fdUiShift(Player.Red, "1")
+    assert(inTray(S, first), "the 1st gear die comes in")
+    eq(first.locked, false, "loose, to roll")
+    eq(first.interactable, false, "but still out of reach")
+    fdUiShift(Player.Red, "2")
+    assert(not inTray(S, first), "out again on the shift")
+    eq(first.locked, true, "parked and locked")
+    assert(inTray(S, second), "and the 2nd gear die in")
+    -- Laid out again (a new map, the start): the tray moves, the die in play
+    -- goes back in.
+    fdMapChanged()
+    eq(#tray(S), 4, "still four walls")
+    assert(inTray(S, second))
+end
+
+function T.the_dice_keep_their_spot_on_a_track_with_edits()
+    local S = world()
+    local Track = require("fd.tts.track")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    -- Opening the editor makes an edited copy of the track, as a save with
+    -- hand edits has.
+    fdEdit({ color = "Red", steam_name = "RedPlayer" })
+    fdEdit({ color = "Red", steam_name = "RedPlayer" })
+    fdMapChanged()
+    local spot = Track.worldOf(S.board, FDMonaco, FDMonaco.dice[1], FDMonaco.dice[2])
+    local _, middle = tray(S)
+    assert(math.abs(middle.x - spot.x) < 1e-6 and math.abs(middle.z - spot.z) < 1e-6, "still on the name panel")
+end
+
+function T.the_tray_sits_in_the_middle_of_a_board_without_a_spot()
+    local S = world()
+    S.board.custom = { image = "http://example.invalid/other-map.png" }
+    fdMapChanged()
+    local _, middle = tray(S)
+    assert(math.abs(middle.x) < 1e-6 and math.abs(middle.z) < 1e-6, "in the middle of the board")
+end
+
+function T.the_black_die_shows_the_scripts_roll()
+    local S = redRacing()
+    eq(S.find("Damage Dice").value, 10, "Red's start, rolled by the script")
 end
 
 function T.screen_buttons_act_on_the_clickers_car()
@@ -1786,18 +1881,39 @@ function T.start_race_needs_drivers_and_the_host()
     assert(S.logged("Nobody is seated yet"))
 end
 
-function T.the_race_panel_lies_beside_the_board()
+function T.the_race_panel_lies_on_the_board_where_the_track_says()
     local S = world()
-    eq(S.board.xml[1].attributes.id, "fdr", "drawn on the board tile")
+    local panel = S.board.xml[1].attributes
+    eq(panel.id, "fdr", "drawn on the board tile")
     for _, node in ipairs(S.xml) do
         assert(node.attributes.id ~= "fdr", "not on the screen")
     end
-    -- Scaled back by the tile's scale (44): 0.04 world units per UI unit.
-    eq(S.board.xml[1].attributes.scale, "0.0909 0.0909 1")
+    -- Monaco's spot, on the Formula D logo: centred on (2172, 1410) of the
+    -- 2474 x 1616 image, which is local (-935 / 2474, 602 / 1616) on a
+    -- 1-unit tile; 400 pixels wide.
+    local x, y = panel.position:match("^(%S+) (%S+)")
+    eq(x, "-37.8")
+    eq(y, "37.3")
+    eq(panel.scale, "0.0425 0.0425 1", "380 UI units across 400 pixels")
+    eq(panel.rotation, "0 0 180", "the same way up as the picture")
     -- A new map reloads the tile, which loses its UI: it is drawn again.
     S.board.xml = {}
     fdMapChanged()
     eq(S.board.xml[1].attributes.id, "fdr")
+end
+
+function T.the_race_panel_goes_on_the_screen_for_a_map_without_a_spot()
+    local S = world()
+    S.board.custom = { image = "http://example.invalid/other-map.png" }
+    fdMapChanged()
+    eq(#S.board.xml, 0, "off the board")
+    local found = nil
+    for _, node in ipairs(S.xml) do
+        if node.attributes.id == "fdr" then found = node end
+    end
+    assert(found, "on the screen")
+    eq(found.attributes.rectAlignment, "UpperLeft")
+    assert(S.ui.fdr_title, "and filled in")
 end
 
 function T.the_setup_menu_comes_back_after_the_flag()
@@ -1912,6 +2028,48 @@ function T.the_host_can_remove_a_driver_who_dropped_out()
     eq(state().cars.Red, nil, "out of the race")
     eq(#S.beginner.buttons, 0, "and the dashboard is free")
     assert(host.color == "Orange", "the host stays where they are")
+end
+
+function T.a_die_lost_in_the_race_is_fetched_again()
+    local S = redRacing()
+    local names = {}
+    for i, n in ipairs({ "First", "Second", "Third", "Fourth", "Fifth", "Sixth" }) do
+        names[i] = { name = n .. " Gear Dice", guid = "d" .. i }
+    end
+    names[7] = { name = "Damage Dice", guid = "d7" }
+    S.object("Dice Set Bag", { guid = "ac4939", spawns = "Dice Set", spawnContents = names })
+    fdUiShift(Player.Red, "1")
+    -- Thrown, it falls through the table and is gone.
+    S.find("First Gear Dice").destruct()
+    fdUiRoll(Player.Red)
+    assert(S.logged("1st gear die has gone"), "Red is told")
+    assert(S.logged("Put 1 missing dice back out"))
+    local die = S.find("First Gear Dice")
+    assert(die, "a new one is out")
+    eq(S.count("First Gear Dice"), 1, "just the one")
+    eq(S.count("Second Gear Dice"), 1, "and nothing else doubled")
+    assert(inTray(S, die), "in the tray, as it is the die in play")
+    die.value = 2
+    fdUiRoll(Player.Red)
+    eq(state().cars.Red.lastRoll, 2, "and it rolls")
+end
+
+function T.the_die_in_play_is_let_go_above_the_tray()
+    local S = redRacing()
+    fdUiShift(Player.Red, "1")
+    local loose, parked = S.find("First Gear Dice"), S.find("Second Gear Dice")
+    assert(loose.pos.y > parked.pos.y + 1, "dropped in from well above the board")
+end
+
+function T.a_gear_die_is_given_a_convex_collider()
+    local S = world()
+    local die = S.object("First Gear Dice", { custom = { mesh = "m", collider = "c", convex = false } })
+    onObjectSpawn(die)
+    eq(die.custom.convex, true, "convex, so it cannot fall through the board")
+    eq(die.reloads, 1, "reloaded to take it")
+    eq(#die.rotationValues, 4, "and taught its faces once back")
+    onObjectSpawn(die)
+    eq(die.reloads, 1, "only once")
 end
 
 return T

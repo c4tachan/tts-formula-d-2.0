@@ -1,5 +1,6 @@
--- The race panel everyone sees, on the table beside the board: standings,
--- pending black die checks, and Undo. Per-player controls live on the
+-- The race panel everyone sees, lying on an empty patch of the board (or on
+-- the screen, for a map without one): standings, pending black die checks,
+-- and Undo. Per-player controls live on the
 -- dashboards (fd.tts.controls), the race-wide ones on the setup menu
 -- (fd.tts.setup).
 --
@@ -7,6 +8,7 @@
 -- already holds, so the Big Box menu button survives.
 
 local Race = require("fd.core.race")
+local Track = require("fd.tts.track")
 local Ui = require("fd.tts.ui")
 
 local Hud = {}
@@ -94,11 +96,19 @@ local function standingsTable(cols)
     }, rows)
 end
 
+local PANEL_WIDTH = 380
+
+-- On the screen: where it was before it went on the board.
+local ON_SCREEN = {
+    rectAlignment = "UpperLeft", offsetXY = "20 -120",
+    allowDragging = "true", returnToOriginalPositionWhenReleased = "false",
+}
+
+--- The panel, placed by `place` (ON_SCREEN or from placement).
 local function racePanel(rules, cols, place)
-    return el("Panel", {
-        id = "fdr", width = "380", height = tostring(PANEL_HEIGHT), color = PANEL_BG,
-        position = place.position, scale = place.scale, rotation = "0 0 0",
-    }, {
+    local attrs = { id = "fdr", width = tostring(PANEL_WIDTH), height = tostring(PANEL_HEIGHT), color = PANEL_BG }
+    for k, v in pairs(place) do attrs[k] = v end
+    return el("Panel", attrs, {
         el("VerticalLayout", { padding = "8 8 6 6", spacing = "4", childForceExpandHeight = "false" }, {
             text("fdr_title", "Formula D", { fontSize = "18", fontStyle = "Bold", preferredHeight = "26" }),
             text("fdr_rules", rules.name, { fontSize = "12", color = "#AAB0B8", preferredHeight = "16" }),
@@ -115,47 +125,55 @@ local function racePanel(rules, cols, place)
     })
 end
 
--- The panel lies on the table, drawn as the board tile's UI just past its
--- edge. Object UI is laid out at 100 units per local unit and then stretched
--- with the object, so the panel is scaled back by the tile's scale to come
--- out WORLD_PER_UNIT world units per UI unit whatever the board's size.
-local WORLD_PER_UNIT = 0.04 -- the 380-wide panel is about 15 units across
-local GAP = 1.5             -- world units between the board and the panel
+-- On the board the panel is the tile's own UI, at the spot the track names
+-- (`panel`: centre and width in image pixels). Object UI is laid out at 100
+-- units per local unit, then stretched with the object, so the panel is
+-- scaled back by the tile's scale and on to the width the track asks for.
+--
+-- The tile's UI runs with its X along local X and its Y along local Z,
+-- which on the board is image left and image down: turned half round, the
+-- panel reads the same way up as the picture.
 local UI_PER_LOCAL = 100
 
---- Where the panel goes on `tile`: centred below the board as its picture
--- reads, a little above the face.
-local function placement(tile)
+--- Where the panel goes on `tile` for `track`, or nil if the track names no
+-- spot for it.
+local function placement(tile, track)
+    local spot = track and track.panel
+    if not spot then
+        return nil
+    end
+    local f = Track.frame(tile, track)
     local scale = tile.getScale()
-    local size = tile.getBoundsNormalized().size
-    local kx = WORLD_PER_UNIT * UI_PER_LOCAL / scale.x
-    local ky = WORLD_PER_UNIT * UI_PER_LOCAL / scale.z
-    local edge = size.z / scale.z / 2 * UI_PER_LOCAL
-    local below = edge + GAP / scale.z * UI_PER_LOCAL + PANEL_HEIGHT * ky / 2
-    local top = size.y / scale.y / 2 * UI_PER_LOCAL + 5
+    local l = Track.localIn(f, spot.pos[1], spot.pos[2])
+    local unit = spot.width * f.world / PANEL_WIDTH -- world units per UI unit
     return {
-        position = string.format("0 %.1f %.1f", -below, -top),
-        scale = string.format("%.4f %.4f 1", kx, ky),
+        position = string.format("%.1f %.1f %.1f", l.x * UI_PER_LOCAL, l.z * UI_PER_LOCAL, -l.y * UI_PER_LOCAL),
+        scale = string.format("%.4f %.4f 1", unit * UI_PER_LOCAL / scale.x, unit * UI_PER_LOCAL / scale.z),
+        rotation = "0 0 180",
     }
 end
 
 local cols = {}
 
---- Set the race panel on the board `tile` and append any `extras` to the
--- Global UI, then call `onReady`. Safe to call again: it replaces what it
--- put there before. Without a tile only the Global UI is built.
-function Hud.build(rules, extras, tile, onReady)
+--- Set the race panel on the board `tile`, where `track` (the map on it)
+-- says, and append any `extras` to the Global UI, then call `onReady`. Safe
+-- to call again: it replaces what it put there before. With no spot on the
+-- board the panel goes on the screen.
+function Hud.build(rules, extras, tile, track, onReady)
     cols = columns(rules)
     -- Hold updates until the new XML has loaded: sent now, they would be lost
     -- with the old elements yet remembered by fd.tts.ui, and the refresh in
     -- onReady would then skip them as repeats.
     ready = false
+    local place = tile and placement(tile, track)
     local function placePanel()
-        if not tile then
+        if not place then
+            if tile then tile.UI.setXmlTable({}) end
             Ui.route("fdr", nil)
+            ready = true
             return onReady()
         end
-        tile.UI.setXmlTable({ racePanel(rules, cols, placement(tile)) })
+        tile.UI.setXmlTable({ racePanel(rules, cols, place) })
         Ui.route("fdr", tile.UI)
         Ui.reset("fdr")
         Wait.frames(function()
@@ -173,6 +191,9 @@ function Hud.build(rules, extras, tile, onReady)
             if id:sub(1, 2) ~= "fd" then
                 kept[#kept + 1] = node
             end
+        end
+        if not place then
+            kept[#kept + 1] = racePanel(rules, cols, ON_SCREEN)
         end
         for _, node in ipairs(extras or {}) do
             kept[#kept + 1] = node

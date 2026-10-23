@@ -39,6 +39,7 @@ local useBoardTrack -- likewise
 local joinAt -- with the dashboard buttons, below
 local deliver, dealInSeated, dropDashless, bench -- likewise
 local isAdmin -- with the race controls, below
+local layDice, activateDie, restockDice -- with the track, below
 -- What syncTurns last told TTS's Turns, as { on, order, color }; nil until
 -- it has, so the first sync after a load sets every part.
 local turnsSet = nil
@@ -48,9 +49,11 @@ local UNDO_LIMIT = 30
 
 --- One roll of the black die, made by the script: the grid, starts,
 -- collisions and engine strain are all rolled this way, the result told in
--- the chat. (The die on the table still counts if somebody throws it.)
+-- the chat and shown on the black die in the middle of the board.
 local function rollBlack()
-    return math.random(20)
+    local value = math.random(20)
+    Dice.showBlack(value)
+    return value
 end
 
 -- The colour of each kind of message in chat. A roll is shown in the colour
@@ -140,6 +143,7 @@ function onLoad(saved_data)
     Wait.time(function()
         Dashboard.scan()
         dropDashless()
+        layDice()
     end, 1)
 end
 
@@ -152,7 +156,8 @@ function buildUi()
     Setup.setReady(false)
     local panels = Mini.panels(Rules)
     panels[#panels + 1] = Setup.panel()
-    Hud.build(Rules, panels, Track.tile(), function()
+    local map = mapOnBoard()
+    Hud.build(Rules, panels, Track.tile(), map and TRACKS[map.id], function()
         applyModMenuButton()
         Mini.setReady()
         Setup.setReady()
@@ -409,6 +414,7 @@ function refresh(announce)
     syncCars()
     Hud.refresh(race)
     Mini.refresh(race)
+    activateDie()
     -- The map is only looked up while the setup menu shows it.
     local map, seated = nil, nil
     if Setup.shows(race.state.phase) then
@@ -453,23 +459,6 @@ local function handPosition(color)
     local p = Player[color]
     local hand = p and p.getHandTransform()
     return hand and hand.position or nil
-end
-
---- Where to put a die for `color`: just past their dashboard (or hand),
--- towards the middle of the table.
-local function dicePosition(color)
-    local car = race:car(color)
-    local dash = car and car.tts and car.tts.dash and getObjectFromGUID(car.tts.dash)
-    local base = dash and dash.getPosition() or handPosition(color)
-    if not base then
-        return nil
-    end
-    local len = math.sqrt(base.x ^ 2 + base.z ^ 2)
-    local reach = dash and 6 or 8
-    if len < 1 then
-        return { x = base.x, y = base.y + 2, z = base.z }
-    end
-    return { x = base.x - base.x / len * reach, y = base.y + 2, z = base.z - base.z / len * reach }
 end
 
 --- Which way is across the table from `pos` towards its middle (x, z), or
@@ -664,10 +653,7 @@ local function shiftTo(color, gear)
     -- A shift starts somebody's turn: the last move's options are done with.
     clearReach()
     act(function() race:shift(color, gear) end)
-    local pos = dicePosition(color)
-    if pos then
-        Dice.bring(gear, pos, color)
-    end
+    Dice.highlight(gear, color)
 end
 
 --- A dashboard may have been moved or flipped: redraw it and pull its markers along.
@@ -1075,8 +1061,9 @@ function fdUiCollision(player) runAction(mine(player), "collision") end
 function fdUiPit(player) runAction(mine(player), "pit") end
 function fdUiLeave(player) runAction(mine(player), "leave") end
 
---- Roll the gear die for the player's gear, fetching it first if it is
--- elsewhere: the same die, read the same way, as throwing it by hand.
+--- Throw the gear die for the player's gear, in its tray on the board: the
+-- only way to roll one, as the dice cannot be picked up. It is read once it
+-- settles, like any roll.
 function fdUiRoll(player)
     local car = mine(player)
     if not car then
@@ -1086,25 +1073,16 @@ function fdUiRoll(player)
         broadcastToColor("Shift into a gear first: click one on your dashboard.", player.color, LEVEL_RGB.warn)
         return
     end
-    local pos = dicePosition(player.color)
-    local die = pos and Dice.bring(car.gear, pos, player.color) or Dice.find(car.gear)
-    if not die then
-        broadcastToColor("The " .. Race.gearName(car.gear) .. " gear die is not on the table.", player.color, LEVEL_RGB.warn)
-        return
-    end
-    if die.held_by_color then
-        broadcastToColor("Someone is holding the " .. Race.gearName(car.gear) .. " gear die.", player.color, LEVEL_RGB.warn)
-        return
-    end
     local gear = car.gear
-    Wait.condition(function()
-        if die == nil then return end
-        die.roll()
-        watchGearDie(die, player.color, gear)
-    end, function() return die == nil or not die.isSmoothMoving() end, 5, function()
-        broadcastToColor("The " .. Race.gearName(gear) .. " gear die did not arrive -- click Roll again.",
+    local die = Dice.throw(gear)
+    if not die then
+        broadcastToColor("The " .. Race.gearName(gear) .. " gear die has gone: another is on its way -- click Roll again in a moment.",
             player.color, LEVEL_RGB.warn)
-    end)
+        restockDice()
+        return
+    end
+    die.highlightOn(player.color, 3)
+    watchGearDie(die, player.color, gear)
 end
 
 function fdUiShift(player, value)
@@ -1163,9 +1141,9 @@ local function startRace(player)
     packTable()
     act(function() race:startRace() end)
     -- Packing the setup board sweeps up the loose dice with it: once it has,
-    -- put out again whatever is missing.
+    -- put out again whatever is missing, and the lot in the middle of the board.
     Wait.time(function()
-        Dice.ensureAll(function(n)
+        layDice(function(n)
             if n > 0 then
                 printToAll(string.format("Put %d dice out for the race", n), LEVEL_RGB.info)
             end
@@ -1235,10 +1213,12 @@ end
 
 --- The Big Box menu put a new map on the board. Reloading the tile took
 -- the race panel with it, so it is drawn again; the setup menu says which
--- map it is, and turn order goes by its track.
+-- map it is, turn order goes by its track, and the dice move to its name
+-- panel.
 function fdMapChanged()
     useBoardTrack()
     buildUi()
+    layDice()
 end
 
 function fdReset(player)
@@ -1355,6 +1335,62 @@ end
 useBoardTrack = function()
     local _, track = boardTrack()
     race:useTrack(track)
+end
+
+--- Where the dice tray goes: on the map's name panel, if its track data
+-- says where that is, otherwise the middle of the board face; and the
+-- middle of the board face, for the dice to park on that side of it. Nil
+-- without a board.
+local function diceCenter()
+    local tile, track = boardTrack()
+    tile = tile or Track.tile()
+    if not tile then
+        return nil
+    end
+    local b = tile.getBounds()
+    local middle = { x = b.center.x, y = b.center.y + b.size.y / 2, z = b.center.z }
+    if track and track.dice then
+        return Track.worldOf(tile, track, track.dice[1], track.dice[2]), middle
+    end
+    return middle, middle
+end
+
+--- Fetch any die that has gone missing in the race, then put the die in
+-- play in the tray.
+restockDice = function()
+    Dice.restock(function(n)
+        if n > 0 then
+            printToAll(string.format("Put %d missing dice back out", n), LEVEL_RGB.info)
+            -- A moment for them to come out of the bag.
+            Wait.time(function() activateDie() end, 1)
+        end
+    end)
+end
+
+--- The die in play: the gear of the car to play, if it has one; with
+-- none, the tray stays empty. A die that has gone is fetched again.
+activateDie = function()
+    local due = race:turn()
+    local gear = due and due.gear or 0
+    if not Dice.activate(gear) and gear > 0 and not Dice.find(gear) then
+        restockDice()
+    end
+end
+
+--- Lay the dice out by their tray, then put the die in play in it. With
+-- `onFetched`, any dice not on the table are fetched first (Dice.setOut),
+-- and it is told how many.
+layDice = function(onFetched)
+    local center, middle = diceCenter()
+    if not center then
+        return
+    end
+    if onFetched then
+        Dice.setOut(center, middle, onFetched)
+    else
+        Dice.layout(center, middle)
+    end
+    activateDie()
 end
 
 --- Set a car down at `pos` (on the board face), level and turned to `yaw`.

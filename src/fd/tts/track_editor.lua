@@ -64,12 +64,16 @@ function Editor.trackFor(track)
     if not e then
         return track
     end
-    return {
-        id = track.id, name = track.name, ruleset = track.ruleset, lanes = track.lanes,
-        laps = track.laps, image = track.image, outer = track.outer, spaces = e.spaces,
-        corners = track.corners, start = e.start or track.start,
-        finish = track.finish, near = track.near,
-    }
+    -- Everything the track has, with the edited parts swapped in: a field
+    -- left out here would be lost to every map with edits.
+    local out = {}
+    for k, v in pairs(track) do
+        out[k] = v
+    end
+    out.spaces = e.spaces
+    out.start = e.start or track.start
+    out.byId = nil -- the track's own, for its own spaces
+    return out
 end
 
 local function working(track)
