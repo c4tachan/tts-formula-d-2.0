@@ -65,6 +65,8 @@ the only thing needing measurement in game is the tile itself — not each track
 
   "start": ["m.s11.4", "i.s11.3"], // grid positions, pole first (below)
   "finish": { "line": ["i.s1.0", "m.s1.0", "o.s1.0"] }, // (below)
+  "dice": [1505, 1468],          // optional: where the dice sit, clear of the track
+                                 // (the map's name panel); default the board's middle
 
   "pit": {                       // omitted on tracks without a pit lane
     "entry": 210,

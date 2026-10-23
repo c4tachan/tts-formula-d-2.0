@@ -66,11 +66,26 @@ end
 
 local SPACING = 2.2 -- world units between neighbouring dice
 local LIFT = 0.6    -- above the board face, so a die sits on it
+-- Two rows, to fit on a map's name panel: gears 1 to 4, then 5, 6 and the
+-- black die.
+local ROWS = { { 1, 2, 3, 4 }, { 5, 6, 7 } }
 
---- Where die `i` of the row (gears 1 to 6, then the black die) goes, in a
--- row centred on `center`, the middle of the board face.
+--- Where die `i` (gears 1 to 6, then the black die) goes, in the rows
+-- centred on `center`, a point on the board face.
 local function spot(i, center)
-    return { x = center.x + (i - 4) * SPACING, y = center.y + LIFT, z = center.z }
+    for r, row in ipairs(ROWS) do
+        for k, n in ipairs(row) do
+            if n == i then
+                return {
+                    x = center.x + (k - (#row + 1) / 2) * SPACING,
+                    y = center.y + LIFT,
+                    z = center.z + (r - (#ROWS + 1) / 2) * SPACING,
+                }
+            end
+        end
+    end
+    -- Past the end of the rows: beside the first.
+    return { x = center.x + (i - 1) * SPACING, y = center.y + LIFT, z = center.z - SPACING }
 end
 
 --- Lock `obj` at `pos`, where players cannot pick it up.

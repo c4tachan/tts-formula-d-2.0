@@ -39,7 +39,7 @@ local useBoardTrack -- likewise
 local joinAt -- with the dashboard buttons, below
 local deliver, dealInSeated, dropDashless, bench -- likewise
 local isAdmin -- with the race controls, below
-local boardCenter -- with the dice, below
+local diceCenter -- with the track, below
 -- What syncTurns last told TTS's Turns, as { on, order, color }; nil until
 -- it has, so the first sync after a load sets every part.
 local turnsSet = nil
@@ -143,7 +143,7 @@ function onLoad(saved_data)
     Wait.time(function()
         Dashboard.scan()
         dropDashless()
-        local center = boardCenter()
+        local center = diceCenter()
         if center then
             Dice.layout(center)
         end
@@ -460,16 +460,6 @@ local function handPosition(color)
     local p = Player[color]
     local hand = p and p.getHandTransform()
     return hand and hand.position or nil
-end
-
---- The middle of the board face, where the dice sit; nil without a board.
-boardCenter = function()
-    local tile = Track.tile()
-    if not tile then
-        return nil
-    end
-    local b = tile.getBounds()
-    return { x = b.center.x, y = b.center.y + b.size.y / 2, z = b.center.z }
 end
 
 --- Which way is across the table from `pos` towards its middle (x, z), or
@@ -1152,7 +1142,7 @@ local function startRace(player)
     -- Packing the setup board sweeps up the loose dice with it: once it has,
     -- put out again whatever is missing, and the lot in the middle of the board.
     Wait.time(function()
-        local center = boardCenter()
+        local center = diceCenter()
         if not center then
             return
         end
@@ -1226,10 +1216,15 @@ end
 
 --- The Big Box menu put a new map on the board. Reloading the tile took
 -- the race panel with it, so it is drawn again; the setup menu says which
--- map it is, and turn order goes by its track.
+-- map it is, turn order goes by its track, and the dice move to its name
+-- panel.
 function fdMapChanged()
     useBoardTrack()
     buildUi()
+    local center = diceCenter()
+    if center then
+        Dice.layout(center)
+    end
 end
 
 function fdReset(player)
@@ -1346,6 +1341,21 @@ end
 useBoardTrack = function()
     local _, track = boardTrack()
     race:useTrack(track)
+end
+
+--- Where the dice sit: on the map's name panel, if its track data says
+-- where that is, otherwise the middle of the board face; nil without a board.
+diceCenter = function()
+    local tile, track = boardTrack()
+    if track and track.dice then
+        return Track.worldOf(tile, track, track.dice[1], track.dice[2])
+    end
+    tile = Track.tile()
+    if not tile then
+        return nil
+    end
+    local b = tile.getBounds()
+    return { x = b.center.x, y = b.center.y + b.size.y / 2, z = b.center.z }
 end
 
 --- Set a car down at `pos` (on the board face), level and turned to `yaw`.

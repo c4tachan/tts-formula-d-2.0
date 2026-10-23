@@ -295,7 +295,6 @@ function T.the_start_falls_back_on_the_spare_dice_set()
     local die = S.find("First Gear Dice")
     eq(die.locked, true, "locked in place")
     eq(die.interactable, false, "out of reach")
-    assert(math.abs(die.pos.x) < 8 and math.abs(die.pos.z) < 1, "in the middle of the board")
     dropOn(S, S.find("Gear Stick"), "gear", 1)
     eq(die.highlight[1], "Red")
 end
@@ -543,15 +542,29 @@ function T.the_roll_button_rolls_the_die_for_your_gear()
     eq(state().cars.Red.lastRoll, 4)
 end
 
-function T.the_dice_sit_in_the_middle_of_the_board_out_of_reach()
+function T.the_dice_sit_on_the_map_name_panel_out_of_reach()
     local S = world()
-    for _, name in ipairs({ "First Gear Dice", "Sixth Gear Dice", "Damage Dice" }) do
+    local Track = require("fd.tts.track")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local panel = Track.worldOf(S.board, FDMonaco, FDMonaco.dice[1], FDMonaco.dice[2])
+    for _, name in ipairs({ "First Gear Dice", "Fourth Gear Dice", "Fifth Gear Dice", "Damage Dice" }) do
         local die = S.find(name)
         eq(die.locked, true, name .. " locked")
         eq(die.interactable, false, name .. " cannot be picked up")
-        assert(math.abs(die.pos.z) < 1e-6 and math.abs(die.pos.x) < 8, name .. " in the row at the middle")
+        assert(math.abs(die.pos.x - panel.x) < 4 and math.abs(die.pos.z - panel.z) < 2, name .. " on the panel")
     end
-    assert(S.find("First Gear Dice").pos.x < S.find("Sixth Gear Dice").pos.x, "in gear order")
+    local first, fourth, fifth = S.find("First Gear Dice"), S.find("Fourth Gear Dice"), S.find("Fifth Gear Dice")
+    eq(first.pos.z, fourth.pos.z, "gears 1 to 4 in one row")
+    assert(first.pos.x < fourth.pos.x, "in gear order")
+    assert(fifth.pos.z ~= first.pos.z, "the rest in a second row")
+end
+
+function T.dice_sit_in_the_middle_of_a_board_without_a_spot()
+    local S = world()
+    S.board.custom = { image = "http://example.invalid/other-map.png" }
+    fdMapChanged()
+    local die = S.find("First Gear Dice")
+    assert(math.abs(die.pos.x) < 5 and math.abs(die.pos.z) < 3, "in the middle of the board")
 end
 
 function T.the_black_die_shows_the_scripts_roll()
