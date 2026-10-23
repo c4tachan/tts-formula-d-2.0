@@ -824,6 +824,20 @@ function T.the_leader_on_the_track_plays_first()
     eq(r:turn().color, "Blue")
 end
 
+function T.a_stop_in_a_corner_is_counted_for_the_corner_line()
+    local r = started("Red")
+    r:useTrack(FDMonaco)
+    r:placed("Red", "i.s1.5")
+    eq(r:cornerAhead(r:car("Red")).here, nil, "on the straight")
+    rollDie(r, "Red", 1, 2)
+    putDown(r, "Red", "i.c1.1", FDMonaco)
+    local a = r:cornerAhead(r:car("Red"))
+    eq(a.here.corner, 1)
+    eq(a.here.made, 1, "the stop just made")
+    eq(a.here.need, 1)
+    eq(a.corner, 2, "its one stop made: corner 2 is next")
+end
+
 function T.the_round_moves_on_when_the_last_car_is_put_down()
     local r = started("Red", "Blue")
     r:useTrack(FDMonaco)
