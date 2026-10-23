@@ -29,7 +29,10 @@ JSON = {
 }
 
 Wait = {
-    condition = function(fn, cond) if cond() then fn() end end,
+    -- Met now, or never: then the timeout, as TTS calls it once it is up.
+    condition = function(fn, cond, _, timeout)
+        if cond() then fn() elseif timeout then timeout() end
+    end,
     frames = function(fn) fn() end,
     time = function(fn) fn() end,
 }
@@ -99,6 +102,8 @@ function Stub.object(name, props)
         return { center = o.pos, size = o.size or vec(1, 1, 1), offset = vec(0, 0, 0) }
     end
     o.getCustomObject = function() return o.custom or {} end
+    -- A global table of the object's own script, as `tables` has it.
+    o.getTable = function(name) return (o.tables or {})[name] end
     o.setCustomObject = function(c) o.custom = c end
     -- Reloading keeps the object, as far as the tests go: TTS spawns it
     -- afresh, under the same guid.
@@ -160,12 +165,18 @@ function Stub.object(name, props)
     o.setPosition = function(p) o.pos = vec(p.x, p.y, p.z) end
     o.setRotationSmooth = function(r) o.rot = r end
     o.isSmoothMoving = function() return false end
-    -- A roll leaves `value` as the test set it; it only counts the throws.
-    o.roll = function() o.rolls = (o.rolls or 0) + 1 end
+    -- A roll counts the throws. A gear die keeps the `value` the test set;
+    -- the black die comes up whatever math.random(20) gives, so a test that
+    -- loads the script's die loads this one too.
+    o.roll = function()
+        o.rolls = (o.rolls or 0) + 1
+        if o.name == "Damage Dice" then o.value = math.random(20) end
+    end
     -- The highlight left on: { color, duration }, duration nil if it stays.
     o.highlightOn = function(c, d) o.highlight = { c, d } end
     o.highlightOff = function() o.highlight = nil end
     o.setColorTint = function(c) o.tint = c end
+    o.setInvisibleTo = function(colors) o.invisibleTo = colors end
     o.setScale = function(s) o.scale = vec(s.x or s[1], s.y or s[2], s.z or s[3]) end
     o.setRotationValues = function(v) o.rotationValues = v end
     -- `value` is what the face that is up shows. As in TTS, getValue() on an

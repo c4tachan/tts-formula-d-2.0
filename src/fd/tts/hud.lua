@@ -155,6 +155,15 @@ end
 
 local cols = {}
 
+-- Longest to wait for the UI to finish loading, in seconds. Should TTS
+-- never say it has, the panels go on regardless rather than never at all.
+local LOAD_WAIT = 5
+
+--- Run `fn` once `ui` (the screen's UI, or an object's) has loaded.
+local function whenLoaded(ui, fn)
+    Wait.condition(fn, function() return ui == nil or not ui.loading end, LOAD_WAIT, fn)
+end
+
 --- Set the race panel on the board `tile`, where `track` (the map on it)
 -- says, and append any `extras` to the Global UI, then call `onReady`. Safe
 -- to call again: it replaces what it put there before. With no spot on the
@@ -177,13 +186,13 @@ function Hud.build(rules, extras, tile, track, onReady)
         Ui.route("fdr", tile.UI)
         Ui.reset("fdr")
         Wait.frames(function()
-            Wait.condition(function()
+            whenLoaded(tile ~= nil and tile.UI or nil, function()
                 ready = true
                 onReady()
-            end, function() return tile == nil or not tile.UI.loading end)
+            end)
         end, 2)
     end
-    Wait.condition(function()
+    whenLoaded(UI, function()
         local xml = UI.getXmlTable() or {}
         local kept = {}
         for _, node in ipairs(xml) do
@@ -201,9 +210,16 @@ function Hud.build(rules, extras, tile, track, onReady)
         UI.setXmlTable(kept)
         Ui.reset()           -- every element is back to what the XML says
         Wait.frames(function()
-            Wait.condition(placePanel, function() return not UI.loading end)
+            whenLoaded(UI, placePanel)
         end, 2)
-    end, function() return not UI.loading end)
+    end)
+end
+
+--- Hold the race panel's updates, its tile about to be reloaded: until
+-- Hud.build draws it again, there is nothing to send them to.
+function Hud.hold()
+    ready = false
+    Ui.route("fdr", nil)
 end
 
 local function wearSummary(race, car)

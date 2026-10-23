@@ -40,6 +40,13 @@ local joinAt -- with the dashboard buttons, below
 local deliver, dealInSeated, dropDashless, bench -- likewise
 local isAdmin -- with the race controls, below
 local layDice, activateDie, restockDice -- with the track, below
+local throwChecks -- with the dice, below
+local startRace -- with the race controls, below
+local pendingStart = nil -- who pressed Start race, while the grid is rolled
+-- The ghost marking where the car to play started its move: its guid, and
+-- which car and space it stands for (see markStart).
+local startGhost = nil
+local startKey = nil
 -- What syncTurns last told TTS's Turns, as { on, order, color }; nil until
 -- it has, so the first sync after a load sets every part.
 local turnsSet = nil
@@ -47,9 +54,9 @@ local undo = {}
 local joining = {} -- steam id -> true from connecting until moved to the spectators (see bench)
 local UNDO_LIMIT = 30
 
---- One roll of the black die, made by the script: the grid, starts,
--- collisions and engine strain are all rolled this way, the result told in
--- the chat and shown on the black die in the middle of the board.
+--- One roll of the black die, made by the script: only when the die itself
+-- is not on the table to be thrown (see throwChecks). The result is told in
+-- the chat, and shown on the die if it turns up.
 local function rollBlack()
     local value = math.random(20)
     Dice.showBlack(value)
@@ -76,29 +83,78 @@ local SEATS = {
 }
 
 -- Setup ---------------------------------------------------------------------
+-- The table holds the board and nothing else to set up: the map and rules
+-- are chosen on the setup menu (fd.tts.setup). The Big Box menu board stays
+-- packed in its bag, and the setup board and everything on it are hidden
+-- where they stand -- the script still reaches the bags it deals
+-- dashboards, cars and markers from.
 
 local MOD_MENU_BAG = "a57988"
 local SETUP_BAG = "0fde3b"
+-- Everyone a hidden object is hidden from: every seat, the spectators and
+-- the Game Master.
+local EVERYONE = {
+    "White", "Brown", "Red", "Orange", "Yellow", "Green", "Teal", "Blue", "Purple", "Pink",
+    "Grey", "Black",
+}
+-- The bags the script deals from, which must stay on the table (hidden),
+-- never inside another bag: everything else of the setup board can go.
+local SOURCE_BAGS = {
+    "1bb99e", -- Formula 1 Black Bag: cars (CAR_BAG, below)
+    "edfadc", -- Beginner Dashboard Bag (DASHBOARD_BAGS, below)
+    "4eb678", -- Advanced Dashboard Bag
+    "71d89b", -- Gear Stick Bag (fd.tts.dashboard)
+    "a845cd", -- Wear Tracker Bag (fd.tts.dashboard)
+    "ac4939", -- Dice Set Bag: spare dice (fd.tts.dice)
+}
 
---- The Big Box menu button: there while the menu is packed away, but not
--- during a race -- the map is chosen before the start or after the flag.
--- Global so the menu board can call it when it closes.
-function applyModMenuButton()
-    local racing = race and race.state.phase == "race"
-    Ui.set("showModMenuButton", "active", tostring(mod_packed and not racing))
+--- Hide `obj` where it stands: locked, out of reach, and invisible to all.
+local function hideObject(obj)
+    obj.setLock(true)
+    obj.interactable = false
+    obj.setInvisibleTo(EVERYONE)
 end
 
---- At the start, put the Big Box menu and the setup board back in their bags.
-local function packTable()
-    local bags = { { MOD_MENU_BAG, mod_packed }, { SETUP_BAG, setup_packed } }
-    for _, b in ipairs(bags) do
-        local bag = not b[2] and getObjectFromGUID(b[1])
-        if bag then
-            bag.call("buttonClick_recall", {})
+--- Hide the bags the script deals from, and whatever is left of the setup
+-- board, but the dice, which sit by their tray. The setup board, packed
+-- away, is put out first: the bags it holds cannot be reached inside it.
+-- Without it -- once deleted from the table -- only the bags are hidden.
+-- `onDone` runs once it is all hidden.
+local function hideSetup(onDone)
+    local bag = getObjectFromGUID(SETUP_BAG)
+    local function hide()
+        for _, guid in ipairs(SOURCE_BAGS) do
+            local obj = getObjectFromGUID(guid)
+            if obj then hideObject(obj) end
         end
+        for guid in pairs(bag and bag.getTable("memoryList") or {}) do
+            local obj = getObjectFromGUID(guid)
+            if obj and not Dice.gearOf(obj) and not Dice.isBlack(obj) then
+                hideObject(obj)
+            end
+        end
+        onDone()
     end
-    -- The bags say so themselves (Global.setVar); this is in case they did not.
-    mod_packed, setup_packed = true, true
+    if not bag then
+        return hide()
+    end
+    if setup_packed then
+        bag.call("buttonClick_place", {})
+        setup_packed = false
+        -- A moment for its objects to come out of the bag.
+        Wait.time(hide, 1.5)
+    else
+        hide()
+    end
+end
+
+--- Put the Big Box menu board back in its bag, if it is out.
+local function packModMenu()
+    local bag = not mod_packed and getObjectFromGUID(MOD_MENU_BAG)
+    if bag then
+        bag.call("buttonClick_recall", {})
+    end
+    mod_packed = true
 end
 
 --- The map on the board tile, from Maps.list, or nil if it is none we know.
@@ -126,7 +182,6 @@ function onLoad(saved_data)
         mod_packed = true
         setup_packed = true
     end
-    applyModMenuButton()
 
     race = Race.new(Rules, saved.race)
     race.autoRolls = true
@@ -143,7 +198,8 @@ function onLoad(saved_data)
     Wait.time(function()
         Dashboard.scan()
         dropDashless()
-        layDice()
+        packModMenu()
+        hideSetup(function() layDice() end)
     end, 1)
 end
 
@@ -155,10 +211,13 @@ function buildUi()
     Mini.setReady(false)
     Setup.setReady(false)
     local panels = Mini.panels(Rules)
-    panels[#panels + 1] = Setup.panel()
     local map = mapOnBoard()
+    local maps = {}
+    for _, m in ipairs(Maps.list) do
+        maps[#maps + 1] = { id = m.id, name = m.name, ready = TRACKS[m.id] ~= nil, current = map ~= nil and map.id == m.id }
+    end
+    panels[#panels + 1] = Setup.panel(maps)
     Hud.build(Rules, panels, Track.tile(), map and TRACKS[map.id], function()
-        applyModMenuButton()
         Mini.setReady()
         Setup.setReady()
         refresh()
@@ -214,18 +273,10 @@ function onSave()
         markers = (function()
             local out = Editor.markerGuids()
             for _, g in ipairs(Ghosts.guids()) do out[#out + 1] = g end
+            if startGhost then out[#out + 1] = startGhost end
             return out
         end)(),
     })
-end
-
-function showModMenu()
-    local memoryBagModMenu = getObjectFromGUID(MOD_MENU_BAG)
-    if memoryBagModMenu then
-        memoryBagModMenu.call("buttonClick_place", {})
-    end
-    mod_packed = false
-    applyModMenuButton()
 end
 
 -- Plumbing ------------------------------------------------------------------
@@ -384,6 +435,30 @@ local function syncTurns(due)
     turnsSet = { on = true, order = key, color = due.color }
 end
 
+--- Put the ghost on the space the car to play started its move from (where
+-- it stands, before it rolls), in its colour; none outside a race. Put back
+-- on it, the car has not moved (Race:backToStart).
+local function markStart(due)
+    local from = due and (due.move and due.move.from or due.space)
+    local key = from and (due.color .. "@" .. from)
+    if key == startKey then
+        return
+    end
+    local old = startGhost and getObjectFromGUID(startGhost)
+    if old then
+        old.destruct()
+    end
+    startGhost, startKey = nil, key
+    local track, s = race.track, nil
+    for _, sp in ipairs(from and track and track.spaces or {}) do
+        if sp.id == from then s = sp end
+    end
+    if s then
+        local obj = Ghosts.mark(track, s, tintOf(due.color), race:label(due) .. " started here")
+        startGhost = obj and obj.getGUID()
+    end
+end
+
 --- Point everyone at the car to play: TTS's turn marker and a highlight on
 -- the car. `announce` also tells its driver, once, when the turn passes to
 -- them. (Black die rolls are made at once, so nothing else is waited on.)
@@ -398,6 +473,7 @@ local function showTurn(announce)
         litCar = guid
     end
     syncTurns(due)
+    markStart(due)
     local key = due and (race.state.round .. ":" .. due.color)
     if announce and key and key ~= turnTold then
         turnTold = key
@@ -430,17 +506,21 @@ function refresh(announce)
     Setup.refresh(race, map and { name = map.name, hasTrack = TRACKS[map.id] ~= nil }, seated)
     renderDashboards()
     showTurn(announce)
-    applyModMenuButton()
 end
 
 --- Run a change to the race: snapshot for undo, apply, then publish.
-local function act(fn)
-    undo[#undo + 1] = JSON.encode(race:serialize())
-    if #undo > UNDO_LIMIT then
-        table.remove(undo, 1)
+-- `followOn` is for a change that finishes the one before -- the black die
+-- thrown for it settling -- which Undo takes back along with it, so it
+-- takes no snapshot of its own.
+local function act(fn, followOn)
+    if not followOn then
+        undo[#undo + 1] = JSON.encode(race:serialize())
+        if #undo > UNDO_LIMIT then
+            table.remove(undo, 1)
+        end
     end
     fn()
-    race:rollChecks(rollBlack)
+    throwChecks()
     if race.gridSettled then
         race.gridSettled = nil
         placeOnGrid()
@@ -452,6 +532,12 @@ local function act(fn)
     refresh(true)
     if opened then
         showReach(opened)
+    end
+    -- Start race waited on the grid roll: once it has settled, the race starts.
+    local starter = pendingStart
+    if starter and race.state.phase == "setup" then
+        pendingStart = nil
+        startRace(starter)
     end
 end
 
@@ -512,21 +598,95 @@ local function ownerOf(color, gear)
     return match or color
 end
 
---- Read gear die `obj` for `gear` once it settles, as rolled by `color`.
-local function watchGearDie(obj, color, gear)
-    Dice.watch(obj, color, function(value, roller)
+--- What to do with a roll of the die for `gear`, once it has settled.
+local function onGearRoll(gear)
+    return function(value, roller)
         if value then
             clearReach()
             act(function() race:rolled(ownerOf(roller, gear), gear, value) end)
         end
+    end
+end
+
+--- Read gear die `obj` for `gear` once it settles, as rolled by `color`.
+local function watchGearDie(obj, color, gear)
+    Dice.watch(obj, color, onGearRoll(gear))
+end
+
+local throwing = nil -- the check the black die is in the air for
+-- Grid rolls thrown since the grid roll was called, and the most before
+-- giving up on a tie that will not break.
+local gridThrows = 0
+local GRID_THROWS = 40
+
+--- The black die check to throw for next: what play waits on (collisions,
+-- engine strain, the start of the car to play), else the next grid roll.
+local function nextCheck()
+    local c = race:checkWaiting()
+    if c then
+        return c
+    end
+    for _, g in ipairs(race.state.checks) do
+        if g.kind == "grid" then
+            return g
+        end
+    end
+    return nil
+end
+
+--- Throw the black die in the tray for the next check, one at a time: each
+-- result is applied when the die settles, through act, which throws for the
+-- one after. Without the die on the table, the script rolls for them at once.
+throwChecks = function()
+    -- One die in the air at a time: bringing in another would park this one
+    -- mid-throw. A gear die settling calls for this again (through act).
+    if throwing or Dice.rolling() then
+        return
+    end
+    local c = nextCheck()
+    if not c then
+        return
+    end
+    if c.kind == "grid" then
+        gridThrows = gridThrows + 1
+        if gridThrows > GRID_THROWS then
+            race:emit("warn", "The grid is still tied -- press Start race to roll it again")
+            pendingStart = nil
+            return
+        end
+    end
+    throwing = c
+    local die = Dice.throw(Dice.BLACK, c.color, function(value)
+        throwing = nil
+        act(function()
+            -- Undone or reset while it was in the air: nothing left to decide.
+            for _, x in ipairs(race.state.checks) do
+                if x == c then
+                    race:blackDie(value or rollBlack(), c.color, c)
+                    return
+                end
+            end
+        end, true)
     end)
+    if die then
+        return
+    end
+    throwing = nil
+    for _ = 1, 100 do
+        c = nextCheck()
+        if not c then
+            return
+        end
+        race:blackDie(rollBlack(), c.color, c)
+    end
 end
 
 function onObjectRandomize(obj, color)
     local gear = Dice.gearOf(obj)
     if gear then
         watchGearDie(obj, color, gear)
-    elseif Dice.isBlack(obj) then
+    elseif Dice.isBlack(obj) and not throwing then
+        -- (While the script throws it, it reads the result itself.)
         Dice.watch(obj, color, function(value, roller)
             if value then
                 act(function() race:blackDie(value, roller) end)
@@ -1073,8 +1233,12 @@ function fdUiRoll(player)
         broadcastToColor("Shift into a gear first: click one on your dashboard.", player.color, LEVEL_RGB.warn)
         return
     end
+    if throwing or Dice.rolling() then
+        broadcastToColor("A die is still rolling in the tray -- roll once it has settled.", player.color, LEVEL_RGB.warn)
+        return
+    end
     local gear = car.gear
-    local die = Dice.throw(gear)
+    local die = Dice.throw(gear, player.color, onGearRoll(gear))
     if not die then
         broadcastToColor("The " .. Race.gearName(gear) .. " gear die has gone: another is on its way -- click Roll again in a moment.",
             player.color, LEVEL_RGB.warn)
@@ -1082,7 +1246,6 @@ function fdUiRoll(player)
         return
     end
     die.highlightOn(player.color, 3)
-    watchGearDie(die, player.color, gear)
 end
 
 function fdUiShift(player, value)
@@ -1132,16 +1295,15 @@ end
 function fdGrid(player)
     if not admin(player) then return end
     printToAll(player.steam_name .. " calls the grid roll", LEVEL_RGB.info)
-    act(function() race:rollForGrid(rollBlack) end)
+    gridThrows = 0
+    act(function() race:rollForGrid() end)
 end
 
-local function startRace(player)
+startRace = function(player)
     printToAll(player.steam_name .. " starts the race", LEVEL_RGB.info)
     clearReach()
-    packTable()
     act(function() race:startRace() end)
-    -- Packing the setup board sweeps up the loose dice with it: once it has,
-    -- put out again whatever is missing, and the lot in the middle of the board.
+    -- The dice set out by their tray again, any gone missing fetched.
     Wait.time(function()
         layDice(function(n)
             if n > 0 then
@@ -1191,13 +1353,40 @@ function fdSetupStart(player)
             return
         end
         printToAll(player.steam_name .. " calls the grid roll", LEVEL_RGB.info)
-        act(function() race:rollForGrid(rollBlack) end)
-        if race.state.phase ~= "setup" then
-            broadcastToColor("The grid is not settled yet -- press Start race again.", player.color, LEVEL_RGB.warn)
-            return
-        end
-        startRace(player)
+        -- The black die is thrown for each driver in turn; the race starts
+        -- once the grid has settled (see act).
+        pendingStart = player
+        gridThrows = 0
+        act(function() race:rollForGrid() end)
     end)
+end
+
+--- The map list on the setup menu: put the chosen map on the board.
+function fdSetupMap(player, value)
+    local phase = race.state.phase
+    if not admin(player) or phase == "race" or phase == "grid" then
+        return
+    end
+    local map = Maps.byId[Setup.mapFor(value) or ""]
+    local tile = Track.tile()
+    if not map or not tile then
+        return
+    end
+    local now = mapOnBoard()
+    if now and now.id == map.id then
+        return
+    end
+    local custom = tile.getCustomObject()
+    custom.image = map.url
+    custom.secondary_image = map.url
+    tile.setCustomObject(custom)
+    -- Reloading takes the race panel with the tile: hold its updates until
+    -- it is drawn again (fdMapChanged).
+    Hud.hold()
+    tile.reload()
+    printToAll(player.steam_name .. " puts " .. map.name .. " on the board", LEVEL_RGB.info)
+    -- Once the tile is back: the race panel, the menu and the dice follow it.
+    Wait.time(function() fdMapChanged() end, 1)
 end
 
 --- The race distance buttons on the setup menu.
@@ -1211,10 +1400,9 @@ function fdSetupLaps(player, value)
     act(function() race:setLaps(laps) end)
 end
 
---- The Big Box menu put a new map on the board. Reloading the tile took
--- the race panel with it, so it is drawn again; the setup menu says which
--- map it is, turn order goes by its track, and the dice move to its name
--- panel.
+--- A new map is on the board. Reloading the tile took the race panel with
+-- it, so it is drawn again; the setup menu says which map it is, turn order
+-- goes by its track, and the dice move to its name panel.
 function fdMapChanged()
     useBoardTrack()
     buildUi()
@@ -1224,6 +1412,7 @@ end
 function fdReset(player)
     if not admin(player) then return end
     printToAll(player.steam_name .. " reset the race (Undo restores it)", LEVEL_RGB.info)
+    pendingStart = nil
     clearReach()
     act(function() race:reset() end)
 end
@@ -1237,6 +1426,7 @@ function fdUndo(player)
     end
     race = Race.new(Rules, JSON.decode(last))
     race.autoRolls = true
+    pendingStart = nil
     useBoardTrack()
     clearReach()
     -- Undo puts the race back, not the pieces: the board still says where
@@ -1248,7 +1438,7 @@ function fdUndo(player)
     race:drain() -- re-reading the board is not news
     printToAll(player.steam_name .. " undid the last change", LEVEL_RGB.info)
     -- In case the state undone to has a roll waiting: it is rolled now.
-    race:rollChecks(rollBlack)
+    throwChecks()
     relay(race:drain())
     syncDashboards(true)
     refresh()
@@ -1370,6 +1560,9 @@ end
 --- The die in play: the gear of the car to play, if it has one; with
 -- none, the tray stays empty. A die that has gone is fetched again.
 activateDie = function()
+    if throwing then
+        return -- the black die has the tray
+    end
     local due = race:turn()
     local gear = due and due.gear or 0
     if not Dice.activate(gear) and gear > 0 and not Dice.find(gear) then

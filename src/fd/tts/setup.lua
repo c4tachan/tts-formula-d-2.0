@@ -46,16 +46,43 @@ end
 
 local STEPS = table.concat({
     "<b>1.</b> Take a coloured seat. Everyone seated is dealt a dashboard and a car when the race starts.",
-    "<b>2.</b> The host picks a map (Choose map, below) and the rules.",
+    "<b>2.</b> The host picks a map and the rules, below.",
     "<b>3.</b> The host presses <b>Start race</b>: the grid is rolled, the cars put on it, and the race begins.",
     "<b>4.</b> On your turn: click a gear on your screen dashboard, press <b>Roll</b>, then move your car. "
         .. "The spaces it can reach are marked on the board.",
 }, "\n")
 
---- The panel, for Hud.build to add to the Global UI.
-function Setup.panel()
+-- The map list's labels, to the map ids they stand for.
+local mapIds = {}
+
+--- The map behind a label in the map list, as fdSetupMap is handed it.
+function Setup.mapFor(label)
+    return mapIds[label]
+end
+
+--- The map list: those with track data first, the rest marked as without.
+local function mapList(maps)
+    local options = {}
+    mapIds = {}
+    for _, ready in ipairs({ true, false }) do
+        for _, m in ipairs(maps) do
+            if m.ready == ready then
+                local label = ready and m.name or (m.name .. "  (no track data)")
+                mapIds[label] = m.id
+                options[#options + 1] = el("Option", m.current and { selected = "true" } or {}, nil, label)
+            end
+        end
+    end
+    return el("Dropdown", {
+        id = "fds_maps", onValueChanged = "fdSetupMap", preferredWidth = "260", fontSize = "13",
+    }, options)
+end
+
+--- The panel, for Hud.build to add to the Global UI. `maps` lists the maps
+-- to choose from: { id, name, ready (has track data), current }.
+function Setup.panel(maps)
     -- The host's choices: the map, then the race distance.
-    local choices = { button("fds_map_btn", "Choose map", "showModMenu", { preferredWidth = "120" }) }
+    local choices = { mapList(maps or {}) }
     for _, n in ipairs(LAPS) do
         choices[#choices + 1] = button("fds_laps" .. n, n == 1 and "1 lap" or (n .. " laps"),
             "fdSetupLaps(" .. n .. ")", { preferredWidth = "80" })

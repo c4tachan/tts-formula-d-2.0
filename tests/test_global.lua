@@ -98,35 +98,86 @@ local function inTray(S, die)
     return die.pos.x > x0 and die.pos.x < x1 and die.pos.z > z0 and die.pos.z < z1
 end
 
+--- Move `car` (of `color`) on the full roll it has open, to the first
+-- space the roll reaches, and put it down there.
+local function moveOn(S, car, color)
+    local Moves = require("fd.core.moves")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local m = state().cars[color].move
+    local to = nil
+    for id, o in pairs(Moves.reach(FDMonaco, m.from, m.roll)) do
+        if o.brake == 0 and (not to or id < to) then to = id end
+    end
+    local Track = require("fd.tts.track")
+    local s = FDMonaco.byId[to]
+    car.pos = Track.worldOf(S.board, FDMonaco, s.pos[1], s.pos[2])
+    onObjectDrop(color, car)
+end
+
 local T = {}
 
 function T.load_builds_the_panel_and_teaches_the_dice()
     local S = world()
     assert(S.ui.fdr_title, "race panel refreshed")
-    eq(S.ui.showModMenuButton.active, "true", "mod menu button kept")
     eq(#S.find("Sixth Gear Dice").rotationValues, 30)
     eq(#S.find("First Gear Dice").rotationValues, 4)
 end
 
-function T.the_big_box_menu_is_packed_away_for_the_race()
+--- Whether `obj` is hidden from everyone, players and spectators alike.
+local function hidden(obj)
+    local seen = {}
+    for _, c in ipairs(obj.invisibleTo or {}) do seen[c] = true end
+    return seen.Red and seen.Blue and seen.Grey and seen.Black and true or false
+end
+
+function T.the_setup_board_is_hidden_where_it_stands()
+    local S = world()
+    local carBag = getObjectFromGUID("1bb99e") -- the world's, the one cars come from
+    local rulebook = S.object("Beginner Rulebook Bag", { guid = "98b2d2", pos = S.vec(72, 0, -26) })
+    local die = S.find("First Gear Dice")
+    S.object("Memory Bag - Setup Board", { guid = "0fde3b", tables = { memoryList = {
+        [carBag.guid] = {}, [rulebook.guid] = {}, [die.guid] = {},
+    } } })
+    onLoad("")
+    local at = rulebook.pos
+    for _, obj in ipairs({ carBag, rulebook }) do
+        eq(hidden(obj), true, obj.name .. " hidden")
+        eq(obj.locked, true, obj.name .. " locked")
+        eq(obj.interactable, false, obj.name .. " out of reach")
+    end
+    eq(rulebook.pos, at, "left where it stands")
+    eq(hidden(die), false, "the dice stay in sight, by their tray")
+    -- The hidden bags still deal: a driver gets a car from one.
+    joinRace("Red", S.beginner)
+    S.beginner.click("fdDashCar", "Red")
+    assert(getObjectFromGUID(state().cars.Red.tts.car), "a car out of the hidden bag")
+end
+
+function T.the_source_bags_are_hidden_without_the_setup_board()
+    local S = world()
+    local carBag = getObjectFromGUID("1bb99e")
+    onLoad("") -- no setup board's memory bag: deleted from the table
+    eq(hidden(carBag), true, "the car bag hidden all the same")
+    eq(carBag.locked, true)
+end
+
+function T.a_packed_setup_board_is_put_out_and_hidden()
+    local S = world()
+    local bag = S.object("Memory Bag - Setup Board", { guid = "0fde3b", tables = { memoryList = {} } })
+    local saved = onSave()
+    saved.json.sp = true -- packed away when saved
+    onLoad(saved)
+    eq(bag.calls[1], "buttonClick_place", "put out, so its bags can be reached")
+end
+
+function T.the_big_box_menu_stays_in_its_bag()
     local S = world()
     local menuBag = S.object("Memory Bag - Mod Menu", { guid = "a57988" })
-    local setupBag = S.object("Memory Bag - Setup Board", { guid = "0fde3b" })
-    showModMenu()
-    eq(menuBag.calls[1], "buttonClick_place")
-    eq(S.ui.showModMenuButton.active, "false", "the menu is out")
-    setup_packed = false -- the setup board is out too
-
-    joinRace("Red", S.beginner)
-    fdStart(Player.Red)
-    eq(menuBag.calls[2], "buttonClick_recall", "the menu goes back in its bag")
-    eq(setupBag.calls[1], "buttonClick_recall", "and the setup board")
-    eq(S.ui.showModMenuButton.active, "false", "no menu button during the race")
-
-    fdReset(Player.Red)
-    eq(S.ui.showModMenuButton.active, "true", "back for choosing the next map")
-    fdStart(Player.Red)
-    eq(#menuBag.calls, 2, "nothing out to pack the second time")
+    local saved = onSave()
+    saved.json.mp = false -- left out when saved
+    onLoad(saved)
+    eq(menuBag.calls[1], "buttonClick_recall", "packed away")
+    eq(S.ui.showModMenuButton, nil, "and no button to bring it out")
 end
 
 -- The script's die always comes up 10 unless a test loads it, so with two or
@@ -280,25 +331,32 @@ local function packDice(S)
     return gone
 end
 
-function T.the_start_fetches_dice_swept_up_with_the_setup_board()
+function T.the_setup_menu_chooses_the_map()
     local S = world()
-    S.find("First Gear Dice").destruct()
-    S.find("Damage Dice").destruct()
-    S.object("Memory Bag - Setup Board", { guid = "0fde3b", contents = {
-        { name = "Setup Board", guid = "632ae8" },
-        { name = "First Gear Dice", guid = "a8062d" },
-        { name = "Damage Dice", guid = "6e3283" },
-    } })
-    joinRace("Red", S.beginner)
-    fdStart(Player.Red)
-    local first = S.find("First Gear Dice")
-    assert(first, "the 1st gear die is back")
-    eq(first.guid, "a8062d", "the same die, out of the bag")
-    eq(#first.rotationValues, 4, "and taught its faces")
-    assert(first.pos.y > 1, "on the table")
-    assert(S.find("Damage Dice"), "the black die too")
-    eq(S.count("Setup Board"), 0, "the setup board stays packed")
-    assert(S.logged("Put 2 dice out"))
+    local Maps = require("fd.data.maps")
+    -- The list: Monaco first, as it has track data, then the rest, marked.
+    local list = nil
+    for _, node in ipairs(S.xml) do
+        if node.attributes.id == "fds" then
+            local function find(n)
+                if n.attributes.id == "fds_maps" then list = n end
+                for _, c in ipairs(n.children or {}) do find(c) end
+            end
+            find(node)
+        end
+    end
+    assert(list, "a map list on the setup menu")
+    eq(list.children[1].value, "Formula D: Monaco")
+    eq(list.children[1].attributes.selected, "true", "showing the map on the board")
+    eq(list.children[2].value:match("%(no track data%)$"), "(no track data)")
+
+    fdSetupMap(Player.Blue, "Formula D: Austin  (no track data)")
+    eq(S.board.custom.image, Maps.byId.FDMonaco.url, "only the host chooses")
+    fdSetupMap(Player.Red, "Formula D: Austin  (no track data)")
+    eq(S.board.custom.image, Maps.byId.FDAustin.url, "the host's choice goes on the board")
+    eq(S.board.reloads, 1, "reloaded to show it")
+    assert(S.logged("puts Formula D: Austin on the board"))
+    assert(S.ui.fds_map.value:find("Austin"), "and the menu says so")
 end
 
 function T.the_start_falls_back_on_the_spare_dice_set()
@@ -1620,7 +1678,7 @@ function T.each_first_turn_starts_with_the_start_roll()
     fdUiShift(Player.Blue, "1")
     roll(S, 1, 2, "Blue")
     eq(state().cars.Blue.lastRoll, 2)
-    onObjectDrop("Blue", blue)
+    moveOn(S, blue, "Blue")
 
     -- Then Red's first turn, starting with Red's start.
     assert(S.logged("RedPlayer rolls 10 on the black die %(start%): normal start"))
@@ -1710,7 +1768,7 @@ function T.the_car_to_play_is_lit_and_its_driver_told()
     eq(Turns.turn_color, first, "still moving")
     eq(cars[first].highlight[1], first)
     assert(not S.logged("Your turn, " .. second .. "Player"))
-    onObjectDrop(first, cars[first])
+    moveOn(S, cars[first], first)
     assert(S.logged("Your turn, " .. second .. "Player"))
     eq(Turns.turn_color, second)
     eq(cars[first].highlight, nil)
@@ -1863,7 +1921,7 @@ function T.start_race_waits_on_an_unsettled_grid()
     -- The script's die always comes up 10: a tie it cannot break.
     fdSetupStart(Player.Red)
     eq(state().phase, "grid")
-    assert(S.logged("press Start race again"))
+    assert(S.logged("press Start race to roll it again"))
     eq(S.ui.fds.active, "true")
 end
 
@@ -2070,6 +2128,104 @@ function T.a_gear_die_is_given_a_convex_collider()
     eq(#die.rotationValues, 4, "and taught its faces once back")
     onObjectSpawn(die)
     eq(die.reloads, 1, "only once")
+end
+
+function T.the_black_die_is_thrown_in_the_tray_for_each_check()
+    local S, red, blue = twoCars()
+    local black = S.find("Damage Dice")
+    -- In join order: Red rolls 4, Blue 15 for the grid; then Blue's start.
+    withRolls({ 4, 15, 12 }, function() fdSetupStart(Player.Red) end)
+    eq(black.rolls, 3, "thrown for each grid roll and the leader's start")
+    eq(state().phase, "race", "and the race under way once the grid settled")
+    assert(S.logged("BluePlayer rolls 12 on the black die %(start%)"))
+    eq(black.locked, true, "parked again once it has settled")
+    assert(not inTray(S, black))
+end
+
+function T.without_the_black_die_the_script_rolls_for_it()
+    local S = twoCars()
+    S.find("Damage Dice").destruct()
+    withRolls({ 4, 15 }, function() fdSetupStart(Player.Red) end)
+    eq(state().phase, "race", "the grid is rolled all the same")
+end
+
+--- The ghost marking where the car to play started, if one is out.
+local function startGhost(S)
+    for _, o in ipairs(S.objects) do
+        if (o.description or ""):find("started here") then return o end
+    end
+    return nil
+end
+
+function T.a_ghost_marks_where_the_car_to_play_started()
+    local S, red, blue = twoCars()
+    eq(startGhost(S), nil, "none before the race")
+    gridRoll(S, { Red = 4, Blue = 15 })
+    fdStart(Player.Red)
+    local first, second = state().order[1], state().order[2]
+    local cars = { Red = red, Blue = blue }
+    local ghost = startGhost(S)
+    assert(ghost, "out for the car to play")
+    assert(ghost.description:find(first .. "Player"), ghost.description)
+    eq(ghost.interactable, false, "out of reach")
+    eq(ghost.tint.a < 1, true, "see-through")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local Track = require("fd.tts.track")
+    local s = FDMonaco.byId[state().cars[first].space]
+    local at = Track.worldOf(S.board, FDMonaco, s.pos[1], s.pos[2])
+    assert(math.abs(ghost.pos.x - at.x) < 1e-6 and math.abs(ghost.pos.z - at.z) < 1e-6, "on its space")
+
+    -- Rolled, and put back on the ghost: not moved, still its turn.
+    fdUiShift(Player[first], "1")
+    roll(S, 1, 2, first)
+    onObjectDrop(first, cars[first])
+    assert(S.logged(first .. "Player is back where its move started"))
+    eq(Turns.turn_color, first, "still to move")
+    -- Moved for real: the turn passes, and the ghost with it.
+    moveOn(S, cars[first], first)
+    eq(Turns.turn_color, second)
+    local marks = 0
+    for _, o in ipairs(S.objects) do
+        if (o.description or ""):find("started here") then marks = marks + 1 end
+    end
+    eq(marks, 1, "one ghost at a time")
+    assert(startGhost(S).description:find(second .. "Player"))
+end
+
+function T.the_panels_go_up_even_if_the_ui_never_says_it_has_loaded()
+    local S = world()
+    UI.loading = true -- TTS stuck saying so
+    S.xml, S.ui = {}, {}
+    onLoad("")
+    UI.loading = false
+    local ids = {}
+    for _, node in ipairs(S.xml) do ids[node.attributes.id or ""] = true end
+    assert(ids.fds, "the setup menu is sent")
+    eq(S.ui.fds.active, "true", "and shown")
+end
+
+function T.the_start_ghost_is_cleared_on_load()
+    local S, red, blue = twoCars()
+    gridRoll(S, { Red = 4, Blue = 15 })
+    fdStart(Player.Red)
+    local ghost = startGhost(S)
+    assert(ghost, "out")
+    local saved = onSave()
+    local listed = false
+    for _, g in ipairs(saved.json.markers or {}) do
+        if g == ghost.guid then listed = true end
+    end
+    assert(listed, "saved among the markers a load clears")
+end
+
+function T.the_map_cannot_change_during_the_grid_roll()
+    local S = twoCars()
+    local Maps = require("fd.data.maps")
+    local saved = onSave()
+    saved.json.race.phase = "grid"
+    onLoad(saved)
+    fdSetupMap(Player.Red, "Formula D: Austin  (no track data)")
+    eq(S.board.custom.image, Maps.byId.FDMonaco.url)
 end
 
 return T
