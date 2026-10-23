@@ -570,6 +570,20 @@ function T.a_tray_walls_the_dice_in()
     eq(S.count("Dice tray"), 4, "still four")
 end
 
+function T.the_dice_keep_their_spot_on_a_track_with_edits()
+    local S = world()
+    local Track = require("fd.tts.track")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    -- Opening the editor makes an edited copy of the track, as a save with
+    -- hand edits has.
+    fdEdit({ color = "Red", steam_name = "RedPlayer" })
+    fdEdit({ color = "Red", steam_name = "RedPlayer" })
+    fdMapChanged()
+    local panel = Track.worldOf(S.board, FDMonaco, FDMonaco.dice[1], FDMonaco.dice[2])
+    local die = S.find("First Gear Dice")
+    assert(math.abs(die.pos.x - panel.x) < 4 and math.abs(die.pos.z - panel.z) < 2, "still on the name panel")
+end
+
 function T.dice_sit_in_the_middle_of_a_board_without_a_spot()
     local S = world()
     S.board.custom = { image = "http://example.invalid/other-map.png" }
