@@ -1063,8 +1063,9 @@ function fdUiCollision(player) runAction(mine(player), "collision") end
 function fdUiPit(player) runAction(mine(player), "pit") end
 function fdUiLeave(player) runAction(mine(player), "leave") end
 
---- Roll the gear die for the player's gear, where it sits in the middle of
--- the board: the only way to roll one, as the dice are out of reach.
+--- Throw the gear die for the player's gear, in its tray on the board: the
+-- only way to roll one, as the dice cannot be picked up. It is read once it
+-- settles, like any roll.
 function fdUiRoll(player)
     local car = mine(player)
     if not car then
@@ -1075,14 +1076,13 @@ function fdUiRoll(player)
         return
     end
     local gear = car.gear
-    local value, die = Dice.roll(gear)
-    if not value then
+    local die = Dice.throw(gear)
+    if not die then
         broadcastToColor("The " .. Race.gearName(gear) .. " gear die is not on the table.", player.color, LEVEL_RGB.warn)
         return
     end
     die.highlightOn(player.color, 3)
-    clearReach()
-    act(function() race:rolled(car.color, gear, value) end)
+    watchGearDie(die, player.color, gear)
 end
 
 function fdUiShift(player, value)

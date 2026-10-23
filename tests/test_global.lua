@@ -293,7 +293,6 @@ function T.the_start_falls_back_on_the_spare_dice_set()
     assert(S.logged("Put 7 dice out"))
     -- In the row in the middle of the board, and the ones the race uses.
     local die = S.find("First Gear Dice")
-    eq(die.locked, true, "locked in place")
     eq(die.interactable, false, "out of reach")
     dropOn(S, S.find("Gear Stick"), "gear", 1)
     eq(die.highlight[1], "Red")
@@ -523,23 +522,14 @@ function T.the_roll_button_rolls_the_die_for_your_gear()
 
     fdUiShift(Player.Red, "2")
     local die = S.find("Second Gear Dice")
-    local at = die.pos
-    -- The 2nd gear die's faces are 3 3 4 4 4 2: the third comes up.
-    local random = math.random
-    math.random = function(m, n)
-        if m == 6 and n == nil then return 3 end
-        return random(m, n)
-    end
+    die.value = 4
     fdUiRoll(Player.Red)
-    math.random = random
-    eq(state().cars.Red.lastRoll, 4, "the face turned up is the roll")
-    eq(die.rot[3], 90, "and the die shows it")
-    eq(die.rolls, nil, "turned, not thrown")
-    eq(die.pos, at, "where it sits")
+    eq(die.rolls, 1, "thrown once")
+    eq(state().cars.Red.lastRoll, 4, "and read once it settles")
 
     -- Someone else's button rolls nothing for Red.
     fdUiRoll(Player.Blue)
-    eq(state().cars.Red.lastRoll, 4)
+    eq(die.rolls, 1)
 end
 
 function T.the_dice_sit_on_the_map_name_panel_out_of_reach()
@@ -549,7 +539,7 @@ function T.the_dice_sit_on_the_map_name_panel_out_of_reach()
     local panel = Track.worldOf(S.board, FDMonaco, FDMonaco.dice[1], FDMonaco.dice[2])
     for _, name in ipairs({ "First Gear Dice", "Fourth Gear Dice", "Fifth Gear Dice", "Damage Dice" }) do
         local die = S.find(name)
-        eq(die.locked, true, name .. " locked")
+        eq(die.locked, false, name .. " free to roll")
         eq(die.interactable, false, name .. " cannot be picked up")
         assert(math.abs(die.pos.x - panel.x) < 4 and math.abs(die.pos.z - panel.z) < 2, name .. " on the panel")
     end
@@ -557,6 +547,27 @@ function T.the_dice_sit_on_the_map_name_panel_out_of_reach()
     eq(first.pos.z, fourth.pos.z, "gears 1 to 4 in one row")
     assert(first.pos.x < fourth.pos.x, "in gear order")
     assert(fifth.pos.z ~= first.pos.z, "the rest in a second row")
+end
+
+function T.a_tray_walls_the_dice_in()
+    local S = world()
+    eq(S.count("Dice tray"), 4, "four walls")
+    local die = S.find("First Gear Dice")
+    local xs, zs = {}, {}
+    for _, o in ipairs(S.objects) do
+        if o.name == "Dice tray" and not o.destroyed then
+            eq(o.locked, true, "walls stay put")
+            eq(o.interactable, false)
+            xs[#xs + 1], zs[#zs + 1] = o.pos.x, o.pos.z
+        end
+    end
+    table.sort(xs)
+    table.sort(zs)
+    assert(xs[1] < die.pos.x and die.pos.x < xs[4], "the dice inside, across")
+    assert(zs[1] < die.pos.z and die.pos.z < zs[4], "and along")
+    -- Laid out again (a new map, the start): the tray moves with them.
+    fdMapChanged()
+    eq(S.count("Dice tray"), 4, "still four")
 end
 
 function T.dice_sit_in_the_middle_of_a_board_without_a_spot()

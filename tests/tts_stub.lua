@@ -158,6 +158,7 @@ function Stub.object(name, props)
     o.highlightOn = function(c, d) o.highlight = { c, d } end
     o.highlightOff = function() o.highlight = nil end
     o.setColorTint = function(c) o.tint = c end
+    o.setScale = function(s) o.scale = vec(s.x or s[1], s.y or s[2], s.z or s[3]) end
     o.setRotationValues = function(v) o.rotationValues = v end
     -- `value` is what the face that is up shows. As in TTS, getValue() on an
     -- object with rotation values is that face's index, not its value.
@@ -247,11 +248,13 @@ end
 function spawnObject(params)
     local p = params.position
     local r = params.rotation or vec(0, 0, 0)
-    return Stub.object(params.type, {
+    local o = Stub.object(params.type, {
         pos = vec(p.x or p[1], p.y or p[2], p.z or p[3]),
         rot = vec(r.x or r[1] or 0, r.y or r[2] or 0, r.z or r[3] or 0),
         scale = params.scale,
     })
+    if params.callback_function then params.callback_function(o) end
+    return o
 end
 
 function spawnObjectData(params)

@@ -1,7 +1,6 @@
 -- The shared dice set: finding the dice, teaching the gear dice their faces,
--- keeping them in a row in the middle of the board, and rolling them there.
--- A die thrown by hand anyway (only the host can unlock one) is still read
--- once it settles (Dice.watch).
+-- keeping them in a walled tray on the board, rolling them there, and reading
+-- a die once it settles (Dice.watch).
 
 local DiceData = require("fd.data.dice")
 
@@ -59,10 +58,9 @@ function Dice.find(gear)
     return nil
 end
 
--- The dice sit in a row in the middle of the board, locked and out of
--- players' hands: they are rolled with the Roll button only (Dice.roll),
--- which turns a face up rather than throwing the die, so nothing tumbles into
--- the cars on the track.
+-- The dice sit in rows in a tray on the board, out of players' hands: they
+-- cannot be picked up, only thrown with the Roll button (Dice.throw). Four
+-- low walls round them keep a throw from tumbling into the cars.
 
 local SPACING = 2.2 -- world units between neighbouring dice
 local LIFT = 0.6    -- above the board face, so a die sits on it
@@ -88,11 +86,65 @@ local function spot(i, center)
     return { x = center.x + (i - 1) * SPACING, y = center.y + LIFT, z = center.z - SPACING }
 end
 
---- Lock `obj` at `pos`, where players cannot pick it up.
+--- Set die `obj` down at `pos`, where players cannot pick it up. It is left
+-- unlocked, to roll.
 local function fix(obj, pos)
     obj.interactable = false
-    obj.setLock(true)
+    obj.setLock(false)
     obj.setPosition(pos)
+end
+
+-- The tray: its inside, and its walls. Spawned afresh wherever the dice are
+-- laid out, and found again by name after a load.
+local TRAY = "Dice tray"
+local TRAY_WIDTH = 11   -- inside, world units: room for the rows and a throw
+local TRAY_DEPTH = 7
+local WALL_HEIGHT = 2     -- a throw goes up a little way: high enough to keep it in
+local WALL_THICKNESS = 0.3
+local TRAY_TINT = { 0.12, 0.13, 0.15 }
+
+local trayGuids = nil -- the walls put out, once known
+
+local function clearTray()
+    if not trayGuids then
+        trayGuids = {}
+        for _, o in ipairs(getObjects()) do
+            if o.getName() == TRAY then trayGuids[#trayGuids + 1] = o.getGUID() end
+        end
+    end
+    for _, g in ipairs(trayGuids) do
+        local o = getObjectFromGUID(g)
+        if o then o.destruct() end
+    end
+    trayGuids = {}
+end
+
+--- One wall, centred on `pos`, `size` across in world units. The block's own
+-- size is only known once it is out, so it is scaled to fit then.
+local function wall(pos, size)
+    local obj = spawnObject({
+        type = "BlockRectangle", position = pos, sound = false,
+        callback_function = function(o)
+            local s = o.getBoundsNormalized().size
+            o.setScale({ size.x / s.x, size.y / s.y, size.z / s.z })
+            o.setName(TRAY)
+            o.setColorTint(TRAY_TINT)
+            o.setLock(true)
+            o.interactable = false
+        end,
+    })
+    trayGuids[#trayGuids + 1] = obj.getGUID()
+end
+
+--- Four walls round the rows at `center`, standing on the board face.
+function Dice.tray(center)
+    clearTray()
+    local y = center.y + WALL_HEIGHT / 2
+    local w, d, t = TRAY_WIDTH, TRAY_DEPTH, WALL_THICKNESS
+    wall({ x = center.x, y = y, z = center.z - (d + t) / 2 }, { x = w + 2 * t, y = WALL_HEIGHT, z = t })
+    wall({ x = center.x, y = y, z = center.z + (d + t) / 2 }, { x = w + 2 * t, y = WALL_HEIGHT, z = t })
+    wall({ x = center.x - (w + t) / 2, y = y, z = center.z }, { x = t, y = WALL_HEIGHT, z = d })
+    wall({ x = center.x + (w + t) / 2, y = y, z = center.z }, { x = t, y = WALL_HEIGHT, z = d })
 end
 
 local function findBlack()
@@ -116,8 +168,9 @@ local function allNames()
     return out
 end
 
---- Put the dice that are out in their row at `center`.
+--- Put the dice that are out in their rows at `center`, in a tray.
 function Dice.layout(center)
+    Dice.tray(center)
     for i in ipairs(allNames()) do
         local obj = nil
         if i <= #DiceData.names then
@@ -140,17 +193,14 @@ function Dice.highlight(gear, color)
     return die
 end
 
---- Roll the die for `gear` where it sits: a face picked at random and turned
--- up. Returns the value it shows and the die, or nil if the die is not out.
-function Dice.roll(gear)
+--- Throw the die for `gear` in the tray. Returns the die, or nil if it is
+-- not out; read it with Dice.watch.
+function Dice.throw(gear)
     local die = Dice.find(gear)
-    local faces = DiceData[gear]
-    if not die or not faces then
-        return nil
+    if die then
+        die.roll()
     end
-    local face = faces[math.random(#faces)]
-    die.setRotationSmooth(face.rotation, false, true)
-    return face.value, die
+    return die
 end
 
 --- Turn the black die to show `value`, rolled by the script.
