@@ -39,7 +39,7 @@ local useBoardTrack -- likewise
 local joinAt -- with the dashboard buttons, below
 local deliver, dealInSeated, dropDashless, bench -- likewise
 local isAdmin -- with the race controls, below
-local diceCenter -- with the track, below
+local layDice, activateDie -- with the track, below
 -- What syncTurns last told TTS's Turns, as { on, order, color }; nil until
 -- it has, so the first sync after a load sets every part.
 local turnsSet = nil
@@ -143,10 +143,7 @@ function onLoad(saved_data)
     Wait.time(function()
         Dashboard.scan()
         dropDashless()
-        local center = diceCenter()
-        if center then
-            Dice.layout(center)
-        end
+        layDice()
     end, 1)
 end
 
@@ -417,6 +414,7 @@ function refresh(announce)
     syncCars()
     Hud.refresh(race)
     Mini.refresh(race)
+    activateDie()
     -- The map is only looked up while the setup menu shows it.
     local map, seated = nil, nil
     if Setup.shows(race.state.phase) then
@@ -1143,11 +1141,7 @@ local function startRace(player)
     -- Packing the setup board sweeps up the loose dice with it: once it has,
     -- put out again whatever is missing, and the lot in the middle of the board.
     Wait.time(function()
-        local center = diceCenter()
-        if not center then
-            return
-        end
-        Dice.setOut(center, function(n)
+        layDice(function(n)
             if n > 0 then
                 printToAll(string.format("Put %d dice out for the race", n), LEVEL_RGB.info)
             end
@@ -1222,10 +1216,7 @@ end
 function fdMapChanged()
     useBoardTrack()
     buildUi()
-    local center = diceCenter()
-    if center then
-        Dice.layout(center)
-    end
+    layDice()
 end
 
 function fdReset(player)
@@ -1344,19 +1335,45 @@ useBoardTrack = function()
     race:useTrack(track)
 end
 
---- Where the dice sit: on the map's name panel, if its track data says
--- where that is, otherwise the middle of the board face; nil without a board.
-diceCenter = function()
+--- Where the dice tray goes: on the map's name panel, if its track data
+-- says where that is, otherwise the middle of the board face; and the
+-- middle of the board face, for the dice to park on that side of it. Nil
+-- without a board.
+local function diceCenter()
     local tile, track = boardTrack()
-    if track and track.dice then
-        return Track.worldOf(tile, track, track.dice[1], track.dice[2])
-    end
-    tile = Track.tile()
+    tile = tile or Track.tile()
     if not tile then
         return nil
     end
     local b = tile.getBounds()
-    return { x = b.center.x, y = b.center.y + b.size.y / 2, z = b.center.z }
+    local middle = { x = b.center.x, y = b.center.y + b.size.y / 2, z = b.center.z }
+    if track and track.dice then
+        return Track.worldOf(tile, track, track.dice[1], track.dice[2]), middle
+    end
+    return middle, middle
+end
+
+--- The die in play: the gear of the car to play, if it has one; with
+-- none, the tray stays empty.
+activateDie = function()
+    local due = race:turn()
+    Dice.activate(due and due.gear or nil)
+end
+
+--- Lay the dice out by their tray, then put the die in play in it. With
+-- `onFetched`, any dice not on the table are fetched first (Dice.setOut),
+-- and it is told how many.
+layDice = function(onFetched)
+    local center, middle = diceCenter()
+    if not center then
+        return
+    end
+    if onFetched then
+        Dice.setOut(center, middle, onFetched)
+    else
+        Dice.layout(center, middle)
+    end
+    activateDie()
 end
 
 --- Set a car down at `pos` (on the board face), level and turned to `yaw`.

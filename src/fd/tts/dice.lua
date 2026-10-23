@@ -58,46 +58,43 @@ function Dice.find(gear)
     return nil
 end
 
--- The dice sit in rows in a tray on the board, out of players' hands: they
--- cannot be picked up, only thrown with the Roll button (Dice.throw). Four
--- low walls round them keep a throw from tumbling into the cars.
+-- Only the die in play sits in the tray on the board, unlocked, to be
+-- thrown with the Roll button (Dice.throw); the rest are parked in a row
+-- beside it, locked. None can be picked up. Four low walls round the tray
+-- keep a throw from tumbling into the cars.
 
-local SPACING = 2.2 -- world units between neighbouring dice
-local LIFT = 0.6    -- above the board face, so a die sits on it
--- Two rows, to fit on a map's name panel: gears 1 to 4, then 5, 6 and the
--- black die.
-local ROWS = { { 1, 2, 3, 4 }, { 5, 6, 7 } }
+local SPACING = 2.2   -- world units between neighbouring parked dice
+local LIFT = 0.6      -- above the board face, so a die sits on it
+local PARK_GAP = 1.5  -- between the tray's wall and the parked row
 
---- Where die `i` (gears 1 to 6, then the black die) goes, in the rows
--- centred on `center`, a point on the board face.
-local function spot(i, center)
-    for r, row in ipairs(ROWS) do
-        for k, n in ipairs(row) do
-            if n == i then
-                return {
-                    x = center.x + (k - (#row + 1) / 2) * SPACING,
-                    y = center.y + LIFT,
-                    z = center.z + (r - (#ROWS + 1) / 2) * SPACING,
-                }
-            end
-        end
+-- Where the dice were last laid out: the tray's centre, and which way the
+-- parked row lies from it (along X or Z, towards the board's middle).
+local place = nil
+local active = nil -- the gear whose die is in the tray
+
+--- Where die `i` (gears 1 to 6, then the black die) is parked: in a row
+-- along the tray's side that faces the board's middle.
+local function parking(i)
+    local c = place.center
+    local along = (i - 4) * SPACING
+    if place.axis == "z" then
+        return { x = c.x + along, y = c.y + LIFT, z = c.z + place.side * place.reach }
     end
-    -- Past the end of the rows: beside the first.
-    return { x = center.x + (i - 1) * SPACING, y = center.y + LIFT, z = center.z - SPACING }
+    return { x = c.x + place.side * place.reach, y = c.y + LIFT, z = c.z + along }
 end
 
---- Set die `obj` down at `pos`, where players cannot pick it up. It is left
--- unlocked, to roll.
-local function fix(obj, pos)
+--- Set die `obj` down at `pos`, where players cannot pick it up: locked when
+-- parked, loose in the tray, to roll.
+local function fix(obj, pos, loose)
     obj.interactable = false
-    obj.setLock(false)
+    obj.setLock(not loose)
     obj.setPosition(pos)
 end
 
 -- The tray: its inside, and its walls. Spawned afresh wherever the dice are
 -- laid out, and found again by name after a load.
 local TRAY = "Dice tray"
-local TRAY_WIDTH = 11   -- inside, world units: room for the rows and a throw
+local TRAY_WIDTH = 11   -- inside, world units: room for a throw
 local TRAY_DEPTH = 7
 local WALL_HEIGHT = 2     -- a throw goes up a little way: high enough to keep it in
 local WALL_THICKNESS = 0.3
@@ -168,20 +165,59 @@ local function allNames()
     return out
 end
 
---- Put the dice that are out in their rows at `center`, in a tray.
-function Dice.layout(center)
+local function dieAt(i)
+    if i <= #DiceData.names then
+        return Dice.find(i)
+    end
+    return findBlack()
+end
+
+--- Put a tray at `center` and park every die that is out beside it, on the
+-- side towards `middle` (the middle of the board). No die is in play until
+-- Dice.activate says which.
+function Dice.layout(center, middle)
+    local dx, dz = middle.x - center.x, middle.z - center.z
+    if math.abs(dz) >= math.abs(dx) then
+        place = { center = center, axis = "z", side = dz < 0 and -1 or 1,
+            reach = TRAY_DEPTH / 2 + WALL_THICKNESS + PARK_GAP }
+    else
+        place = { center = center, axis = "x", side = dx < 0 and -1 or 1,
+            reach = TRAY_WIDTH / 2 + WALL_THICKNESS + PARK_GAP }
+    end
+    active = nil
     Dice.tray(center)
     for i in ipairs(allNames()) do
-        local obj = nil
-        if i <= #DiceData.names then
-            obj = Dice.find(i)
-        else
-            obj = findBlack()
-        end
+        local obj = dieAt(i)
         if obj then
-            fix(obj, spot(i, center))
+            fix(obj, parking(i))
         end
     end
+end
+
+--- Put the die for `gear` in the tray, parking the one that was there; with
+-- no gear (0 or nil), park it and leave the tray empty. Does nothing until
+-- the dice have been laid out, or if that die is in already. Returns the
+-- die in the tray.
+function Dice.activate(gear)
+    if not place then
+        return nil
+    end
+    if gear == active then
+        return active and Dice.find(active)
+    end
+    local was = active and Dice.find(active)
+    if was then
+        fix(was, parking(active))
+    end
+    active = nil
+    local die = gear and gear > 0 and Dice.find(gear)
+    if not die then
+        return nil
+    end
+    local c = place.center
+    fix(die, { x = c.x, y = c.y + LIFT, z = c.z }, true)
+    active = gear
+    return die
 end
 
 --- Light up the die for `gear` for `color`, who has just shifted into it.
@@ -193,10 +229,11 @@ function Dice.highlight(gear, color)
     return die
 end
 
---- Throw the die for `gear` in the tray. Returns the die, or nil if it is
--- not out; read it with Dice.watch.
+--- Throw the die for `gear` in the tray, bringing it in first if another
+-- is there. Returns the die, or nil if it is not out; read it with
+-- Dice.watch.
 function Dice.throw(gear)
-    local die = Dice.find(gear)
+    local die = Dice.activate(gear) or Dice.find(gear)
     if die then
         die.roll()
     end
@@ -220,15 +257,14 @@ local SETUP_BAG = "0fde3b"
 local DICE_SET_BAG = "ac4939"
 
 --- Take whichever of `missing` (name -> place in the row) `bag` holds,
--- setting each down in its place in the row at `center`. Returns how many
--- came out.
-local function takeFrom(bag, missing, center)
+-- parking each by the tray. Returns how many came out.
+local function takeFrom(bag, missing)
     local n = 0
     for _, item in ipairs(bag.getObjects()) do
         local i = missing[item.name]
         if i then
             missing[item.name] = nil
-            local pos = spot(i, center)
+            local pos = parking(i)
             bag.takeObject({
                 guid = item.guid, position = pos, smooth = false,
                 callback_function = function(obj)
@@ -242,11 +278,11 @@ local function takeFrom(bag, missing, center)
     return n
 end
 
---- Make sure all seven dice are out, in their row at `center`, fetching any
--- that are not: from the setup board's bag, else from a spare set.
--- `onDone(n)` is told how many were fetched, once they are.
-function Dice.setOut(center, onDone)
-    Dice.layout(center)
+--- Make sure all seven dice are out, parked by a tray at `center` (see
+-- Dice.layout), fetching any that are not: from the setup board's bag, else
+-- from a spare set. `onDone(n)` is told how many were fetched, once they are.
+function Dice.setOut(center, middle, onDone)
+    Dice.layout(center, middle)
     local onTable = {}
     for _, o in ipairs(getObjects()) do onTable[o.getName()] = true end
     local missing, count = {}, 0
@@ -257,18 +293,18 @@ function Dice.setOut(center, onDone)
         return onDone(0)
     end
     local setup = getObjectFromGUID(SETUP_BAG)
-    local fetched = setup and takeFrom(setup, missing, center) or 0
+    local fetched = setup and takeFrom(setup, missing) or 0
     local spare = fetched < count and getObjectFromGUID(DICE_SET_BAG)
     if not spare then
         return onDone(fetched)
     end
     -- The infinite bag hands out a whole set in a bag: take what is still
     -- missing and put the rest away.
-    local beside = spot(#DiceData.names + 3, center)
+    local beside = parking(#DiceData.names + 3)
     spare.takeObject({
         position = { x = beside.x, y = beside.y + 3, z = beside.z }, smooth = false,
         callback_function = function(set)
-            fetched = fetched + takeFrom(set, missing, center)
+            fetched = fetched + takeFrom(set, missing)
             set.destruct()
             onDone(fetched)
         end,

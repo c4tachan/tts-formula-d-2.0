@@ -75,6 +75,29 @@ local function roll(S, gear, value, color)
     onObjectRandomize(die, color or "Red")
 end
 
+--- The dice tray's walls, and the middle of them.
+local function tray(S)
+    local walls, x, z = {}, 0, 0
+    for _, o in ipairs(S.objects) do
+        if o.name == "Dice tray" then
+            walls[#walls + 1] = o
+            x, z = x + o.pos.x, z + o.pos.z
+        end
+    end
+    return walls, { x = x / #walls, z = z / #walls }
+end
+
+--- Whether `die` lies inside the tray's walls.
+local function inTray(S, die)
+    local walls = tray(S)
+    local x0, x1, z0, z1 = math.huge, -math.huge, math.huge, -math.huge
+    for _, w in ipairs(walls) do
+        x0, x1 = math.min(x0, w.pos.x), math.max(x1, w.pos.x)
+        z0, z1 = math.min(z0, w.pos.z), math.max(z1, w.pos.z)
+    end
+    return die.pos.x > x0 and die.pos.x < x1 and die.pos.z > z0 and die.pos.z < z1
+end
+
 local T = {}
 
 function T.load_builds_the_panel_and_teaches_the_dice()
@@ -374,11 +397,10 @@ end
 function T.dropping_the_gear_stick_shifts_and_lights_the_die()
     local S = redRacing()
     local die = S.find("First Gear Dice")
-    local at = die.pos
     dropOn(S, S.find("Gear Stick"), "gear", 1)
     eq(state().cars.Red.gear, 1)
     eq(die.highlight[1], "Red", "the die for the gear is lit")
-    eq(die.pos, at, "and stays in the middle of the board")
+    assert(inTray(S, die), "and in the tray")
     roll(S, 1, 2)
     eq(state().cars.Red.lastRoll, 2)
     eq(state().round, 2)
@@ -532,42 +554,48 @@ function T.the_roll_button_rolls_the_die_for_your_gear()
     eq(die.rolls, 1)
 end
 
-function T.the_dice_sit_on_the_map_name_panel_out_of_reach()
+function T.the_tray_sits_on_the_map_name_panel_with_the_dice_parked_beside_it()
     local S = world()
     local Track = require("fd.tts.track")
     local FDMonaco = require("fd.data.tracks.FDMonaco")
-    local panel = Track.worldOf(S.board, FDMonaco, FDMonaco.dice[1], FDMonaco.dice[2])
-    for _, name in ipairs({ "First Gear Dice", "Fourth Gear Dice", "Fifth Gear Dice", "Damage Dice" }) do
+    local spot = Track.worldOf(S.board, FDMonaco, FDMonaco.dice[1], FDMonaco.dice[2])
+    local walls, middle = tray(S)
+    eq(#walls, 4)
+    assert(math.abs(middle.x - spot.x) < 1e-6 and math.abs(middle.z - spot.z) < 1e-6, "the tray on the panel")
+    -- Before the race no die is in play: all parked, locked, in gear order,
+    -- on the side of the tray towards the middle of the board.
+    local last = nil
+    for _, name in ipairs({ "First Gear Dice", "Second Gear Dice", "Sixth Gear Dice", "Damage Dice" }) do
         local die = S.find(name)
-        eq(die.locked, false, name .. " free to roll")
+        eq(die.locked, true, name .. " parked")
         eq(die.interactable, false, name .. " cannot be picked up")
-        assert(math.abs(die.pos.x - panel.x) < 4 and math.abs(die.pos.z - panel.z) < 2, name .. " on the panel")
+        assert(not inTray(S, die), name .. " outside the tray")
+        assert(math.abs(die.pos.z) < math.abs(spot.z), name .. " towards the middle of the board")
+        if last then
+            eq(die.pos.z, last.pos.z, "in one row")
+            assert(die.pos.x > last.pos.x, "in gear order")
+        end
+        last = die
     end
-    local first, fourth, fifth = S.find("First Gear Dice"), S.find("Fourth Gear Dice"), S.find("Fifth Gear Dice")
-    eq(first.pos.z, fourth.pos.z, "gears 1 to 4 in one row")
-    assert(first.pos.x < fourth.pos.x, "in gear order")
-    assert(fifth.pos.z ~= first.pos.z, "the rest in a second row")
 end
 
-function T.a_tray_walls_the_dice_in()
-    local S = world()
-    eq(S.count("Dice tray"), 4, "four walls")
-    local die = S.find("First Gear Dice")
-    local xs, zs = {}, {}
-    for _, o in ipairs(S.objects) do
-        if o.name == "Dice tray" and not o.destroyed then
-            eq(o.locked, true, "walls stay put")
-            eq(o.interactable, false)
-            xs[#xs + 1], zs[#zs + 1] = o.pos.x, o.pos.z
-        end
-    end
-    table.sort(xs)
-    table.sort(zs)
-    assert(xs[1] < die.pos.x and die.pos.x < xs[4], "the dice inside, across")
-    assert(zs[1] < die.pos.z and die.pos.z < zs[4], "and along")
-    -- Laid out again (a new map, the start): the tray moves with them.
+function T.only_the_die_in_play_is_in_the_tray()
+    local S = redRacing()
+    local first, second = S.find("First Gear Dice"), S.find("Second Gear Dice")
+    assert(not inTray(S, first), "Red has no gear yet: the tray is empty")
+    fdUiShift(Player.Red, "1")
+    assert(inTray(S, first), "the 1st gear die comes in")
+    eq(first.locked, false, "loose, to roll")
+    eq(first.interactable, false, "but still out of reach")
+    fdUiShift(Player.Red, "2")
+    assert(not inTray(S, first), "out again on the shift")
+    eq(first.locked, true, "parked and locked")
+    assert(inTray(S, second), "and the 2nd gear die in")
+    -- Laid out again (a new map, the start): the tray moves, the die in play
+    -- goes back in.
     fdMapChanged()
-    eq(S.count("Dice tray"), 4, "still four")
+    eq(#tray(S), 4, "still four walls")
+    assert(inTray(S, second))
 end
 
 function T.the_dice_keep_their_spot_on_a_track_with_edits()
@@ -579,17 +607,17 @@ function T.the_dice_keep_their_spot_on_a_track_with_edits()
     fdEdit({ color = "Red", steam_name = "RedPlayer" })
     fdEdit({ color = "Red", steam_name = "RedPlayer" })
     fdMapChanged()
-    local panel = Track.worldOf(S.board, FDMonaco, FDMonaco.dice[1], FDMonaco.dice[2])
-    local die = S.find("First Gear Dice")
-    assert(math.abs(die.pos.x - panel.x) < 4 and math.abs(die.pos.z - panel.z) < 2, "still on the name panel")
+    local spot = Track.worldOf(S.board, FDMonaco, FDMonaco.dice[1], FDMonaco.dice[2])
+    local _, middle = tray(S)
+    assert(math.abs(middle.x - spot.x) < 1e-6 and math.abs(middle.z - spot.z) < 1e-6, "still on the name panel")
 end
 
-function T.dice_sit_in_the_middle_of_a_board_without_a_spot()
+function T.the_tray_sits_in_the_middle_of_a_board_without_a_spot()
     local S = world()
     S.board.custom = { image = "http://example.invalid/other-map.png" }
     fdMapChanged()
-    local die = S.find("First Gear Dice")
-    assert(math.abs(die.pos.x) < 5 and math.abs(die.pos.z) < 3, "in the middle of the board")
+    local _, middle = tray(S)
+    assert(math.abs(middle.x) < 1e-6 and math.abs(middle.z) < 1e-6, "in the middle of the board")
 end
 
 function T.the_black_die_shows_the_scripts_roll()
