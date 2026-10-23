@@ -548,6 +548,10 @@ T.finish = { line = { "i.s1.0", "m.s1.0", "o.s1.0" } }
 -- the track. Without it they sit in the middle of the board.
 T.dice = { 1505, 1468 }
 
+-- Where the race panel lies (image pixels): its centre and width, on an
+-- empty patch of the board. Without it the panel is on the screen.
+T.panel = { pos = { 1290, 1090 }, width = 380 }
+
 -- The spaces touching each one, in any direction and whatever the
 -- arrows say: from tracks/<id>.adjacency.json (find_adjacency.py).
 -- A car ending its move rolls for a collision with each car in one.

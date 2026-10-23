@@ -87,6 +87,12 @@ def lua_track(track, near=None):
           "-- the track. Without it they sit in the middle of the board.",
           ("T.dice = {{ {}, {} }}".format(*track["dice"]) if track.get("dice") else "T.dice = nil"),
           "",
+          "-- Where the race panel lies (image pixels): its centre and width, on an",
+          "-- empty patch of the board. Without it the panel is on the screen.",
+          ("T.panel = {{ pos = {{ {}, {} }}, width = {} }}".format(
+              track["panel"]["pos"][0], track["panel"]["pos"][1], track["panel"]["width"])
+           if track.get("panel") else "T.panel = nil"),
+          "",
           "-- The spaces touching each one, in any direction and whatever the",
           "-- arrows say: from tracks/<id>.adjacency.json (find_adjacency.py).",
           "-- A car ending its move rolls for a collision with each car in one.",

@@ -1828,18 +1828,38 @@ function T.start_race_needs_drivers_and_the_host()
     assert(S.logged("Nobody is seated yet"))
 end
 
-function T.the_race_panel_lies_beside_the_board()
+function T.the_race_panel_lies_on_the_board_where_the_track_says()
     local S = world()
-    eq(S.board.xml[1].attributes.id, "fdr", "drawn on the board tile")
+    local panel = S.board.xml[1].attributes
+    eq(panel.id, "fdr", "drawn on the board tile")
     for _, node in ipairs(S.xml) do
         assert(node.attributes.id ~= "fdr", "not on the screen")
     end
-    -- Scaled back by the tile's scale (44): 0.04 world units per UI unit.
-    eq(S.board.xml[1].attributes.scale, "0.0909 0.0909 1")
+    -- Monaco's spot: centred on (1290, 1090) of the 2474 x 1616 image, which
+    -- is local (-53 / 2474, 282 / 1616) on a 1-unit tile; 380 pixels wide.
+    local x, y = panel.position:match("^(%S+) (%S+)")
+    eq(x, "-2.1")
+    eq(y, "17.5")
+    eq(panel.scale, "0.0404 0.0404 1", "380 UI units across 380 pixels")
+    eq(panel.rotation, "0 0 180", "the same way up as the picture")
     -- A new map reloads the tile, which loses its UI: it is drawn again.
     S.board.xml = {}
     fdMapChanged()
     eq(S.board.xml[1].attributes.id, "fdr")
+end
+
+function T.the_race_panel_goes_on_the_screen_for_a_map_without_a_spot()
+    local S = world()
+    S.board.custom = { image = "http://example.invalid/other-map.png" }
+    fdMapChanged()
+    eq(#S.board.xml, 0, "off the board")
+    local found = nil
+    for _, node in ipairs(S.xml) do
+        if node.attributes.id == "fdr" then found = node end
+    end
+    assert(found, "on the screen")
+    eq(found.attributes.rectAlignment, "UpperLeft")
+    assert(S.ui.fdr_title, "and filled in")
 end
 
 function T.the_setup_menu_comes_back_after_the_flag()
