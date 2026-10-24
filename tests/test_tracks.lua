@@ -70,6 +70,18 @@ function T.every_link_leads_forward()
     end)
 end
 
+function T.every_space_can_be_driven_onto()
+    each(function(track)
+        local into = {}
+        for _, s in ipairs(track.spaces) do
+            for _, n in ipairs(s.next) do into[n] = true end
+        end
+        for _, s in ipairs(track.spaces) do
+            assert(into[s.id], s.id .. " has no link into it")
+        end
+    end)
+end
+
 function T.the_grid_runs_back_from_pole()
     each(function(track)
         local P = Position.of(track)

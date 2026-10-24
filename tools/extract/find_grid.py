@@ -71,8 +71,10 @@ def track_only(im):
 ARROW_EXTENT = 60
 
 
-def paint_out_arrows(track, road):
-    """Arrows are dark for where they are, and bold; grid lines are a pixel or
+def arrow_marks(track, road):
+    """The arrows on the road, as a mask and each one's centre.
+
+    Arrows are dark for where they are, and bold; grid lines are a pixel or
     two wide. Judging darkness against the local asphalt keeps the lines in
     the darker tunnel stretch, which a fixed cut-off takes for arrows. Where
     the lines are as dark and bold as the arrows, the arrows are the marks
@@ -84,14 +86,21 @@ def paint_out_arrows(track, road):
     rel = gray.astype(np.float32) / np.maximum(bg, 1)
     thick = cv2.distanceTransform(ink, cv2.DIST_L2, 3)
     core = ((rel < 0.55) & (ink > 0)).astype(np.uint8)
-    n, lab, st, _ = cv2.connectedComponentsWithStats(core, 8)
+    n, lab, st, cen = cv2.connectedComponentsWithStats(core, 8)
     keep = [i for i in range(1, n) if st[i, 4] >= 25 and thick[lab == i].max() >= 2.0
             and max(st[i, 2], st[i, 3]) <= ARROW_EXTENT]
-    arrows = np.isin(lab, keep).astype(np.uint8)
+    return np.isin(lab, keep).astype(np.uint8), cen[keep].reshape(-1, 2)
+
+
+def paint_out_arrows(track, road):
+    """The board with its arrows (arrow_marks) painted out."""
+    arrows, centres = arrow_marks(track, road)
+    gray = cv2.cvtColor(track, cv2.COLOR_BGR2GRAY)
+    dark = cv2.medianBlur(gray, 21).astype(np.float32) - gray.astype(np.float32)
     halo = cv2.dilate(arrows, np.ones((5, 5), np.uint8))
     halo &= ((dark > 3) | (arrows > 0)).astype(np.uint8)
     halo = cv2.dilate(halo, np.ones((3, 3), np.uint8)) & road
-    return cv2.inpaint(track, halo, 5, cv2.INPAINT_TELEA), len(keep)
+    return cv2.inpaint(track, halo, 5, cv2.INPAINT_TELEA), len(centres)
 
 
 def paint_out_flag(track, road, line=None):
@@ -509,30 +518,43 @@ def ink_along(dark, a, b, slack=3):
     return best
 
 
-def confirm_guesses(by_lane, grey, blank):
+def confirm_guesses(by_lane, grey, blank, arrows):
     """Take back out each guessed division that is printed nowhere.
 
     patch_gaps() takes a cell well over the usual length for cells whose
     divisions it missed. But the outside of a bend, and the inside of a
     hairpin, have cells that long as printed (Singapore's Marina Promenade):
     a division guessed across one runs through the middle of a single cell.
+
     A missed division is faint, not absent, so a guess with no line along
-    it is dropped -- except under the painted-out flag (`blank`), where the
-    lines are gone. Judged on `grey`, the board with its arrows painted
-    out, so an arrow does not pass for a line. Returns what was dropped."""
+    it is dropped. Judged on `grey`, the board with its arrows painted out,
+    so an arrow does not pass for a line; and never under the painted-out
+    flag (`blank`), where the lines are gone. But Sebring's divisions are so
+    faint that real ones can show too little ink, so the arrows have the
+    last word: every cell in a corner has its own, and a guess with an
+    arrow (`arrows`, their centres) in the cell either side of it stands
+    whatever the ink says. Returns what was dropped."""
     gray = cv2.cvtColor(grey, cv2.COLOR_BGR2GRAY).astype(np.float32)
     dark = cv2.medianBlur(gray.astype(np.uint8), 15).astype(np.float32) - gray
     flag = cv2.dilate(blank, np.ones((25, 25), np.uint8)) > 0
+
+    def arrowed(a, b):
+        quad = np.array([a["inner"], a["outer"], b["outer"], b["inner"]], np.float32)
+        return any(cv2.pointPolygonTest(quad, (float(x), float(y)), False) >= 0 for x, y in arrows)
     out = []
     for l, rs in by_lane.items():
-        keep = []
-        for r in rs:
+        unprinted = set()
+        for i, r in enumerate(rs):
             mid = np.round(r["mid"]).astype(int)
-            if r["guessed"] and not flag[mid[1], mid[0]] and ink_along(dark, r["inner"], r["outer"]) < INKED:
-                out.append(r)
-            else:
-                keep.append(r)
-        by_lane[l] = keep
+            if not r["guessed"] or flag[mid[1], mid[0]]:
+                continue
+            if ink_along(dark, r["inner"], r["outer"], slack=10) >= INKED:
+                continue
+            if arrowed(rs[i - 1], r) and arrowed(r, rs[(i + 1) % len(rs)]):
+                continue
+            unprinted.add(id(r))
+        out += [r for r in rs if id(r) in unprinted]
+        by_lane[l] = [r for r in rs if id(r) not in unprinted]
     return out
 
 
@@ -874,8 +896,8 @@ def main():
         spaces, labels = cells_steps(map_id, im, clean, main, across_dir, pos, local_w, lane_w, line, tangent,
                                      reverse, name)
     else:
-        spaces, labels = rungs_steps(map_id, grey, main, flag, across_dir, pos, local_w, lane_w, line, tangent,
-                                     reverse, name)
+        spaces, labels = rungs_steps(map_id, grey, main, flag, arrow_marks(track, road)[1], across_dir, pos,
+                                     local_w, lane_w, line, tangent, reverse, name)
     per = [sum(1 for s in spaces.values() if s["lane"] == l) for l in range(1, LANES + 1)]
     guessed = sum(1 for s in spaces.values() if s["guessed"])
     print("6. cells %d -- per lane %s; %d %s"
@@ -941,7 +963,8 @@ def cells_steps(map_id, im, clean, main, across_dir, pos, local_w, lane_w, line,
     return spaces, labels
 
 
-def rungs_steps(map_id, grey, main, flag, across_dir, pos, local_w, lane_w, line, tangent, reverse, name):
+def rungs_steps(map_id, grey, main, flag, arrows, across_dir, pos, local_w, lane_w, line, tangent, reverse,
+                name):
     """Steps 4-6 read as rungs: the divisions across each lane."""
     skel, ink = grid_skeleton(grey, main, flag)
     across, along = split_lines(skel, across_dir)
@@ -956,7 +979,7 @@ def rungs_steps(map_id, grey, main, flag, across_dir, pos, local_w, lane_w, line
     by_lane = order_rungs(rungs, line, tangent, reverse, lap_sense(line, reverse))
     found = {l: len(rs) for l, rs in by_lane.items()}
     dropped, added = patch_gaps(by_lane, lane_w, lay=rung_layer(line, reverse, across_dir, pos, local_w))
-    unprinted = confirm_guesses(by_lane, grey, flag)
+    unprinted = confirm_guesses(by_lane, grey, flag, arrows)
     print("5. rungs per lane %s; %d stray dropped; %d missing put in by interpolation, %d of them "
           "taken back out as printed nowhere"
           % ([found.get(l, 0) for l in range(1, LANES + 1)], len(dropped), len(added), len(unprinted)))

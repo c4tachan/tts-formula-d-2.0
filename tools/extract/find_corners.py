@@ -379,9 +379,11 @@ def main():
     track["corners"] = corners
     recode(track, codes, ROOT / "tracks" / f"{map_id}.arrows.json")
     # The finish line is where the codes start counting: the first cell of
-    # s1 in each lane, the one at or just past the band.
+    # s1 in each lane, the one at or just past the band -- the pit lane's
+    # too, but not a pit box that happens to be coded after it (Sebring's).
     track["finish"] = {**track.get("finish", {}),
-                       "line": [s["id"] for s in track["spaces"] if s["id"].split(".")[1:] == ["s1", "0"]]}
+                       "line": [s["id"] for s in track["spaces"]
+                                if s["id"].split(".")[1:] == ["s1", "0"] and not s.get("box")]}
     per = Counter(c.rsplit(".", 1)[0] for c in codes.values())
     print("4. codes given: %d spaces, %d lane-sectors, e.g. %s" % (len(codes), len(per), ", ".join(
         s["id"] for s in track["spaces"][:3])))
