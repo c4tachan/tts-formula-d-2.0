@@ -8,44 +8,12 @@
     "thumb": "fD6Austin"
   },
   {
-    "id": "FDBaltimore",
-    "name": "Formula D: Baltimore",
-    "key": "Formula D: Baltimore",
-    "category": "formula_d",
-    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943920262829636/67BB74395A04A9B0596033157461FC9C77BB55D9/",
-    "thumb": "fD4Baltimore"
-  },
-  {
     "id": "FDBuddh",
     "name": "Formula D: Buddh",
     "key": "Formula D: Buddh",
     "category": "formula_d",
     "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943920262832180/147A3A167C17284615698923BC9B37E7897BFC6B/",
     "thumb": "fd4Buddh"
-  },
-  {
-    "id": "FDChicago",
-    "name": "Formula D: Chicago",
-    "key": "Formula D: Chicago",
-    "category": "formula_d",
-    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014238203/908BBF22412D68A0CED43D6DAB6F93E73DE97239/",
-    "thumb": "formulaD1Bchicago"
-  },
-  {
-    "id": "FDDocks",
-    "name": "Formula D: Docks",
-    "key": "Formula D: Docks",
-    "category": "formula_d",
-    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014241911/4D5CB22E13E9C014858B43596DFE2A628DF8CC2B/",
-    "thumb": "formulaD3Adocksorg"
-  },
-  {
-    "id": "FDDocksAlt",
-    "name": "Formula D: Docks (Alt)",
-    "key": "Formula D: Docks (Alt)",
-    "category": "formula_d",
-    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014243040/E383145AB9B72D56A3A480E10ECEC452C07709C8/",
-    "thumb": "formulaD3Adocksrev"
   },
   {
     "id": "FDHockenheim",
@@ -62,38 +30,6 @@
     "category": "formula_d",
     "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014232538/CC3911BF378E3DA31959B56901F60A14B456A1FF/",
     "thumb": "formulaD0Amonaco"
-  },
-  {
-    "id": "FDNevada",
-    "name": "Formula D: Nevada",
-    "key": "Formula D: Nevada",
-    "category": "formula_d",
-    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943920262836221/0624D7A4BF64E7DB01F49C6576EB98CC67DA204C/",
-    "thumb": "fD6Nevada"
-  },
-  {
-    "id": "FDNewJersey",
-    "name": "Formula D: New Jersey",
-    "key": "Formula D: New Jersey",
-    "category": "formula_d",
-    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943920262832692/A579B7C010410CC2ACAE93FFED9027C1B6159809/",
-    "thumb": "fD5NewJersey"
-  },
-  {
-    "id": "FDRaceCity",
-    "name": "Formula D: Race City",
-    "key": "Formula D: Race City",
-    "category": "formula_d",
-    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014233913/FDDA7626CA3F65CFB21601577F05C7E2364E62C1/",
-    "thumb": "formulaD0Bracecityorg"
-  },
-  {
-    "id": "FDRaceCityAlt",
-    "name": "Formula D: Race City (Alt)",
-    "key": "Formula D: Race City (Alt)",
-    "category": "formula_d",
-    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014235128/29D90BF72EF0F8797A30F5F2E39A5C725C1E711F/",
-    "thumb": "formulaD0Bracecityrev"
   },
   {
     "id": "FDSebring",
@@ -126,5 +62,269 @@
     "category": "formula_d",
     "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014240406/80F9F33ECB931991D025DB32A0D97DC61037450A/",
     "thumb": "formulaD2Bvalencia"
+  },
+  {
+    "id": "FDe01",
+    "name": "Formula De Circuit 01: Monaco",
+    "key": "Formula De Circuit 01: Monaco",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014192871/5C8AA43D1E01323C398263D03082AE2FC42D1398/",
+    "thumb": "formula1monaco"
+  },
+  {
+    "id": "FDe02",
+    "name": "Formula De Circuit 02: Nederland",
+    "key": "Formula De Circuit 02: Nederland",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014215260/BDD8C1F05EC950B964D70C0EB4986BE1C841A59F/",
+    "thumb": "formula2nederland"
+  },
+  {
+    "id": "FDe03",
+    "name": "Formula De Circuit 03: Nederland (Alt)",
+    "key": "Formula De Circuit 03: Nederland (Alt)",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014221375/52DB634072E8AAE93D36B285BFCD1C152237D6DB/",
+    "thumb": "formula3nederland2"
+  },
+  {
+    "id": "FDe04",
+    "name": "Formula De Circuit 04: Belgique",
+    "key": "Formula De Circuit 04: Belgique",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014223002/7CE0F8C895DB0045E31C904994793890092C0EA3/",
+    "thumb": "formula4belgique"
+  },
+  {
+    "id": "FDe05",
+    "name": "Formula De Circuit 05: South Africa",
+    "key": "Formula De Circuit 05: South Africa",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014223948/A210BEE7E6EEB0F2D3EEA2276939C998BD376445/",
+    "thumb": "formula5southafrica"
+  },
+  {
+    "id": "FDe06",
+    "name": "Formula De Circuit 06: San Marino",
+    "key": "Formula De Circuit 06: San Marino",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014225294/B2973EF3F6F3A57467544FDC0477AB4BB9975216/",
+    "thumb": "formula6sanmarino"
+  },
+  {
+    "id": "FDe07",
+    "name": "Formula De Circuit 07: France",
+    "key": "Formula De Circuit 07: France",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014226766/482BDB94475331B68654476923AD2E950B248779/",
+    "thumb": "formula7france"
+  },
+  {
+    "id": "FDe08a",
+    "name": "Formula De Circuit 08: Italia",
+    "key": "Formula De Circuit 08: Italia",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014227843/62879949672CC8E8D2673044AD9F988AE019BFFF/",
+    "thumb": "formula8italiaorg"
+  },
+  {
+    "id": "FDe08b",
+    "name": "Formula De Circuit 08: Italia (Alt)",
+    "key": "Formula De Circuit 08: Italia (Alt)",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014228765/0C0FE8DF6791BC3FFF1A5F5C36EE2F3DAAFFB707/",
+    "thumb": "formula8italiarev"
+  },
+  {
+    "id": "FDe09a",
+    "name": "Formula De Circuit 09: Portugal",
+    "key": "Formula De Circuit 09: Portugal",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014230032/E50644C4B1DAC56CCD66DA9B6E4F4993EC1C7144/",
+    "thumb": "formula9portugalorg"
+  },
+  {
+    "id": "FDe09b",
+    "name": "Formula De Circuit 09: Portugal (Alt)",
+    "key": "Formula De Circuit 09: Portugal (Alt)",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014231420/AF8A7A58CE86F4F4E4B902EF7AA51C673EF5A823/",
+    "thumb": "formula9portugalrev"
+  },
+  {
+    "id": "FDe10",
+    "name": "Formula De Circuit 10: Brasil",
+    "key": "Formula De Circuit 10: Brasil",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014178841/EDF15683C4595B329A81D1556EA56C698A63139F/",
+    "thumb": "formula10brasil"
+  },
+  {
+    "id": "FDe11",
+    "name": "Formula De Circuit 11: Watkins Glen",
+    "key": "Formula De Circuit 11: Watkins Glen",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014180219/F03216C7FBD0A90CDE6B9D7370B13374F2F1A7FB/",
+    "thumb": "formula11watkinsglen"
+  },
+  {
+    "id": "FDe12",
+    "name": "Formula De Circuit 12: Silverstone",
+    "key": "Formula De Circuit 12: Silverstone",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014181275/AA880A0E33223A422D27F6579904F1280BF7EC50/",
+    "thumb": "formula12silverstone"
+  },
+  {
+    "id": "FDe13",
+    "name": "Formula De Circuit 13: Montreal",
+    "key": "Formula De Circuit 13: Montreal",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014182629/D461573A84C35FD527BBC2A9687D8A21605E3727/",
+    "thumb": "formula13montreal"
+  },
+  {
+    "id": "FDe14",
+    "name": "Formula De Circuit 14: Long Beach",
+    "key": "Formula De Circuit 14: Long Beach",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014183640/CD919B04DE13F29AAE1E967A9FA3A0CA9FBCBF8A/",
+    "thumb": "formula14longbeach"
+  },
+  {
+    "id": "FDe15",
+    "name": "Formula De Circuit 15: Hokenheim",
+    "key": "Formula De Circuit 15: Hokenheim",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014184907/DB4BB0B52221D779FA4780B3380EDF5738E12131/",
+    "thumb": "formula15hokenheim"
+  },
+  {
+    "id": "FDe16",
+    "name": "Formula De Circuit 16: Zeltweg",
+    "key": "Formula De Circuit 16: Zeltweg",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014186508/9D314CEB670CCF4E902DD9F3A779CAF1838D94AF/",
+    "thumb": "formula16zeltweg"
+  },
+  {
+    "id": "FDe17",
+    "name": "Formula De Circuit 17: Buenos Aires",
+    "key": "Formula De Circuit 17: Buenos Aires",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014187965/6E7CBD9A1EE1575D556A9DD45CEEA59D533368F5/",
+    "thumb": "formula17buenosaires"
+  },
+  {
+    "id": "FDe18",
+    "name": "Formula De Circuit 18: Barcelona",
+    "key": "Formula De Circuit 18: Barcelona",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014188979/C566F4FE62C63F75032251DA6DAA0C1EE7D01045/",
+    "thumb": "formula18barcelona"
+  },
+  {
+    "id": "FDe19",
+    "name": "Formula De Circuit 19: Suzuka",
+    "key": "Formula De Circuit 19: Suzuka",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014191951/1E3677FF7DD28A61A44697DDE3C33FFF6DCA130A/",
+    "thumb": "formula19suzuka"
+  },
+  {
+    "id": "FDe20a",
+    "name": "Formula De Circuit 20: Melbourne",
+    "key": "Formula De Circuit 20: Melbourne",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014193819/28DA6EBFB42362F7B096E27CB5E7BFC221E869C0/",
+    "thumb": "formula20melbourneorg"
+  },
+  {
+    "id": "FDe20b",
+    "name": "Formula De Circuit 20: Melbourne (Alt)",
+    "key": "Formula De Circuit 20: Melbourne (Alt)",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014194933/D33BCB7751BCE4397C41CDEE808F26D5FAA53531/",
+    "thumb": "formula20melbournerev"
+  },
+  {
+    "id": "FDe21a",
+    "name": "Formula De Circuit 21: Budapest",
+    "key": "Formula De Circuit 21: Budapest",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014195793/C0AED3930F1C4490B97754F9C43A0FAE74D5C83D/",
+    "thumb": "formula21budapestorg"
+  },
+  {
+    "id": "FDe21b",
+    "name": "Formula De Circuit 21: Budapest (Alt)",
+    "key": "Formula De Circuit 21: Budapest (Alt)",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014196757/58314A831EA4A91CF2B111A6E569CD5E1390DBCA/",
+    "thumb": "formula21budapestrev"
+  },
+  {
+    "id": "FDe22a",
+    "name": "Formula De Circuit 22: Nurburgring",
+    "key": "Formula De Circuit 22: Nurburgring",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014197709/3D74D37151B3D14BE79A88F176B869015820E29A/",
+    "thumb": "formula22nurburgringorg"
+  },
+  {
+    "id": "FDe22b",
+    "name": "Formula De Circuit 22: Nurburgring (Alt)",
+    "key": "Formula De Circuit 22: Nurburgring (Alt)",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014198895/687C137A5715E95BBA74749CE741EF42C8C30AD2/",
+    "thumb": "formula22nurburgringrev"
+  },
+  {
+    "id": "FDe26a",
+    "name": "Formula De Circuit 26: Indianapolis",
+    "key": "Formula De Circuit 26: Indianapolis",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014206321/42BF94A3ED189E1DEE2EBC92A517286F08C2335A/",
+    "thumb": "formula26indianapolisorg"
+  },
+  {
+    "id": "FDe26b",
+    "name": "Formula De Circuit 26: Indianapolis (Alt)",
+    "key": "Formula De Circuit 26: Indianapolis (Alt)",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014207536/65C03910D67AC2F7C39BF778D5F1476072A95B8B/",
+    "thumb": "formula26indianapolisrev"
+  },
+  {
+    "id": "FDe27a",
+    "name": "Formula De Circuit 27: Detroit",
+    "key": "Formula De Circuit 27: Detroit",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014208494/C636D56B3BBD896285F57ECA3B1298FD5CE1D24C/",
+    "thumb": "formula27detroitorg"
+  },
+  {
+    "id": "FDe27b",
+    "name": "Formula De Circuit 27: Detroit (Alt)",
+    "key": "Formula De Circuit 27: Detroit (Alt)",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014209737/BC6D23BFDCA2B95D623CE1AFCAE08FF5F6409BE8/",
+    "thumb": "formula27detroitrev"
+  },
+  {
+    "id": "FDe32",
+    "name": "Formula De Circuit 32: Sepang",
+    "key": "Formula De Circuit 32: Sepang",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781014219065/DBE2EE02890EE9600688D973C4BF4B116B6263D7/",
+    "thumb": "formula32sepang"
+  },
+  {
+    "id": "FDe34",
+    "name": "Extra: Nederland Combined",
+    "key": "Extra: Nederland Combined",
+    "category": "formula_de",
+    "url": "https://steamusercontent-a.akamaihd.net/ugc/1624066328576609278/AD08178E29F88F40016D781A63E515C887807A52/",
+    "thumb": "formula34nedex"
   }
 ]

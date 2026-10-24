@@ -364,7 +364,8 @@ function T.the_setup_menu_chooses_the_map()
     end
     assert(at["Formula D: Austin"] and at["Formula D: Monaco"], "the maps with track data, unmarked")
     eq(list.children[at["Formula D: Monaco"]].attributes.selected, "true", "showing the map on the board")
-    assert(at["Formula D: Baltimore  (no track data)"], "the rest, marked")
+    assert(at["Formula De Circuit 01: Monaco  (no track data)"], "the rest, marked")
+    eq(at["Formula D: Baltimore"] or at["Formula D: Baltimore  (no track data)"], nil, "no board of a circuit that is not F1")
 
     fdSetupMap(Player.Blue, "Formula D: Austin")
     eq(S.board.custom.image, Maps.byId.FDMonaco.url, "only the host chooses")
