@@ -6,7 +6,7 @@ local Graph = require("fd.core.trackgraph")
 local Moves = require("fd.core.moves")
 local Position = require("fd.core.position")
 
-local TRACKS = { "FDAustin", "FDHockenheim", "FDMonaco" }
+local TRACKS = { "FDAustin", "FDHockenheim", "FDMonaco", "FDSebring" }
 
 local function eq(a, b, msg)
     if a ~= b then
@@ -58,7 +58,12 @@ function T.every_link_leads_forward()
                     -- it, and a pit box beside its space in the pit lane.
                     local across = (s.pit or false) ~= (t.pit or false) or s.box or t.box
                     local slack = across and P.cell / 2 or 0
-                    assert(P.along[n] > P.along[s.id] - slack, s.id .. " -> " .. n .. " runs backwards")
+                    -- A fork can point into a space printed level with it:
+                    -- round a hairpin, or the outside of a bend, the lane
+                    -- beside has cells longer or out of step. Never behind.
+                    local ok = P.along[n] > P.along[s.id] - slack
+                        or (t.lane ~= s.lane and P.along[n] == P.along[s.id])
+                    assert(ok, s.id .. " -> " .. n .. " runs backwards")
                 end
             end
         end

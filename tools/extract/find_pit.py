@@ -61,7 +61,9 @@ WORK = OUT / "_work"
 # Read by eye, in image pixels. `ends` are the slanted divisions closing the
 # printed cells, entry end first; `merges` the centres of the merge spaces
 # beyond them; `boxes` the pit boxes' colours in running order, from the
-# `first_box`-th pit space (0 being the entry merge).
+# `first_box`-th pit space (0 being the entry merge); `rows` the image rows
+# the pit road's wall runs through, or for one running across the board,
+# `cols` the columns.
 READING = {
     "FDMonaco": {
         "ends": [[[202.5, 1272.5], [235.0, 1301.0]], [[352.5, 623.8], [395.0, 618.8]]],
@@ -83,6 +85,13 @@ READING = {
         "first_box": 1,
         "boxes": ["white", "white", "yellow", "yellow", "green", "green", "red", "red", "blue", "blue"],
         "rows": (870, 1300),
+    },
+    "FDSebring": {
+        "ends": [[[776.0, 1226.0], [776.0, 1250.0]], [[1300.0, 1226.0], [1300.0, 1250.0]]],
+        "merges": [[740.0, 1236.0], [1336.0, 1236.0]],
+        "first_box": 2,
+        "boxes": ["white", "white", "yellow", "yellow", "green", "green", "red", "red", "blue", "blue"],
+        "cols": (760, 1300),
     },
 }
 
@@ -164,11 +173,15 @@ def pit_road(im, ends):
     return lab == best, road
 
 
-def middle_line(pit, rows, toward):
+def middle_line(pit, rows, toward, across=False):
     """The line half a lane in from the pit road's wall, at a pixel a step:
     points, and unit normals pointing in from the wall. The wall is the pit
     road's far edge from the track, `toward` +1 for its right side, -1 its
-    left."""
+    left -- or, for a pit road running `across` the board (Sebring's), its
+    lower side or its upper, and `rows` are then the columns it spans."""
+    if across:
+        pts, nrms = middle_line(pit.T, rows, toward)
+        return pts[:, ::-1], nrms[:, ::-1]
     ys = np.arange(rows[0], rows[1], 4)
     keep, xs = [], []
     for y in ys:
@@ -381,8 +394,10 @@ def main():
     pit, road = pit_road(im, rd["ends"])
     # The wall is the side of the pit road away from the track.
     centre = np.argwhere(pit)[:, ::-1].mean(axis=0)
-    toward = 1 if centre[0] > np.mean([s["pos"][0] for s in entries]) else -1
-    pts, nrms = middle_line(pit, rd["rows"], toward)
+    across = "cols" in rd
+    k = 1 if across else 0
+    toward = 1 if centre[k] > np.mean([s["pos"][k] for s in entries]) else -1
+    pts, nrms = middle_line(pit, rd["cols"] if across else rd["rows"], toward, across)
     cuts = divisions(im, pts, nrms)
     print("1. pit road: middle line %d px long; %d divisions across it" % (len(pts), len(cuts)))
 
@@ -394,9 +409,19 @@ def main():
         cuts = sorted(len(pts) - 1 - i for i in cuts)
         first, last = len(pts) - 1 - first, len(pts) - 1 - last
     cuts = [first] + [i for i in cuts if first + 10 < i < last - 10] + [last]
+    # A division too faint to dip (Sebring's, where a garage meets the next)
+    # leaves a cell two or more long: cut it evenly.
+    usual = np.median(np.diff(cuts))
+    filled = [cuts[0]]
+    for a, b in zip(cuts, cuts[1:]):
+        k = int(round((b - a) / usual))
+        filled += [int(round(a + (b - a) * j / k)) for j in range(1, k)] if k > 1 else []
+        filled.append(b)
+    added, cuts = len(filled) - len(cuts), filled
     gaps = np.diff(cuts)
-    print("2. %d printed cells, %.0f-%.0f px long (median %.0f)"
-          % (len(gaps), gaps.min(), gaps.max(), np.median(gaps)))
+    print("2. %d printed cells, %.0f-%.0f px long (median %.0f)%s"
+          % (len(gaps), gaps.min(), gaps.max(), np.median(gaps),
+             "; %d division(s) too faint to see put in" % added if added else ""))
 
     centres = [np.asarray(rd["merges"][0], float)]
     centres += [cell_centre(im, pts, nrms, a, b) for a, b in zip(cuts, cuts[1:])]

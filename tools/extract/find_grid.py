@@ -450,21 +450,51 @@ def order_rungs(rungs, line, tangent, reverse, sense):
     return by_lane
 
 
-def rung_between(a, b, t):
-    """A rung made up between rungs a and b, t of the way from a to b."""
+def rung_layer(line, reverse, across_dir, pos, local_w):
+    """A function laying a rung across a lane at a place round the lap: the
+    road's own cross-section there, from its edges, cut into lanes. Returns
+    (inner, outer), or None off the road."""
+    arc = np.r_[0, np.cumsum(np.hypot(*np.diff(line, axis=0).T))]
+    L = arc[-1] + np.hypot(*(line[0] - line[-1]))
+    H, W = pos.shape
+
+    def lay(along, lane):
+        a = ((L - along) if reverse else along) % L
+        j = int(np.argmin(np.abs(arc - a)))
+        x, y = np.round(line[j]).astype(int)
+        if not (0 <= x < W and 0 <= y < H) or local_w[y, x] < 2:
+            return None
+        c, w = across_dir[y, x], local_w[y, x]
+        edge = line[j] - c * pos[y, x]
+        return edge + c * (lane - 1) * w / LANES, edge + c * lane * w / LANES
+    return lay
+
+
+def rung_between(a, b, t, lay=None):
+    """A rung made up between rungs a and b, t of the way from a to b: laid
+    across the road there by `lay` (rung_layer), or, without it, on the
+    straight line between them -- which round a tight bend cuts across the
+    inside of it, off the road (Sebring's Sunset Bend)."""
     g = {"lane": a["lane"], "size": 0, "guessed": True, "loop_len": a["loop_len"], "fwd": a["fwd"],
          "along": (a["along"] + t * ((b["along"] - a["along"]) % a["loop_len"])) % a["loop_len"]}
     for key in ("inner", "outer", "mid"):
         g[key] = a[key] + t * (b[key] - a[key])
+    laid = lay(g["along"], a["lane"]) if lay else None
+    if laid is not None:
+        mid = (laid[0] + laid[1]) / 2
+        # Only if it lands between the two, as a division of their cell would.
+        span = np.hypot(*(b["mid"] - a["mid"]))
+        if max(np.hypot(*(mid - a["mid"])), np.hypot(*(mid - b["mid"]))) < 1.1 * span:
+            g["inner"], g["outer"], g["mid"] = laid[0], laid[1], mid
     return g
 
 
-def patch_gaps(by_lane, lane_w, max_fill=3):
+def patch_gaps(by_lane, lane_w, max_fill=3, lay=None):
     """Check the spacing of the rungs along each lane. A cell far shorter
     than its neighbours is a stray line, and the odder of its two rungs is
     dropped; one far longer hides up to `max_fill` undetected divisions,
-    which are put in between its rungs and marked as guesses. Returns what
-    changed, for the step image."""
+    which are put in between its rungs (rung_between) and marked as
+    guesses. Returns what changed, for the step image."""
     dropped, added = [], []
     # The cell's length along the road: its longer side, measured the way
     # the road runs (a wedge in a hairpin has one long side; a stray lying
@@ -499,7 +529,7 @@ def patch_gaps(by_lane, lane_w, max_fill=3):
             n = int(round(mean / local(keep, i)))
             if mean > 1.6 * local(keep, i) and 2 <= n <= max_fill + 1:
                 for k in range(1, n):
-                    g = rung_between(r, nxt, k / n)
+                    g = rung_between(r, nxt, k / n, lay)
                     out.append(g)
                     added.append(g)
         by_lane[l] = out
@@ -878,7 +908,7 @@ def rungs_steps(map_id, grey, main, flag, across_dir, pos, local_w, lane_w, line
     rungs = find_rungs(across, pos, local_w, lane_w, flag)
     by_lane = order_rungs(rungs, line, tangent, reverse, lap_sense(line, reverse))
     found = {l: len(rs) for l, rs in by_lane.items()}
-    dropped, added = patch_gaps(by_lane, lane_w)
+    dropped, added = patch_gaps(by_lane, lane_w, lay=rung_layer(line, reverse, across_dir, pos, local_w))
     print("5. rungs per lane %s; %d stray dropped; %d missing put in by interpolation"
           % ([found.get(l, 0) for l in range(1, LANES + 1)], len(dropped), len(added)))
     np.savez(OUT / f"{map_id}_grid.npz",
