@@ -6,7 +6,7 @@ local Graph = require("fd.core.trackgraph")
 local Moves = require("fd.core.moves")
 local Position = require("fd.core.position")
 
-local TRACKS = { "FDAustin", "FDMonaco" }
+local TRACKS = { "FDAustin", "FDHockenheim", "FDMonaco" }
 
 local function eq(a, b, msg)
     if a ~= b then
@@ -176,6 +176,8 @@ function T.the_pit_lane_is_one_way_with_a_box_for_each_seat()
     end)
 end
 
+-- Both are optional: without them the dice sit in the board's middle and
+-- the panel goes on the screen.
 function T.the_dice_and_the_panel_lie_on_the_board_clear_of_the_track()
     each(function(track)
         local w, h = track.image.width, track.image.height
@@ -186,12 +188,16 @@ function T.the_dice_and_the_panel_lie_on_the_board_clear_of_the_track()
                 assert(dx > reach[1] or dy > reach[2], what .. " covers " .. s.id)
             end
         end
-        clear(track.dice[1], track.dice[2], { 60, 60 }, "the dice")
+        if track.dice then
+            clear(track.dice[1], track.dice[2], { 60, 60 }, "the dice")
+        end
         local p = track.panel
-        -- The panel is laid out 380 by 360, stretched to its width.
-        local half = { p.width / 2, p.width * 360 / 380 / 2 }
-        clear(p.pos[1], p.pos[2], half, "the race panel")
-        assert(p.pos[1] + half[1] <= w and p.pos[2] + half[2] <= h, "the race panel is on the board")
+        if p then
+            -- The panel is laid out 380 by 360, stretched to its width.
+            local half = { p.width / 2, p.width * 360 / 380 / 2 }
+            clear(p.pos[1], p.pos[2], half, "the race panel")
+            assert(p.pos[1] + half[1] <= w and p.pos[2] + half[2] <= h, "the race panel is on the board")
+        end
     end)
 end
 

@@ -94,12 +94,17 @@ def paint_out_arrows(track, road):
     return cv2.inpaint(track, halo, 5, cv2.INPAINT_TELEA), len(keep)
 
 
-def paint_out_flag(track, road):
+def paint_out_flag(track, road, line=None):
     """The start/finish flag: a band of white squares on the asphalt (nothing
     else painted on the road is that bright) with black ones between them.
     Its edges would otherwise pass for divisions. Where a striped kerb is
     taken for road, as on Austin, its white blocks pass for squares too, but
-    they alternate with red, and the flag has none."""
+    they alternate with red, and the flag has none.
+
+    Where the road mask takes in the scenery as well (Hockenheim's car parks,
+    Valencia's harbour), windows and awnings make bands of their own. The
+    flag lies across the track, so given the racing `line` only the band
+    nearest it is kept."""
     gray = cv2.cvtColor(track, cv2.COLOR_BGR2GRAY)
     bg = cv2.medianBlur(gray, 21).astype(np.float32)
     bright = ((gray.astype(np.float32) - bg > 35) & (road > 0)).astype(np.uint8)
@@ -109,8 +114,13 @@ def paint_out_flag(track, road):
     hsv = cv2.cvtColor(track, cv2.COLOR_BGR2HSV).astype(int)
     red = (((hsv[..., 0] <= 10) | (hsv[..., 0] >= 170)) & (hsv[..., 1] > 90) & (hsv[..., 2] > 80))
     n, lab, st, _ = cv2.connectedComponentsWithStats(band, 8)
-    band = np.isin(lab, [i for i in range(1, n) if st[i, 4] >= 600
-                         and red[lab == i].mean() < 0.05]).astype(np.uint8)
+    keep = [i for i in range(1, n) if st[i, 4] >= 600 and red[lab == i].mean() < 0.05]
+    if line is not None and len(keep) > 1:
+        rail = np.zeros(road.shape, np.uint8)
+        cv2.polylines(rail, [line.astype(np.int32).reshape(-1, 1, 2)], True, 255, 1)
+        dist = cv2.distanceTransform(255 - rail, cv2.DIST_L2, 5)
+        keep = [min(keep, key=lambda i: np.median(dist[lab == i]))]
+    band = np.isin(lab, keep).astype(np.uint8)
     band = cv2.dilate(band, np.ones((7, 7), np.uint8)) & road
     return cv2.inpaint(track, band, 5, cv2.INPAINT_TELEA), band
 
@@ -751,15 +761,15 @@ def main():
     track, road = track_only(im)
     cv2.imwrite(str(name("1_track_only")), track)
 
+    line, length, width = racing_line(im)
     clean, n_arrows = paint_out_arrows(track, road)
-    clean, flag = paint_out_flag(clean, road)
+    clean, flag = paint_out_flag(clean, road, line)
     cv2.imwrite(str(name("2_no_arrows")), clean)
     print("1-2. road %.1f%% of the board; %d arrows painted out; flag %d px"
           % (100 * road.mean(), n_arrows, int(flag.sum())))
 
     # The track proper: near the racing line. Leaves out the pit road and
     # scraps of pavement that came along with the road.
-    line, length, width = racing_line(im)
     norm = normals(line)
     side = inner_side(line, norm)
     tangent = np.c_[norm[:, 1], -norm[:, 0]]

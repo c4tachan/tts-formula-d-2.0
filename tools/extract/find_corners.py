@@ -295,8 +295,8 @@ def main():
     track = json.loads(path.read_text(encoding="utf-8"))
     info, im = board_image(map_id)
     track_img, road = track_only(im)
-    _, band = paint_out_flag(track_img, road)
     line, _, width = racing_line(im)
+    _, band = paint_out_flag(track_img, road, line)
     main_road = track_proper(road, line, width)
 
     lab, n_lines = pieces(im, main_road)
@@ -321,10 +321,15 @@ def main():
                  "spaces, ring closes: %s) -- check out/%s_7_corners.png" % (len(ring), len(used), p == start, map_id))
 
     corner_of = {piece: i // 2 + 1 for i, piece in enumerate(ring) if i % 2 == 1}
+    # A space on no piece takes the sector of the one before it in its lane
+    # (assign_codes), and with it the corner, if that sector is one.
+    codes = assign_codes(spaces, where, ring, band)
+    corner_by_space = {s["id"]: int(s["sector"][1:]) if s["sector"].startswith("c") else None
+                       for s in spaces}
     old = {c["id"]: c for c in track.get("corners", [])}
     corners = []
     for piece, cid in sorted(corner_of.items(), key=lambda kv: kv[1]):
-        members = [s["id"] for s in spaces if where[s["id"]] == piece]
+        members = [s["id"] for s in spaces if corner_by_space[s["id"]] == cid]
         was = old.get(cid, {})
         by_lane = Counter(s["lane"] for s in spaces if s["id"] in set(members))
         c = {"id": cid,
@@ -338,7 +343,7 @@ def main():
         corners.append(c)
         cv2.imwrite(str(WORK / f"{map_id}_flag_{cid}.png"), flag_crop(im, spaces, set(members)))
     for s in spaces:
-        s["corner"] = corner_of.get(where[s["id"]])
+        s["corner"] = corner_by_space[s["id"]]
     print("2. %d corners, %d spaces inside them, %d on the straights"
           % (len(corners), sum(c["spaces"] for c in corners), sum(1 for s in spaces if s["corner"] is None)))
     for c in corners:
@@ -372,7 +377,6 @@ def main():
     print("   ->", out.relative_to(ROOT))
 
     track["corners"] = corners
-    codes = assign_codes(spaces, where, ring, band)
     recode(track, codes, ROOT / "tracks" / f"{map_id}.arrows.json")
     # The finish line is where the codes start counting: the first cell of
     # s1 in each lane, the one at or just past the band.

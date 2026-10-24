@@ -353,10 +353,18 @@ function T.the_setup_menu_chooses_the_map()
         end
     end
     assert(list, "a map list on the setup menu")
-    eq(list.children[1].value, "Formula D: Austin")
-    eq(list.children[2].value, "Formula D: Monaco")
-    eq(list.children[2].attributes.selected, "true", "showing the map on the board")
-    eq(list.children[3].value, "Formula D: Baltimore  (no track data)")
+    local at, marked = {}, false
+    for i, o in ipairs(list.children) do
+        at[o.value] = i
+        if o.value:match("%(no track data%)$") then
+            marked = true
+        else
+            assert(not marked, o.value .. " has track data, so comes before the maps without")
+        end
+    end
+    assert(at["Formula D: Austin"] and at["Formula D: Monaco"], "the maps with track data, unmarked")
+    eq(list.children[at["Formula D: Monaco"]].attributes.selected, "true", "showing the map on the board")
+    assert(at["Formula D: Baltimore  (no track data)"], "the rest, marked")
 
     fdSetupMap(Player.Blue, "Formula D: Austin")
     eq(S.board.custom.image, Maps.byId.FDMonaco.url, "only the host chooses")

@@ -77,6 +77,13 @@ READING = {
         "boxes": ["white", "white", "yellow", "yellow", "green", "green", "red", "red", "blue", "blue"],
         "rows": (940, 1230),
     },
+    "FDHockenheim": {
+        "ends": [[[405.0, 1272.0], [438.0, 1257.0]], [[214.0, 872.0], [256.0, 880.0]]],
+        "merges": [[428.0, 1302.0], [228.0, 850.0]],
+        "first_box": 1,
+        "boxes": ["white", "white", "yellow", "yellow", "green", "green", "red", "red", "blue", "blue"],
+        "rows": (870, 1300),
+    },
 }
 
 # The two seats sharing each printed team colour, in running order: the
@@ -105,21 +112,56 @@ def lavender(hsv):
     return (s < 40) & ((h > 110) | (s < 12)) & (v > 100) & (v < 215)
 
 
-def pit_road(im):
-    """The road off the track proper: the pit road's asphalt. Only the
-    lavender: the road mask can take in the garages, and on Austin the crowd
-    beyond them, which would pass for the wall."""
+REACH_END = 30  # px: how near each end read off the board the pit road must come
+
+
+def near_both(lab, ends):
+    """The labels in `lab` that come within REACH_END of the middle of both
+    `ends`, nearest first."""
+    seen = []
+    for e in ends:
+        x, y = np.round(np.mean(e, axis=0)).astype(int)
+        y0, x0 = max(y - REACH_END, 0), max(x - REACH_END, 0)
+        win = lab[y0:y + REACH_END + 1, x0:x + REACH_END + 1]
+        d = {}
+        for (py, px), k in zip(np.argwhere(win > 0), win[win > 0]):
+            r = np.hypot(py + y0 - y, px + x0 - x)
+            if r <= REACH_END and r < d.get(int(k), np.inf):
+                d[int(k)] = r
+        seen.append(d)
+    both = set(seen[0]) & set(seen[1])
+    return sorted(both, key=lambda k: max(seen[0][k], seen[1][k]))
+
+
+def pit_road(im, ends):
+    """The road off the track proper: the pit road's asphalt, the patch of it
+    that runs between the two `ends` read off the board.
+
+    Only the lavender: the road mask can take in the garages, and on Austin
+    the crowd beyond them, which would pass for the wall. And where the road
+    mask leaves the pit road out altogether -- on Hockenheim a white wall
+    cuts it off from the track the whole way along, and the road mask keeps
+    only the track's piece -- the lavender is looked for on its own."""
     _, road = track_only(im)
     line, _, width = racing_line(im)
     main = track_proper(road, line, width)
-    pit = ((road > 0) & ~(cv2.dilate(main, np.ones((9, 9), np.uint8)) > 0)).astype(np.uint8)
-    for asphalt_only in (False, True):
-        if asphalt_only:
-            pit &= lavender(cv2.cvtColor(im, cv2.COLOR_BGR2HSV).astype(int))
-            pit = cv2.morphologyEx(pit, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
-        n, lab, st, _ = cv2.connectedComponentsWithStats(pit, 8)
-        pit = (lab == 1 + int(np.argmax(st[1:, 4]))).astype(np.uint8)
-    return pit > 0, road
+    off_track = ~(cv2.dilate(main, np.ones((9, 9), np.uint8)) > 0)
+    asphalt = lavender(cv2.cvtColor(im, cv2.COLOR_BGR2HSV).astype(int))
+    pit = ((road > 0) & off_track).astype(np.uint8)
+    n, lab, st, _ = cv2.connectedComponentsWithStats(pit, 8)
+    pit = (lab == 1 + int(np.argmax(st[1:, 4]))).astype(np.uint8) & asphalt
+    pit = cv2.morphologyEx(pit, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+    n, lab, st, _ = cv2.connectedComponentsWithStats(pit, 8)
+    best = 1 + int(np.argmax(st[1:, 4]))
+    if best not in near_both(lab, ends):
+        pit = (asphalt & off_track).astype(np.uint8)
+        pit = cv2.morphologyEx(pit, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+        lab = cv2.connectedComponents(pit, connectivity=8)[1]
+        found = near_both(lab, ends)
+        if not found:
+            sys.exit("no pit road runs between the ends in READING -- check them")
+        best = found[0]
+    return lab == best, road
 
 
 def middle_line(pit, rows, toward):
@@ -243,8 +285,10 @@ def garage(im, cells):
 
     `cells` are the boxes in running order, each (centre, forward, out):
     `out` points from the pit lane towards the garages. The garage is the
-    largest patch of its colour within GARAGE of the boxes -- the cars drawn
-    in the boxes are its colour too, but nearer -- and the white team's,
+    largest patch of its colour within GARAGE of the boxes, and no more than
+    a little past their ends along the lane -- the cars drawn in the boxes
+    are its colour too, but nearer, and past its ends the white team's runs
+    into pale ground on Hockenheim -- and the white team's,
     grey but warm, is told from the pavement by its hue and by being less
     saturated. (Austin's is paler than Monaco's.)"""
     hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV).astype(int)
@@ -264,7 +308,7 @@ def garage(im, cells):
     for c, f, o in cells:
         dx, dy = xs - c[0], ys - c[1]
         a, b = dx * f[0] + dy * f[1], dx * o[0] + dy * o[1]
-        band |= (abs(a) <= length) & (b >= GARAGE[0]) & (b <= GARAGE[1])
+        band |= (abs(a) <= 0.6 * length) & (b >= GARAGE[0]) & (b <= GARAGE[1])
     mask = cv2.morphologyEx((colour & band).astype(np.uint8), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
     # A garage printed as bays with dark lines between (Austin's white one)
     # comes apart in stripes: close them up into the one garage.
@@ -334,7 +378,7 @@ def main():
         sys.exit("no track space touches the %s merge -- check its centre in READING"
                  % ("entry" if not entries else "exit"))
 
-    pit, road = pit_road(im)
+    pit, road = pit_road(im, rd["ends"])
     # The wall is the side of the pit road away from the track.
     centre = np.argwhere(pit)[:, ::-1].mean(axis=0)
     toward = 1 if centre[0] > np.mean([s["pos"][0] for s in entries]) else -1
@@ -365,12 +409,14 @@ def main():
     # The band, carried on across the pit road, crosses one cell: that one
     # is the pit lane's space on the line. Where it lies along a division
     # instead (Austin's), the space on the line is the cell just past it, as
-    # on the track.
+    # on the track; and where it lies past the last division (Hockenheim's),
+    # it is the exit merge. Space k ends at division k, the exit merge at
+    # its centre.
     line_spaces = [by_id[v] for v in track.get("finish", {}).get("line", []) if v in by_id]
     if not line_spaces:
         sys.exit("no finish line in %s -- run find_corners.py first" % path.relative_to(ROOT))
     c, d = band_line(im, road, line_spaces)
-    side = np.array([(p - c)[0] * d[1] - (p - c)[1] * d[0] for p in pts[cuts]])
+    side = np.array([(p - c)[0] * d[1] - (p - c)[1] * d[0] for p in list(pts[cuts]) + [centres[-1]]])
     side *= np.sign(side[-1] - side[0])          # + is past the band, in running order
     on_line = next((k for k in range(1, len(side)) if side[0] < 0 < side[k] - ON_LINE), None)
     line_sector, before = exits[0]["sector"], entries[0]["sector"]
