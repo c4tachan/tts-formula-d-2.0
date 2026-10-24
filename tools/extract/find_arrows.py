@@ -416,6 +416,26 @@ def tidy(track, found, cell):
     return sorted(same | set(fixed)), dropped
 
 
+def next_by_code(spaces):
+    """Each coded space's successor down its own lane: the next code along
+    (see docs/track-format.md, Space codes), on into the next sector. Where
+    the cells are short, round a tight corner, the space a cell's length
+    ahead can be the one after (Valencia's Malvarrosa); the codes say which
+    is next. Spaces not yet coded (a fresh scan) have none."""
+    def key(sid):
+        lane, sector, n = sid.split(".")
+        return lane, int(sector[1:]) * 2 - (sector[0] == "s"), int(n)
+    lanes = {}
+    for s in spaces:
+        if isinstance(s["id"], str) and s["id"].count(".") == 2 and not s.get("pit"):
+            lanes.setdefault(s["id"][0], []).append(s["id"])
+    out = {}
+    for ids in lanes.values():
+        ids.sort(key=key)
+        out.update(zip(ids, ids[1:] + ids[:1]))
+    return out
+
+
 def from_reading(track, reading, cell):
     """Links from a reading of the board by eye (tracks/<id>.arrows.json).
 
@@ -432,9 +452,10 @@ def from_reading(track, reading, cell):
     runs = {}
     arrowed = {(int(k) if k.isdigit() else k): v for k, v in reading["forks"].items()}
     arrowed.update({i: 0 for i in reading.get("approach", [])})
+    following = next_by_code(spaces)
     for i, side in arrowed.items():
         src = sp[i]
-        on = ahead_of(src, spaces, pos, cell).get(src["lane"])
+        on = sp.get(following.get(i)) or ahead_of(src, spaces, pos, cell).get(src["lane"])
         if on is not None:
             out.add((i, on["id"]))
         if side:

@@ -29,6 +29,7 @@ local TRACKS = {
     FDMonaco = require("fd.data.tracks.FDMonaco"),
     FDSebring = require("fd.data.tracks.FDSebring"),
     FDSingapore = require("fd.data.tracks.FDSingapore"),
+    FDValencia = require("fd.data.tracks.FDValencia"),
 }
 
 mod_packed = false

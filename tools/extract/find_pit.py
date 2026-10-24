@@ -104,6 +104,13 @@ READING = {
         "rows": (515, 1018),
         "wall": "near",
     },
+    "FDValencia": {
+        "ends": [[[1128.0, 927.0], [1108.0, 952.0]], [[1005.0, 470.0], [1045.0, 470.0]]],
+        "merges": [[1147.0, 1002.0], [1040.0, 440.0]],
+        "first_box": 2,
+        "boxes": ["white", "white", "yellow", "yellow", "green", "green", "red", "red", "blue", "blue"],
+        "rows": (470, 1000),
+    },
 }
 
 # The two seats sharing each printed team colour, in running order: the

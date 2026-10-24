@@ -39,7 +39,7 @@ from scipy.spatial import cKDTree
 from skimage.morphology import skeletonize
 
 from detect_track import (OUT, LANES, board_image, inner_side, normals, racing_line, road_surface,
-                          smooth_closed)
+                          smooth_closed, surface_mask)
 
 WORK = OUT / "_work"
 
@@ -607,10 +607,15 @@ def patch_gaps(by_lane, lane_w, max_fill=3, lay=None):
 
 # 6. Spaces ------------------------------------------------------------------------
 
-def spaces_from_rungs(by_lane, shape, origin):
+def spaces_from_rungs(by_lane, shape, origin, road=None):
     """A space per pair of neighbouring rungs in a lane: its centre from the
     four corners, its facing from one rung to the next, and the spaces it
-    touches ahead. Each lane's order starts at the space nearest `origin`."""
+    touches ahead. Each lane's order starts at the space nearest `origin`.
+
+    The middle of the four corners can fall off the road: the inside cell
+    at a hairpin's apex is a wedge, its two inner corners nearly one point
+    on the kerb (Valencia's). Given the `road`, such a cell is centred on
+    the part of it that is road instead (middle())."""
     spaces, quads = {}, []
     for l, rs in by_lane.items():
         L = rs[0]["loop_len"]
@@ -635,6 +640,17 @@ def spaces_from_rungs(by_lane, shape, origin):
     labels = np.zeros(shape, np.int32)
     for i, corners in quads:
         cv2.fillPoly(labels, [corners.round().astype(np.int32).reshape(-1, 1, 2)], int(i))
+    if road is not None:
+        on = cv2.erode(road.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+        for i, corners in quads:
+            x, y = np.round(spaces[i]["pos"]).astype(int)
+            if on[y, x]:
+                continue
+            x0, y0 = np.floor(corners.min(0)).astype(int)
+            x1, y1 = np.ceil(corners.max(0)).astype(int) + 1
+            ys, xs = np.nonzero((labels[y0:y1, x0:x1] == i) & on[y0:y1, x0:x1])
+            if len(xs) >= 20:
+                spaces[i]["pos"] = middle(xs + x0, ys + y0)
     link_across(spaces, labels)
     return spaces, labels
 
@@ -700,6 +716,52 @@ def middle(xs, ys):
         return c
     k = np.argmin(np.hypot(xs[deep] - c[0], ys[deep] - c[1]))
     return np.array([xs[deep][k], ys[deep][k]], float)
+
+
+SNAP_REACH = 25     # px: how far a space off the road may be moved, into a cell no space has
+EDGE_CLEAR = 6      # px: a space's centre nearer the asphalt's edge than this is off its cell
+
+
+def snap_to_cells(spaces, cells, asphalt):
+    """Move each space whose centre is off the asphalt or on its very edge
+    -- at the kerb of a hairpin's apex, where its cell is a wedge whose
+    corners give no middle (Valencia's) -- into the nearest printed cell
+    (`cells`, as printed_cells() gives them) that no other space sits in.
+    A cell's own middle lies half a lane from any edge. Returns how many
+    were moved."""
+    n, lab, st, _ = cells
+    typical = float(np.median([st[i, 4] for i in range(1, n) if st[i, 4] >= 150]))
+    on = cv2.distanceTransform(asphalt.astype(np.uint8), cv2.DIST_L2, 3) >= EDGE_CLEAR
+    H, W = lab.shape
+
+    def cell_at(p):
+        x, y = np.round(p).astype(int)
+        w = lab[max(y - 3, 0):y + 4, max(x - 3, 0):x + 4]
+        w = w[w > 0]
+        return int(np.bincount(w).argmax()) if len(w) else 0
+    held = {cell_at(s["pos"]) for s in spaces.values()} - {0}
+    moved = 0
+    for s in spaces.values():
+        x, y = np.round(s["pos"]).astype(int)
+        if not (0 <= x < W and 0 <= y < H) or on[y, x]:
+            continue
+        r = SNAP_REACH
+        win = lab[max(y - r, 0):y + r + 1, max(x - r, 0):x + r + 1]
+        pts = np.argwhere(win > 0)
+        best, best_d = 0, None
+        for (py, px) in pts:
+            k = int(win[py, px])
+            if k in held or st[k, 4] < SCRAP * typical:
+                continue
+            d = np.hypot(py + max(y - r, 0) - y, px + max(x - r, 0) - x)
+            if d <= r and (best_d is None or d < best_d):
+                best, best_d = k, d
+        if best:
+            ys, xs = np.nonzero(lab == best)
+            s["pos"] = middle(xs, ys)
+            held.add(best)
+            moved += 1
+    return moved
 
 
 def spaces_from_cells(cells, across_dir, pos, local_w, lane_w, lap, sense, origin, pit=()):
@@ -1005,7 +1067,14 @@ def rungs_steps(map_id, grey, main, flag, arrows, across_dir, pos, local_w, lane
     if map_id == "FDMonaco":
         for label, box in MONACO_CROPS.items():
             cv2.imwrite(str(WORK / f"{map_id}_5_rungs_{label}.png"), crop(vis, box))
-    return spaces_from_rungs(by_lane, main.shape, line[0])
+    # Asphalt only, for centring cells: the track mask takes in a kerb here
+    # and there at an apex.
+    asphalt = (main > 0) & (surface_mask(grey) > 0)
+    spaces, labels = spaces_from_rungs(by_lane, main.shape, line[0], asphalt)
+    moved = snap_to_cells(spaces, printed_cells(grey, grey, main), asphalt)
+    if moved:
+        print("   %d space(s) found on the kerb moved into the cell beside them" % moved)
+    return spaces, labels
 
 
 if __name__ == "__main__":
