@@ -63,7 +63,10 @@ WORK = OUT / "_work"
 # beyond them; `boxes` the pit boxes' colours in running order, from the
 # `first_box`-th pit space (0 being the entry merge); `rows` the image rows
 # the pit road's wall runs through, or for one running across the board,
-# `cols` the columns.
+# `cols` the columns. The pit lane is found from the pit road's wall, its edge
+# away from the track; `wall: "near"` takes its edge by the track instead,
+# for a board where the far edge is broken by a garage as pale as the
+# asphalt (Singapore's white one).
 READING = {
     "FDMonaco": {
         "ends": [[[202.5, 1272.5], [235.0, 1301.0]], [[352.5, 623.8], [395.0, 618.8]]],
@@ -92,6 +95,14 @@ READING = {
         "first_box": 2,
         "boxes": ["white", "white", "yellow", "yellow", "green", "green", "red", "red", "blue", "blue"],
         "cols": (760, 1300),
+    },
+    "FDSingapore": {
+        "ends": [[[2297.0, 1018.0], [2322.0, 1018.0]], [[2297.0, 515.0], [2322.0, 515.0]]],
+        "merges": [[2310.0, 1045.0], [2312.0, 492.0]],
+        "first_box": 2,
+        "boxes": ["white", "white", "yellow", "yellow", "green", "green", "red", "red", "blue", "blue"],
+        "rows": (515, 1018),
+        "wall": "near",
     },
 }
 
@@ -397,6 +408,8 @@ def main():
     across = "cols" in rd
     k = 1 if across else 0
     toward = 1 if centre[k] > np.mean([s["pos"][k] for s in entries]) else -1
+    if rd.get("wall") == "near":
+        toward = -toward
     pts, nrms = middle_line(pit, rd["cols"] if across else rd["rows"], toward, across)
     cuts = divisions(im, pts, nrms)
     print("1. pit road: middle line %d px long; %d divisions across it" % (len(pts), len(cuts)))

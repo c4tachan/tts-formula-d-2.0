@@ -489,6 +489,53 @@ def rung_between(a, b, t, lay=None):
     return g
 
 
+INKED = 0.6     # share of a division's length that must show a line for a guessed one to stand
+
+
+def ink_along(dark, a, b, slack=3):
+    """The share of the segment from a to b, its ends left off, that lies
+    on a printed line -- looked for up to `slack` px either side, as a guess
+    can sit a little off the line it stands for."""
+    d = (b - a) / (np.linalg.norm(b - a) + 1e-9)
+    n = np.array([-d[1], d[0]])
+    t = np.linspace(0.15, 0.85, 30)
+    H, W = dark.shape
+    best = 0.0
+    for off in np.linspace(-slack, slack, 2 * slack + 1):
+        p = (a[None] + t[:, None] * (b - a)[None] + off * n).round().astype(int)
+        p[:, 0] = p[:, 0].clip(0, W - 1)
+        p[:, 1] = p[:, 1].clip(0, H - 1)
+        best = max(best, float((dark[p[:, 1], p[:, 0]] > 4).mean()))
+    return best
+
+
+def confirm_guesses(by_lane, grey, blank):
+    """Take back out each guessed division that is printed nowhere.
+
+    patch_gaps() takes a cell well over the usual length for cells whose
+    divisions it missed. But the outside of a bend, and the inside of a
+    hairpin, have cells that long as printed (Singapore's Marina Promenade):
+    a division guessed across one runs through the middle of a single cell.
+    A missed division is faint, not absent, so a guess with no line along
+    it is dropped -- except under the painted-out flag (`blank`), where the
+    lines are gone. Judged on `grey`, the board with its arrows painted
+    out, so an arrow does not pass for a line. Returns what was dropped."""
+    gray = cv2.cvtColor(grey, cv2.COLOR_BGR2GRAY).astype(np.float32)
+    dark = cv2.medianBlur(gray.astype(np.uint8), 15).astype(np.float32) - gray
+    flag = cv2.dilate(blank, np.ones((25, 25), np.uint8)) > 0
+    out = []
+    for l, rs in by_lane.items():
+        keep = []
+        for r in rs:
+            mid = np.round(r["mid"]).astype(int)
+            if r["guessed"] and not flag[mid[1], mid[0]] and ink_along(dark, r["inner"], r["outer"]) < INKED:
+                out.append(r)
+            else:
+                keep.append(r)
+        by_lane[l] = keep
+    return out
+
+
 def patch_gaps(by_lane, lane_w, max_fill=3, lay=None):
     """Check the spacing of the rungs along each lane. A cell far shorter
     than its neighbours is a stray line, and the odder of its two rungs is
@@ -909,8 +956,10 @@ def rungs_steps(map_id, grey, main, flag, across_dir, pos, local_w, lane_w, line
     by_lane = order_rungs(rungs, line, tangent, reverse, lap_sense(line, reverse))
     found = {l: len(rs) for l, rs in by_lane.items()}
     dropped, added = patch_gaps(by_lane, lane_w, lay=rung_layer(line, reverse, across_dir, pos, local_w))
-    print("5. rungs per lane %s; %d stray dropped; %d missing put in by interpolation"
-          % ([found.get(l, 0) for l in range(1, LANES + 1)], len(dropped), len(added)))
+    unprinted = confirm_guesses(by_lane, grey, flag)
+    print("5. rungs per lane %s; %d stray dropped; %d missing put in by interpolation, %d of them "
+          "taken back out as printed nowhere"
+          % ([found.get(l, 0) for l in range(1, LANES + 1)], len(dropped), len(added), len(unprinted)))
     np.savez(OUT / f"{map_id}_grid.npz",
              ends=np.array([[r["inner"], r["outer"]] for rs in by_lane.values() for r in rs]),
              lane=np.array([r["lane"] for rs in by_lane.values() for r in rs]),
