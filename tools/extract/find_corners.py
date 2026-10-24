@@ -119,7 +119,8 @@ def finish_piece(im, lab):
 
 
 def running_order(spaces, where):
-    """Pieces in the order a car meets them, following the links."""
+    """Pieces in the order a car meets them, following the links: each
+    piece's most common next piece, and every piece it leads to at all."""
     ahead = {}
     for s in spaces:
         a = where[s["id"]]
@@ -127,7 +128,24 @@ def running_order(spaces, where):
             b = where.get(n, 0)
             if a and b and b != a:
                 ahead.setdefault(a, Counter())[b] += 1
-    return {a: c.most_common(1)[0][0] for a, c in ahead.items()}
+    return {a: c.most_common(1)[0][0] for a, c in ahead.items()}, {a: set(c) for a, c in ahead.items()}
+
+
+def fit_in(ring, used, ahead, leads):
+    """Put into the ring each piece the walk round it missed: a small one
+    most of the spaces before it link straight past, as where a corner's
+    red lines lie close and the outer lanes' cells cross one (Sochi's
+    Turn 9). It goes between the piece that leads into it and the one it
+    leads on to, where those two are next to each other in the ring."""
+    for u in used:
+        if u in ring:
+            continue
+        c = ahead.get(u)
+        for i, p in enumerate(ring):
+            if ring[(i + 1) % len(ring)] == c and u in leads.get(p, ()):
+                ring.insert(i + 1, u)
+                break
+    return ring
 
 
 LANE_LETTER = {1: "i", 2: "m", 3: "o"}
@@ -310,12 +328,14 @@ def main():
         print("   spaces on no piece (left out of every corner): %s" % lost)
 
     # Walk the ring from the start/finish straight.
-    ahead = running_order(spaces, where)
+    ahead, leads = running_order(spaces, where)
     start = finish_piece(im, lab)
     ring, p = [start], ahead.get(start)
     while p and p != start and p not in ring:
         ring.append(p)
         p = ahead.get(p)
+    if p == start:
+        ring = fit_in(ring, used, ahead, leads)
     if p != start or len(ring) != len(used) or len(ring) % 2:
         sys.exit("the pieces do not make one ring of corners and straights (%d in the ring, %d with "
                  "spaces, ring closes: %s) -- check out/%s_7_corners.png" % (len(ring), len(used), p == start, map_id))

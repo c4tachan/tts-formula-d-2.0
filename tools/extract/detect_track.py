@@ -73,11 +73,11 @@ def board_image(map_id):
 def asphalt(hsv):
     """Grey enough to be the track's asphalt, which is printed a cool
     lavender grey. The run-off and service roads round some boards (Austin's)
-    are as grey and as bright, but warm -- olive to sand -- and joined onto
-    the track they swallow it."""
+    are as grey and as bright, but warm -- olive to sand -- and the paddock
+    on Sochi's a green-tinted grey; joined onto the track they swallow it."""
     H, S, V = hsv[..., 0], hsv[..., 1], hsv[..., 2]
-    warm = (H >= 10) & (H <= 75) & (S >= 12)
-    return (S < 50) & (V > 105) & (V < 205) & ~warm
+    tinted = (H >= 10) & (H < 110) & (S >= 12)
+    return (S < 50) & (V > 105) & (V < 205) & ~tinted
 
 
 def road_mask(im):

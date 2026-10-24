@@ -66,7 +66,8 @@ WORK = OUT / "_work"
 # `cols` the columns. The pit lane is found from the pit road's wall, its edge
 # away from the track; `wall: "near"` takes its edge by the track instead,
 # for a board where the far edge is broken by a garage as pale as the
-# asphalt (Singapore's white one).
+# asphalt (Singapore's white one). `area`, where given, is the box (x0, y0,
+# x1, y1) the pit road lies in, for a board where the track reaches into it.
 READING = {
     "FDMonaco": {
         "ends": [[[202.5, 1272.5], [235.0, 1301.0]], [[352.5, 623.8], [395.0, 618.8]]],
@@ -118,6 +119,15 @@ READING = {
         "boxes": ["blue", "blue", "red", "red", "green", "green", "yellow", "yellow", "white", "white"],
         "cols": (1172, 1664),
     },
+    "FDSotchi": {
+        "ends": [[[2128.0, 1442.0], [2128.0, 1466.0]], [[1662.0, 1438.0], [1662.0, 1460.0]]],
+        "merges": [[2180.0, 1455.0], [1620.0, 1440.0]],
+        "first_box": 1,
+        "boxes": ["white", "white", "yellow", "yellow", "green", "green", "red", "red", "blue", "blue"],
+        "cols": (1662, 2128),
+        "area": (1645, 1436, 2200, 1467),
+        "wall": "near",
+    },
 }
 
 # The two seats sharing each printed team colour, in running order: the
@@ -167,7 +177,7 @@ def near_both(lab, ends):
     return sorted(both, key=lambda k: max(seen[0][k], seen[1][k]))
 
 
-def pit_road(im, ends):
+def pit_road(im, ends, area=None):
     """The road off the track proper: the pit road's asphalt, the patch of it
     that runs between the two `ends` read off the board.
 
@@ -177,10 +187,20 @@ def pit_road(im, ends):
     cuts it off from the track the whole way along, and the road mask keeps
     only the track's piece -- the lavender is looked for on its own."""
     _, road = track_only(im)
+    asphalt = lavender(cv2.cvtColor(im, cv2.COLOR_BGR2HSV).astype(int))
+    if area is not None:
+        # Read off the board: the box the pit road lies in, its track side
+        # just short of the wall, for where the track proper reaches into
+        # the pit road (Sochi's exit).
+        x0, y0, x1, y1 = area
+        pit = np.zeros(asphalt.shape, np.uint8)
+        pit[y0:y1, x0:x1] = asphalt[y0:y1, x0:x1]
+        pit = cv2.morphologyEx(pit, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+        n, lab, st, _ = cv2.connectedComponentsWithStats(pit, 8)
+        return lab == 1 + int(np.argmax(st[1:, 4])), road
     line, _, width = racing_line(im)
     main = track_proper(road, line, width)
     off_track = ~(cv2.dilate(main, np.ones((9, 9), np.uint8)) > 0)
-    asphalt = lavender(cv2.cvtColor(im, cv2.COLOR_BGR2HSV).astype(int))
     pit = ((road > 0) & off_track).astype(np.uint8)
     n, lab, st, _ = cv2.connectedComponentsWithStats(pit, 8)
     pit = (lab == 1 + int(np.argmax(st[1:, 4]))).astype(np.uint8) & asphalt
@@ -191,6 +211,20 @@ def pit_road(im, ends):
         pit = (asphalt & off_track).astype(np.uint8)
         pit = cv2.morphologyEx(pit, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
         lab = cv2.connectedComponents(pit, connectivity=8)[1]
+        found = near_both(lab, ends)
+        if found:
+            return lab == found[0], road
+        # Broken in pieces along the way (Sochi's, by the pit box markers):
+        # every piece lying across the line from one end to the other.
+        a, b = [np.round(np.mean(e, axis=0)).astype(int) for e in ends]
+        band = np.zeros(lab.shape, np.uint8)
+        cv2.line(band, tuple(int(v) for v in a), tuple(int(v) for v in b), 1, 9)
+        ks, counts = np.unique(lab[(band > 0) & (lab > 0)], return_counts=True)
+        pieces = [k for k, c in zip(ks, counts) if c >= 30]
+        if not pieces:
+            sys.exit("no pit road runs between the ends in READING -- check them")
+        joined = cv2.morphologyEx(np.isin(lab, pieces).astype(np.uint8), cv2.MORPH_CLOSE, np.ones((9, 9), np.uint8))
+        lab = cv2.connectedComponents(joined, connectivity=8)[1]
         found = near_both(lab, ends)
         if not found:
             sys.exit("no pit road runs between the ends in READING -- check them")
@@ -416,7 +450,7 @@ def main():
         sys.exit("no track space touches the %s merge -- check its centre in READING"
                  % ("entry" if not entries else "exit"))
 
-    pit, road = pit_road(im, rd["ends"])
+    pit, road = pit_road(im, rd["ends"], rd.get("area"))
     # The wall is the side of the pit road away from the track.
     centre = np.argwhere(pit)[:, ::-1].mean(axis=0)
     across = "cols" in rd

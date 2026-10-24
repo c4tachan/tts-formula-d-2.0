@@ -30,6 +30,7 @@ local TRACKS = {
     FDMonaco = require("fd.data.tracks.FDMonaco"),
     FDSebring = require("fd.data.tracks.FDSebring"),
     FDSingapore = require("fd.data.tracks.FDSingapore"),
+    FDSotchi = require("fd.data.tracks.FDSotchi"),
     FDValencia = require("fd.data.tracks.FDValencia"),
 }
 

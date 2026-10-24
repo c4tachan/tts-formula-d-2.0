@@ -622,10 +622,14 @@ def main():
         # on, or a lane either side -- in case an earlier run fixed them.
         if reading_path.exists():
             pos = np.array([s["pos"] for s in track["spaces"]])
+            following = next_by_code(track["spaces"])
             for sid in reading.get("blank", []):
                 s = spaces[sid]
                 s.pop("fixed", None)
-                s["next"] = sorted(o["id"] for o in ahead_of(s, track["spaces"], pos, cell).values())
+                choices = ahead_of(s, track["spaces"], pos, cell)
+                if following.get(sid) in spaces:
+                    choices[s["lane"]] = spaces[following[sid]]
+                s["next"] = sorted(o["id"] for o in choices.values())
         for s in track["spaces"]:
             s["next"] = sorted(s["next"] + into_pit.get(s["id"], []))
         track["spaces"] += pit

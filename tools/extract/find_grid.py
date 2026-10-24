@@ -103,6 +103,9 @@ def paint_out_arrows(track, road):
     return cv2.inpaint(track, halo, 5, cv2.INPAINT_TELEA), len(centres)
 
 
+ON_TRACK = 45   # px: a band whose middle lies this near the racing line lies across the track
+
+
 def paint_out_flag(track, road, line=None):
     """The start/finish flag: a band of white squares on the asphalt (nothing
     else painted on the road is that bright) with black ones between them.
@@ -128,7 +131,16 @@ def paint_out_flag(track, road, line=None):
         rail = np.zeros(road.shape, np.uint8)
         cv2.polylines(rail, [line.astype(np.int32).reshape(-1, 1, 2)], True, 255, 1)
         dist = cv2.distanceTransform(255 - rail, cv2.DIST_L2, 5)
-        keep = [min(keep, key=lambda i: np.median(dist[lab == i]))]
+        near = [i for i in keep if np.median(dist[lab == i]) <= ON_TRACK]
+        if near:
+            # A band of white paint by the track (Sochi's) is near it too:
+            # the flag is the one checkered with dark squares.
+            dark = ((bg - gray.astype(np.float32) > 35) & (road > 0)).astype(np.uint8)
+            nd, dl, ds, _ = cv2.connectedComponentsWithStats(dark, 8)
+            square = np.isin(dl, [j for j in range(1, nd) if 12 <= ds[j, 4] <= 400])
+            keep = [max(near, key=lambda i: cv2.connectedComponents((square & (lab == i)).astype(np.uint8))[0])]
+        else:
+            keep = [min(keep, key=lambda i: np.median(dist[lab == i]))]
     band = np.isin(lab, keep).astype(np.uint8)
     band = cv2.dilate(band, np.ones((7, 7), np.uint8)) & road
     return cv2.inpaint(track, band, 5, cv2.INPAINT_TELEA), band
