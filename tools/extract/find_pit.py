@@ -53,7 +53,7 @@ import cv2
 import numpy as np
 from scipy.ndimage import gaussian_filter1d, median_filter
 
-from detect_track import OUT, ROOT, board_image, racing_line
+from detect_track import OUT, PALETTE, ROOT, asphalt, board_image, racing_line
 from find_grid import paint_out_flag, track_only, track_proper
 
 WORK = OUT / "_work"
@@ -128,6 +128,13 @@ READING = {
         "area": (1645, 1436, 2200, 1467),
         "wall": "near",
     },
+    "FDe01": {
+        "ends": [[[177.0, 1228.0], [202.0, 1250.0]], [[330.0, 640.0], [360.0, 622.0]]],
+        "merges": [[163.0, 1283.0], [360.0, 500.0]],
+        "first_box": 3,
+        "boxes": ["white", "white", "yellow", "yellow", "green", "green", "red", "red", "blue", "blue"],
+        "rows": (500, 1290),
+    },
 }
 
 # The two seats sharing each printed team colour, in running order: the
@@ -151,7 +158,9 @@ ON_LINE = 8     # px: a division this near the middle of the finish band lies un
 
 def lavender(hsv):
     """The asphalt: a pale lavender. The grey of the white team's garage is
-    as dull, but warm."""
+    as dull, but warm. On a Formula Dé board, its stronger blue-grey."""
+    if PALETTE["palette"] == "formula_de":
+        return asphalt(hsv)
     h, s, v = hsv[..., 0], hsv[..., 1], hsv[..., 2]
     return (s < 40) & ((h > 110) | (s < 12)) & (v > 100) & (v < 215)
 
@@ -370,6 +379,13 @@ def garage(im, cells):
     dh = np.minimum(abs(h - seed[0]), 180 - abs(h - seed[0]))
     if seed[1] > 100:
         colour = (dh < 10) & (sat > 110)
+    elif seed[1] < 12 and seed[2] > 200:
+        # Plain white (the Formula Dé boards' white team): no hue to go by.
+        colour = (sat < 25) & (val > 200)
+    elif seed[1] > 45:
+        # A duller colour (the Formula Dé boards' dark green): its hue, and
+        # about its own saturation and brightness.
+        colour = (dh < 10) & (sat > 0.6 * seed[1]) & (abs(val - seed[2]) < 60)
     else:
         # The paler the grey, the less its hue says: Austin's spreads twice
         # as wide as Monaco's, though still short of the pavement's.

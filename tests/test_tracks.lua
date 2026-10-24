@@ -6,7 +6,8 @@ local Graph = require("fd.core.trackgraph")
 local Moves = require("fd.core.moves")
 local Position = require("fd.core.position")
 
-local TRACKS = { "FDAustin", "FDBuddh", "FDHockenheim", "FDMonaco", "FDSebring", "FDSingapore", "FDSotchi", "FDValencia" }
+local TRACKS = { "FDAustin", "FDBuddh", "FDHockenheim", "FDMonaco", "FDSebring", "FDSingapore", "FDSotchi", "FDValencia",
+                 "FDe01" }
 
 local function eq(a, b, msg)
     if a ~= b then

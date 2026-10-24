@@ -56,26 +56,41 @@ def board_image(map_id):
     if not hit:
         sys.exit(f"unknown map id {map_id}")
     key = re.sub(r"[^A-Za-z0-9]", "", hit["url"].split("ugc/")[-1])
-    for f in (MODS / "Images").iterdir():
-        if key in f.name:
-            im = cv2.imread(str(f))
-            if im is not None:
-                hit = dict(hit, upscale=1)
-                if im.shape[1] < FULL_WIDTH:
-                    im = cv2.resize(im, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
-                    hit["upscale"] = 2      # and its printed lines twice as wide
-                return hit, im
-    sys.exit(f"{hit['name']} is not in the TTS cache -- open it in game once")
+    # The TTS cache first, then what download_maps.py fetched into tracks/raw/.
+    found = [f for f in (MODS / "Images").iterdir() if key in f.name]
+    found += sorted((ROOT / "tracks" / "raw").glob(f"{map_id}.*"))
+    for f in found:
+        im = cv2.imread(str(f))
+        if im is not None:
+            PALETTE["palette"] = hit["category"]
+            hit = dict(hit, upscale=1)
+            if im.shape[1] < FULL_WIDTH:
+                im = cv2.resize(im, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+                hit["upscale"] = 2      # and its printed lines twice as wide
+            return hit, im
+    sys.exit(f"{hit['name']} is not in the TTS cache or tracks/raw/ -- run download_maps.py {map_id}")
 
 
+
+
+# Which board's colours asphalt() looks for: set by board_image(), which
+# every script calls before anything else, from the board's category.
+PALETTE = {"palette": "formula_d"}
 
 
 def asphalt(hsv):
-    """Grey enough to be the track's asphalt, which is printed a cool
-    lavender grey. The run-off and service roads round some boards (Austin's)
-    are as grey and as bright, but warm -- olive to sand -- and the paddock
-    on Sochi's a green-tinted grey; joined onto the track they swallow it."""
+    """Grey enough to be the track's asphalt.
+
+    On the Formula D boards it is printed a cool lavender grey. The run-off
+    and service roads round some (Austin's) are as grey and as bright, but
+    warm -- olive to sand -- and the paddock on Sochi's a green-tinted grey;
+    joined onto the track they swallow it.
+
+    The Formula Dé boards print it a stronger blue-grey, from just short of
+    cyan to violet, and paler; their sea and sky are far bluer still."""
     H, S, V = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+    if PALETTE["palette"] == "formula_de":
+        return (H >= 98) & (H <= 128) & (S >= 8) & (S < 100) & (V > 120) & (V < 240)
     tinted = (H >= 10) & (H < 110) & (S >= 12)
     return (S < 50) & (V > 105) & (V < 205) & ~tinted
 
@@ -99,8 +114,14 @@ def road_mask(im):
     m = cv2.morphologyEx(grey, cv2.MORPH_CLOSE, np.ones((9, 9), np.uint8))
     m[white > 0] = 0
     m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
-    _, lab, stats, _ = cv2.connectedComponentsWithStats(m, 8)
-    return (lab == 1 + int(np.argmax(stats[1:, 4]))).astype(np.uint8)
+    # The largest piece -- and on a Formula Dé board any other sizeable one:
+    # there a stretch of road can be cut off by the flag and a corner line
+    # together (Monaco's climb to the Casino). On the Formula D boards the
+    # other big pieces are scenery (Sochi's paddock).
+    n, lab, stats, _ = cv2.connectedComponentsWithStats(m, 8)
+    big = stats[1:, 4].max()
+    keep = 0.1 if PALETTE["palette"] == "formula_de" else 1.0
+    return np.isin(lab, [i for i in range(1, n) if stats[i, 4] >= keep * big]).astype(np.uint8)
 
 
 def graph_of(points, radius=1.5, extra=()):
@@ -529,18 +550,30 @@ def outer_edge(edge_pixels, line, norm, side, width, reverse, step=6.0, jump=2.5
 
 
 def racing_line(im):
-    """The middle of the road, as one closed loop, plus the road width."""
-    mask = road_mask(im)
+    """The middle of the road, as one closed loop, plus the road width.
+
+    On a Formula Dé board the asphalt alone is too broken up by its marks to
+    trace (Monaco's climb to the Casino comes apart in specks), and the
+    solid road surface is traced instead."""
+    mask = road_mask(im) if PALETTE["palette"] != "formula_de" else road_surface(im)
     # Thin white grid lines can speckle the asphalt (Austin's); closing the
     # specks keeps the skeleton in one piece without welding passes together.
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7)))
     n, lab, st, _ = cv2.connectedComponentsWithStats((mask == 0).astype(np.uint8), 4)
     mask[np.isin(lab, [i for i in range(1, n) if st[i, 4] < 400])] = 1
+    if PALETTE["palette"] == "formula_de":
+        # The dashed kerbs leave the edge scalloped, and every scallop a spur
+        # on the skeleton: smooth it off.
+        disc = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))
+        mask = cv2.morphologyEx(cv2.morphologyEx(mask, cv2.MORPH_OPEN, disc), cv2.MORPH_CLOSE, disc)
     dist = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
     skel = skeletonize(mask > 0)
     # The pit road is one lane wide (~25 px on Monaco) and the track three
     # (~73); cut between them, low enough to keep the track in one piece.
-    keep = skel & (dist * 2 > 35)
+    # The Formula Dé pit roads are wider (~35), and its tracks no narrower
+    # than two lanes (~50).
+    classic = PALETTE["palette"] == "formula_de"
+    keep = skel & (dist * 2 > (42 if classic else 35))
     lab = cv2.connectedComponents(keep.astype(np.uint8), 8)[1]
     sizes = np.bincount(lab[keep])
     # The start/finish band always breaks the line, and on a busy board a
@@ -548,7 +581,9 @@ def racing_line(im):
     # piece, not just the longest, and let bridge_ends() join them up.
     pieces = [i for i in range(1, len(sizes)) if sizes[i] >= 0.05 * sizes[1:].max()]
     pts = np.argwhere(np.isin(lab, pieces))
-    loop = find_cycle(pts, extra=bridge_ends(pts))
+    # The solid surface a Formula Dé board is traced on has no gaps to
+    # bridge, and a bridge would only join the two legs of a hairpin.
+    loop = find_cycle(pts, extra=() if classic else bridge_ends(pts))
     line, length = resample(loop, 3.0)
     width = float(np.median([dist[int(round(y)), int(round(x))] * 2 for x, y in line]))
     return centre_line(smooth_closed(line, 7), road_surface(im, red=False), width), length, width
