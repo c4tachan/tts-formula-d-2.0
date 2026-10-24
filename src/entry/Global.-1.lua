@@ -25,6 +25,7 @@ local Ghosts = require("fd.tts.ghosts")
 local Setup = require("fd.tts.setup")
 local TRACKS = {
     FDAustin = require("fd.data.tracks.FDAustin"),
+    FDBuddh = require("fd.data.tracks.FDBuddh"),
     FDHockenheim = require("fd.data.tracks.FDHockenheim"),
     FDMonaco = require("fd.data.tracks.FDMonaco"),
     FDSebring = require("fd.data.tracks.FDSebring"),

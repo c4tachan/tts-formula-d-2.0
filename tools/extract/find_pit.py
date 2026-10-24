@@ -111,6 +111,13 @@ READING = {
         "boxes": ["white", "white", "yellow", "yellow", "green", "green", "red", "red", "blue", "blue"],
         "rows": (470, 1000),
     },
+    "FDBuddh": {
+        "ends": [[[1172.0, 1103.0], [1172.0, 1123.0]], [[1664.0, 1063.0], [1664.0, 1085.0]]],
+        "merges": [[1115.0, 1110.0], [1690.0, 1072.0]],
+        "first_box": 2,
+        "boxes": ["blue", "blue", "red", "red", "green", "green", "yellow", "yellow", "white", "white"],
+        "cols": (1172, 1664),
+    },
 }
 
 # The two seats sharing each printed team colour, in running order: the
@@ -275,10 +282,10 @@ def cell_centre(im, pts, nrms, i0, i1):
     return np.mean(mids, axis=0)
 
 
-def touching(im, at, spaces, window=150):
+def touching(im, at, spaces, window=150, seam=SEAM):
     """Of `spaces`, the ones whose printed cell shares an edge with the cell
-    at `at`: their patches of asphalt lie within a grid line's width of
-    each other along at least TOUCH px."""
+    at `at`: their patches of asphalt lie within a grid line's width
+    (`seam`) of each other along at least TOUCH px."""
     x0, y0 = (np.round(at).astype(int) - window).clip(0)
     sub = im[y0:y0 + 2 * window, x0:x0 + 2 * window]
     gray = cv2.cvtColor(sub, cv2.COLOR_BGR2GRAY)
@@ -300,7 +307,7 @@ def touching(im, at, spaces, window=150):
     mine = label(at)
     if not mine:
         return []
-    seam = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * SEAM + 1, 2 * SEAM + 1))
+    seam = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * seam + 1, 2 * seam + 1))
     reach = cv2.dilate((lab == mine).astype(np.uint8), seam) > 0
     out = []
     for s in spaces:
@@ -394,7 +401,7 @@ def main():
     rd = READING[map_id]
     path = ROOT / "tracks" / f"{map_id}.json"
     track = json.loads(path.read_text(encoding="utf-8"))
-    _, im = board_image(map_id)
+    info, im = board_image(map_id)
     WORK.mkdir(parents=True, exist_ok=True)
 
     # What an earlier run wrote goes first.
@@ -404,7 +411,7 @@ def main():
         s["next"] = [n for n in s["next"] if n not in old]
     by_id = {s["id"]: s for s in track["spaces"]}
     # The ways in and out: the track spaces touching each merge.
-    entries, exits = [touching(im, m, track["spaces"]) for m in rd["merges"]]
+    entries, exits = [touching(im, m, track["spaces"], seam=SEAM * info["upscale"]) for m in rd["merges"]]
     if not entries or not exits:
         sys.exit("no track space touches the %s merge -- check its centre in READING"
                  % ("entry" if not entries else "exit"))

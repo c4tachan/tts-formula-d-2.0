@@ -43,6 +43,13 @@ OUT = ROOT / "tools" / "extract" / "out"
 from tts_paths import MODS, TTS_DIR, documents_dir  # noqa: F401  (re-exported)
 
 
+# Most boards are about 2470 px wide, and the tools' sizes in pixels are
+# set for that. A few come at half that (Buddh's, Sochi's): those are read
+# at twice their size. A track file's pixels are relative to the image size
+# it records, so the mod places them on the board just the same.
+FULL_WIDTH = 1800
+
+
 def board_image(map_id):
     maps = json.loads((ROOT / "tools" / "extract" / "maps.json").read_text(encoding="utf-8"))
     hit = next((m for m in maps if m["id"] == map_id), None)
@@ -53,6 +60,10 @@ def board_image(map_id):
         if key in f.name:
             im = cv2.imread(str(f))
             if im is not None:
+                hit = dict(hit, upscale=1)
+                if im.shape[1] < FULL_WIDTH:
+                    im = cv2.resize(im, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+                    hit["upscale"] = 2      # and its printed lines twice as wide
                 return hit, im
     sys.exit(f"{hit['name']} is not in the TTS cache -- open it in game once")
 
