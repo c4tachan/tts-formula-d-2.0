@@ -77,6 +77,19 @@ LAP = {
             [(1018, 696), (1045, 735), (1060, 790), (1055, 840), (1040, 872)],
         ],
     },
+    "FDe03": {
+        # Its start band runs out to the track limits (checkered_band()).
+        "open_band": True,
+        "grass": [
+            # The hairpin's two legs carried on off the bottom edge, to board
+            # 1: this lap turns round the hairpin between them.
+            [(810, 1540), (912, 1540), (912, 1615), (810, 1615)],
+            # and the left one's lanes running on up beside the hairpin's
+            # exit, which merges into them on the slant.
+            [(826, 1545), (906, 1545), (882, 1505), (862, 1473), (845, 1440), (828, 1408)],
+            [(1195, 1555), (1305, 1555), (1305, 1615), (1195, 1615)],
+        ],
+    },
 }
 
 
@@ -93,6 +106,7 @@ def board_image(map_id):
         im = cv2.imread(str(f))
         if im is not None:
             PALETTE["palette"] = hit["category"]
+            PALETTE["open_band"] = LAP.get(map_id, {}).get("open_band", False)
             hit = dict(hit, upscale=1)
             if im.shape[1] < FULL_WIDTH:
                 im = cv2.resize(im, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
@@ -694,7 +708,43 @@ def road_surface(im, red=True):
     for i in range(1, n):
         if st[i, 4] < 3000:
             m[lab == i] = 1
-    return m
+    # A start band printed out to the white track limits on both sides
+    # (Zandvoort nr. 2's) is no hole the road closes round, and would cut it.
+    # Looked for only where LAP says so: on a board whose road mask takes in
+    # the scenery, car parks pass for one too.
+    return m | checkered_band(im, m) if PALETTE.get("open_band") else m
+
+
+def checkered_band(im, road):
+    """The start/finish band where it lies across the road: small white and
+    black squares packed together, none of them red, within the road closed
+    over a band's depth. Empty where there is none."""
+    gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+    bg = cv2.medianBlur(gray, 21).astype(np.float32)
+    reach = cv2.morphologyEx(road.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((31, 31), np.uint8)) > 0
+    squares = np.zeros(road.shape, np.uint8)
+    for mark in (gray - bg > 35, bg - gray > 35):
+        n, lab, st, _ = cv2.connectedComponentsWithStats((mark & reach).astype(np.uint8), 8)
+        squares |= np.isin(lab, [i for i in range(1, n) if 12 <= st[i, 4] <= 400]).astype(np.uint8)
+    band = cv2.morphologyEx(squares, cv2.MORPH_CLOSE, np.ones((9, 9), np.uint8))
+    hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV).astype(int)
+    red = ((hsv[..., 0] <= 10) | (hsv[..., 0] >= 170)) & (hsv[..., 1] > 90) & (hsv[..., 2] > 80)
+    n, lab, st, _ = cv2.connectedComponentsWithStats(band, 8)
+
+    def across(i):
+        # Lying across the road, it meets it on two sides, before and after;
+        # a patch of scenery beside the road meets it on one.
+        x, y, w, h = st[i, :4]
+        x0, y0 = max(x - 6, 0), max(y - 6, 0)
+        patch = (lab[y0:y + h + 6, x0:x + w + 6] == i).astype(np.uint8)
+        rim = cv2.dilate(patch, np.ones((7, 7), np.uint8)) & ~patch.astype(bool) & (road[y0:y + h + 6, x0:x + w + 6] > 0)
+        k, _, ks, _ = cv2.connectedComponentsWithStats(rim.astype(np.uint8), 8)
+        return sum(1 for j in range(1, k) if ks[j, 4] >= 20) >= 2
+
+    # Of the patches, the band is one the road does not already cover.
+    keep = [i for i in range(1, n) if 600 <= st[i, 4] <= 6000 and red[lab == i].mean() < 0.05
+            and (road[lab == i] == 0).mean() > 0.5 and across(i)]
+    return (np.isin(lab, keep) & reach).astype(np.uint8)
 
 
 def link(keep, info, lane, reverse, n_steps, reach=45):

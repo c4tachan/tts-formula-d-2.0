@@ -67,7 +67,8 @@ WORK = OUT / "_work"
 # away from the track; `wall: "near"` takes its edge by the track instead,
 # for a board where the far edge is broken by a garage as pale as the
 # asphalt (Singapore's white one). `area`, where given, is the box (x0, y0,
-# x1, y1) the pit road lies in, for a board where the track reaches into it.
+# x1, y1) the pit road lies in, for a board where the track reaches into it,
+# or a polygon of (x, y) points for one running on the slant.
 READING = {
     "FDMonaco": {
         "ends": [[[202.5, 1272.5], [235.0, 1301.0]], [[352.5, 623.8], [395.0, 618.8]]],
@@ -144,6 +145,15 @@ READING = {
         "area": (320, 1198, 1020, 1232),
         "wall": "near",
     },
+    "FDe03": {
+        "ends": [[[1843.0, 676.0], [1872.0, 673.0]], [[1995.0, 1152.0], [2022.0, 1148.0]]],
+        "merges": [[1850.0, 620.0], [2025.0, 1195.0]],
+        "first_box": 2,
+        "boxes": ["white", "white", "yellow", "yellow", "green", "green", "red", "red", "blue", "blue"],
+        "rows": (676, 1152),
+        "area": [(1836, 640), (1873, 640), (2012, 1105), (2024, 1152), (1994, 1162), (1952, 1110)],
+        "wall": "near",
+    },
 }
 
 # The two seats sharing each printed team colour, in running order: the
@@ -210,9 +220,14 @@ def pit_road(im, ends, area=None):
         # Read off the board: the box the pit road lies in, its track side
         # just short of the wall, for where the track proper reaches into
         # the pit road (Sochi's exit).
-        x0, y0, x1, y1 = area
         pit = np.zeros(asphalt.shape, np.uint8)
-        pit[y0:y1, x0:x1] = asphalt[y0:y1, x0:x1]
+        if len(area) == 4 and not isinstance(area[0], (tuple, list)):
+            x0, y0, x1, y1 = area
+            pit[y0:y1, x0:x1] = asphalt[y0:y1, x0:x1]
+        else:
+            # A polygon, for a pit road running on the slant.
+            cv2.fillPoly(pit, [np.array(area, np.int32)], 1)
+            pit &= asphalt.astype(np.uint8)
         pit = cv2.morphologyEx(pit, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
         n, lab, st, _ = cv2.connectedComponentsWithStats(pit, 8)
         return lab == 1 + int(np.argmax(st[1:, 4])), road

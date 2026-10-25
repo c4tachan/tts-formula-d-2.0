@@ -116,7 +116,19 @@ def paint_out_flag(track, road, line=None):
     Where the road mask takes in the scenery as well (Hockenheim's car parks,
     Valencia's harbour), windows and awnings make bands of their own. The
     flag lies across the track, so given the racing `line` only the band
-    nearest it is kept."""
+    nearest it is kept.
+
+    A band printed out to the white track limits on both sides (Zandvoort
+    nr. 2's) is no part of the road mask at all: when none is found on the
+    road, it is looked for again with the road closed over a band's depth."""
+    band = _flag_band(track, road, line)
+    if not band.any():
+        closed = cv2.morphologyEx(road.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((31, 31), np.uint8))
+        band = _flag_band(track, closed, line)
+    return cv2.inpaint(track, band, 5, cv2.INPAINT_TELEA), band
+
+
+def _flag_band(track, road, line):
     gray = cv2.cvtColor(track, cv2.COLOR_BGR2GRAY)
     bg = cv2.medianBlur(gray, 21).astype(np.float32)
     bright = ((gray.astype(np.float32) - bg > 35) & (road > 0)).astype(np.uint8)
@@ -142,13 +154,18 @@ def paint_out_flag(track, road, line=None):
         else:
             keep = [min(keep, key=lambda i: np.median(dist[lab == i]))]
     band = np.isin(lab, keep).astype(np.uint8)
-    band = cv2.dilate(band, np.ones((7, 7), np.uint8)) & road
-    return cv2.inpaint(track, band, 5, cv2.INPAINT_TELEA), band
+    return cv2.dilate(band, np.ones((7, 7), np.uint8)) & road
 
 
-def track_proper(road, line, width):
+def track_proper(road, line, width, band=None):
     """The road near the racing line: leaves out the pit road and scraps of
-    pavement that came along with the road."""
+    pavement that came along with the road.
+
+    The start/finish `band`, where given, is road too. The road mask fills in
+    a band it closes round, but one printed out to the white track limits on
+    both sides (Zandvoort nr. 2's) it leaves out, and that cuts the lap."""
+    if band is not None:
+        road = road | (cv2.dilate(band.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0)
     rail = np.zeros(road.shape, np.uint8)
     cv2.polylines(rail, [line.astype(np.int32).reshape(-1, 1, 2)], True, 255, 1)
     return ((cv2.distanceTransform(255 - rail, cv2.DIST_L2, 5) <= 0.62 * width) & (road > 0)).astype(np.uint8)
@@ -948,7 +965,7 @@ def main():
     tangent = np.c_[norm[:, 1], -norm[:, 0]]
     outward_line = -norm * side
     lane_w = width / LANES
-    main = track_proper(road, line, width)
+    main = track_proper(road, line, width, flag)
 
     across_dir, pos, local_w, inside, widened = road_frame(main, line, outward_line)
     grey, n_red = grey_corners(clean, road, main, across_dir)

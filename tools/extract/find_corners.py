@@ -324,7 +324,7 @@ def main():
     track_img, road = track_only(im)
     line, _, width = racing_line(im)
     _, band = paint_out_flag(track_img, road, line)
-    main_road = track_proper(road, line, width)
+    main_road = track_proper(road, line, width, band)
 
     # The pit lane is no part of the ring: find_pit.py codes it.
     spaces = [s for s in track["spaces"] if not s.get("pit")]

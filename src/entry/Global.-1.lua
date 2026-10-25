@@ -34,6 +34,7 @@ local TRACKS = {
     FDValencia = require("fd.data.tracks.FDValencia"),
     FDe01 = require("fd.data.tracks.FDe01"),
     FDe02 = require("fd.data.tracks.FDe02"),
+    FDe03 = require("fd.data.tracks.FDe03"),
 }
 
 mod_packed = false
