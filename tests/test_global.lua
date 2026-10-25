@@ -2165,6 +2165,25 @@ function T.the_dice_tray_moves_where_the_board_menu_says_and_is_saved()
     assert(math.abs(middle.x - spot.x) < 1e-6 and math.abs(middle.z - spot.z) < 1e-6, "still there")
 end
 
+function T.the_board_takes_a_right_click_only_while_the_layout_or_editor_is_open()
+    local S = world()
+    local host = { color = "Red", steam_name = "RedPlayer" }
+    eq(S.board.interactable, false, "out of reach in a race")
+    fdLayout(host)
+    eq(S.board.interactable, true, "open to the layout menu")
+    eq(S.board.locked, true, "but locked, so it cannot be moved")
+    fdMapChanged()
+    eq(S.board.interactable, true, "and still, on a new map")
+    fdLayout(host)
+    eq(S.board.interactable, false, "out of reach again")
+    fdEdit(host)
+    eq(S.board.interactable, true, "open to the editor's menu")
+    fdEdit(host)
+    eq(S.board.interactable, false)
+    fdLayout({ color = "Blue", steam_name = "BluePlayer" })
+    eq(S.board.interactable, false, "not for a player who is not the host")
+end
+
 function T.turning_the_dice_moves_their_row_a_quarter_round_the_tray()
     local S = world()
     -- Where the parked dice lie from the tray's middle, on average.

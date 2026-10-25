@@ -1831,12 +1831,21 @@ local function scalePanel(color, factor)
     broadcastToColor(string.format("Race panel %d px wide. Save the game to keep it.", width), color, LEVEL_RGB.info)
 end
 
+-- Whether the board is open for its layout to be set (fdLayout).
+local layoutOn = false
+
 --- Right-click menu on the board: it knows where the player clicked, so
 -- nothing needs a key bound to it. The layout items are always there; the
 -- editor's (`on`) only while it is open.
+--
+-- The tile is kept out of players' hands (its own onLoad), and TTS offers
+-- no menu on an object that cannot be interacted with: while the editor or
+-- the layout is open it can be, but stays locked, so it cannot be moved.
 boardMenu = function(on)
     local tile = Track.tile()
     if not tile then return end
+    tile.setLock(true)
+    tile.interactable = (on or layoutOn) and true or false
     tile.clearContextMenu()
     local function item(label, fn)
         tile.addContextMenuItem(label, function(color, pos)
@@ -1856,6 +1865,20 @@ boardMenu = function(on)
         broadcastToColor(Editor.clearGrid(), color, LEVEL_RGB.info)
         editorStatus()
     end)
+end
+
+--- Let the board be right-clicked, for its layout menu, or stop it.
+function fdLayout(player)
+    if not admin(player) then return end
+    layoutOn = not layoutOn
+    boardMenu(Editor.isOpen())
+    if layoutOn then
+        broadcastToColor("Right-click the board: Put the dice here, Turn the dice, Put the race panel here, "
+            .. "Race panel larger / smaller. Press Layout again when done, and save the game to keep it.",
+            player.color, LEVEL_RGB.info)
+    else
+        broadcastToColor("Board layout closed. Save the game to keep it.", player.color, LEVEL_RGB.info)
+    end
 end
 
 --- Open or close the track editor for the map on the board.
