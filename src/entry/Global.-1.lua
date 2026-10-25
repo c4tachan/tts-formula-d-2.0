@@ -55,6 +55,7 @@ local deliver, dealInSeated, dropDashless, bench -- likewise
 local isAdmin -- with the race controls, below
 local layDice, activateDie, restockDice -- with the track, below
 local throwChecks -- with the dice, below
+local boardMenu -- with the track editor, below
 local startRace -- with the race controls, below
 local pendingStart = nil -- who pressed Start race, while the grid is rolled
 -- Which car and space the flag marking where the car to play started its
@@ -214,6 +215,7 @@ function onLoad(saved_data)
         Dashboard.scan()
         dropDashless()
         packModMenu()
+        boardMenu(Editor.isOpen())
         hideSetup(function() layDice() end)
     end, 1)
 end
@@ -232,7 +234,8 @@ function buildUi()
         maps[#maps + 1] = { id = m.id, name = m.name, ready = TRACKS[m.id] ~= nil, current = map ~= nil and map.id == m.id }
     end
     panels[#panels + 1] = Setup.panel(maps)
-    Hud.build(Rules, panels, Track.tile(), map and TRACKS[map.id], function()
+    local track = map and TRACKS[map.id]
+    Hud.build(Rules, panels, Track.tile(), track and Editor.trackFor(track), function()
         Mini.setReady()
         Setup.setReady()
         refresh()
@@ -1421,6 +1424,8 @@ end
 -- goes by its track, its pit boxes take their seats' colours, and the dice
 -- move to its name panel.
 function fdMapChanged()
+    -- A new map means a reloaded tile, and that has lost its menu.
+    boardMenu(Editor.isOpen())
     drawPits(useBoardTrack())
     Track.drawIcons()
     buildUi()
@@ -1743,18 +1748,69 @@ local function addAt(color, pos)
     editorStatus()
 end
 
---- Right-click menu on the board while the editor is open: it knows where
--- the player clicked, so nothing needs a key bound to it.
-local function boardMenu(on)
+--- The board layout: where the dice tray and the race panel go on the map
+-- on the board. Kept with the track's edits (fd.tts.track_editor), and
+-- brought into the repo by import_track.py like the rest of them.
+local function layoutTrack(color)
+    local track = trackOnBoard()
+    if not track then
+        broadcastToColor("No track data for the map on the board yet.", color, LEVEL_RGB.warn)
+    end
+    return Track.tile(), track
+end
+
+local function diceAt(color, pos)
+    local tile, track = layoutTrack(color)
+    if not (tile and track) then return end
+    local px, py = Track.pixelOf(tile, track, pos)
+    Editor.setDice(track, px, py)
+    layDice()
+    broadcastToColor(string.format("Dice tray moved to (%d, %d). Save the game to keep it.", px, py),
+        color, LEVEL_RGB.info)
+end
+
+local function panelAt(color, pos)
+    local tile, track = layoutTrack(color)
+    if not (tile and track) then return end
+    local px, py = Track.pixelOf(tile, track, pos)
+    Editor.setPanel(track, px, py)
+    buildUi()
+    broadcastToColor(string.format("Race panel moved to (%d, %d). Save the game to keep it.", px, py),
+        color, LEVEL_RGB.info)
+end
+
+-- How much each step makes the race panel larger or smaller.
+local PANEL_STEP = 1.15
+
+local function scalePanel(color, factor)
+    local tile, track = layoutTrack(color)
+    if not (tile and track) then return end
+    local width = Editor.scalePanel(track, factor)
+    if not width then
+        broadcastToColor("Put the race panel on the board first (Put the race panel here).", color, LEVEL_RGB.warn)
+        return
+    end
+    buildUi()
+    broadcastToColor(string.format("Race panel %d px wide. Save the game to keep it.", width), color, LEVEL_RGB.info)
+end
+
+--- Right-click menu on the board: it knows where the player clicked, so
+-- nothing needs a key bound to it. The layout items are always there; the
+-- editor's (`on`) only while it is open.
+boardMenu = function(on)
     local tile = Track.tile()
     if not tile then return end
     tile.clearContextMenu()
-    if not on then return end
     local function item(label, fn)
         tile.addContextMenuItem(label, function(color, pos)
             if admin({ color = color }) then fn(color, pos) end
         end)
     end
+    item("Put the dice here", diceAt)
+    item("Put the race panel here", panelAt)
+    item("Race panel larger", function(color) scalePanel(color, PANEL_STEP) end)
+    item("Race panel smaller", function(color) scalePanel(color, 1 / PANEL_STEP) end)
+    if not on then return end
     item("Pick up spaces here", pickUpAt)
     item("Add a space here", addAt)
     item("Apply track edits", function(color) fdApply({ color = color }) end)
@@ -1836,6 +1892,16 @@ local function editorKey(fn)
 end
 
 local function registerEditorKeys()
+    local function layoutKey(fn)
+        return function(color, _, pointer, up)
+            if up or not admin({ color = color }) then return end
+            fn(color, pointer)
+        end
+    end
+    addHotkey("Board layout: put the dice here", layoutKey(diceAt))
+    addHotkey("Board layout: put the race panel here", layoutKey(panelAt))
+    addHotkey("Board layout: race panel larger", layoutKey(function(color) scalePanel(color, PANEL_STEP) end))
+    addHotkey("Board layout: race panel smaller", layoutKey(function(color) scalePanel(color, 1 / PANEL_STEP) end))
     addHotkey("Track editor: pick up spaces here", editorKey(function(color, _, pointer)
         pickUpAt(color, pointer)
     end))

@@ -184,6 +184,17 @@ out with the rest of the edits.
 Where the grid boxes are printed with their numbers, as on Austin, the
 list can be read straight off the board into the track file instead.
 
+## The dice and the race panel
+
+`dice` and `panel` are set in the game, from the board's right-click menu
+(the host only, editor open or not): **Put the dice here** moves the dice
+tray to where you clicked, **Put the race panel here** centres the panel
+there, and **Race panel larger** / **smaller** change its width by 15% a
+step (150 to 1600 pixels). The tray and panel move at once. The same four
+can be bound as keys under "Board layout" in Options > Game Keys. They are
+kept with the track's edits: save the game and `import_track.py` writes
+them into the track file with the rest.
+
 A fresh scan from `find_grid.py` has plain numbers for ids until
 `find_corners.py` runs; that step renames every link and the arrow reading in
 `tracks/<id>.arrows.json` to match. A space added in the editor is named

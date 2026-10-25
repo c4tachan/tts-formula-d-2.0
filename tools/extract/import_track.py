@@ -110,6 +110,14 @@ def main():
         if "start" in e:
             ids = {s["id"] for s in spaces}
             track["start"] = [sid(v) for v in as_list(e["start"]) if sid(v) in ids]
+        # The board layout, as set from the board's right-click menu: where
+        # the dice tray and the race panel go. Left alone if not set.
+        if e.get("dice"):
+            track["dice"] = [round(float(v)) for v in as_list(e["dice"])]
+        if e.get("panel"):
+            panel = e["panel"]
+            track["panel"] = {"pos": [round(float(v)) for v in as_list(panel["pos"])],
+                              "width": round(float(panel["width"]))}
         track["edited"] = True
         track["edited_from"] = f"{save_path.name} ({when:%Y-%m-%d %H:%M})"
         path.write_text(json.dumps(track, indent=1), encoding="utf-8")

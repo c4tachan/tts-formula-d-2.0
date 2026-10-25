@@ -75,6 +75,8 @@ function Editor.trackFor(track)
     end
     out.spaces = e.spaces
     out.start = e.start or track.start
+    out.dice = e.dice or track.dice
+    out.panel = e.panel or track.panel
     out.byId = nil -- the track's own, for its own spaces
     return out
 end
@@ -458,6 +460,43 @@ function Editor.clearGrid()
     return "Grid cleared (" .. #was .. " space(s)). Mark it again from pole."
 end
 
+-- The board layout: where the dice tray and the race panel go. Both are
+-- spots in image pixels kept with the track's edits, so they are saved with
+-- the game and import_track.py carries them into the track file. Unlike the
+-- spaces they can be set with the editor closed.
+
+-- The race panel's width in image pixels: where a track names none, and
+-- the most and least it can be made.
+local PANEL_WIDTH = 400
+local PANEL_MIN, PANEL_MAX = 150, 1600
+
+--- Put the dice tray at (px, py) on `track`.
+function Editor.setDice(track, px, py)
+    local e = working(track)
+    e.dice = { px, py }
+    e.dirty = true
+end
+
+--- Put the race panel's centre at (px, py) on `track`, at the width it has.
+function Editor.setPanel(track, px, py)
+    local e = working(track)
+    local was = e.panel or track.panel
+    e.panel = { pos = { px, py }, width = was and was.width or PANEL_WIDTH }
+    e.dirty = true
+end
+
+--- Make the race panel on `track` `factor` times as wide, within bounds.
+-- Returns its new width, or nil if the track names no spot for it yet.
+function Editor.scalePanel(track, factor)
+    local e = working(track)
+    local was = e.panel or track.panel
+    if not was then return nil end
+    local width = math.max(PANEL_MIN, math.min(PANEL_MAX, was.width * factor))
+    e.panel = { pos = { was.pos[1], was.pos[2] }, width = width }
+    e.dirty = true
+    return width
+end
+
 --- How many spaces are on the open track's grid.
 function Editor.gridCount()
     return open and #edits[open].start or 0
@@ -601,7 +640,7 @@ function Editor.save()
                 end
                 spaces[i] = c
             end
-            out[id] = { spaces = spaces, nextId = e.nextId, start = e.start }
+            out[id] = { spaces = spaces, nextId = e.nextId, start = e.start, dice = e.dice, panel = e.panel }
         end
     end
     return out
@@ -634,7 +673,8 @@ function Editor.load(saved, strayMarkers)
             for _, sp in ipairs(e.spaces or {}) do
                 sp.sector = sp.sector or sectorOf(sp.id)
             end
-            edits[id] = { spaces = e.spaces, nextId = e.nextId or 1, dirty = true, start = e.start }
+            edits[id] = { spaces = e.spaces, nextId = e.nextId or 1, dirty = true, start = e.start,
+                          dice = e.dice, panel = e.panel }
         end
     end
     for _, guid in ipairs(strayMarkers or {}) do

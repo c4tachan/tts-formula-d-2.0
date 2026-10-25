@@ -1501,7 +1501,8 @@ function T.the_editor_works_from_right_click_menus()
     eq(#Editor.trackFor(FDMonaco).spaces, #FDMonaco.spaces, "one deleted, one added")
 
     fdEdit({ color = "Red", steam_name = "RedPlayer" })
-    eq(next(S.board.menu), nil, "the board menu goes when the editor closes")
+    eq(S.board.menu["Add a space here"], nil, "the editor's items go when it closes")
+    assert(S.board.menu["Put the dice here"], "leaving the board layout's")
 end
 
 function T.deleting_every_marker_before_apply_is_still_saved()
@@ -2140,6 +2141,52 @@ function T.the_race_panel_lies_on_the_board_where_the_track_says()
     S.board.xml = {}
     fdMapChanged()
     eq(S.board.xml[1].attributes.id, "fdr")
+end
+
+function T.the_dice_tray_moves_where_the_board_menu_says_and_is_saved()
+    local S = world()
+    local Track = require("fd.tts.track")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    -- On the board's menu with the editor closed, for the host only.
+    local spot = Track.worldOf(S.board, FDMonaco, 600, 900)
+    S.board.menu["Put the dice here"]("Blue", spot)
+    local _, middle = tray(S)
+    assert(math.abs(middle.x - spot.x) > 1e-3, "not for a player who is not the host")
+    S.board.menu["Put the dice here"]("Red", spot)
+    _, middle = tray(S)
+    assert(math.abs(middle.x - spot.x) < 1e-6 and math.abs(middle.z - spot.z) < 1e-6, "moved to the spot")
+    local saved = onSave().json.edits.FDMonaco
+    eq(saved.dice[1], 600)
+    eq(saved.dice[2], 900)
+    -- And kept through a load, and a new map.
+    onLoad(onSave())
+    fdMapChanged()
+    _, middle = tray(S)
+    assert(math.abs(middle.x - spot.x) < 1e-6 and math.abs(middle.z - spot.z) < 1e-6, "still there")
+end
+
+function T.the_race_panel_moves_and_resizes_from_the_board_menu()
+    local S = world()
+    local Track = require("fd.tts.track")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    -- Monaco's own spot is 2474 / 2 - 935 = 302 pixels from its middle's x.
+    S.board.menu["Put the race panel here"]("Red", Track.worldOf(S.board, FDMonaco, 1237, 808))
+    local panel = S.board.xml[1].attributes
+    local x, y = panel.position:match("^(%S+) (%S+)")
+    assert(math.abs(tonumber(x)) < 0.05 and math.abs(tonumber(y)) < 0.05, "centred on the board: " .. x .. " " .. y)
+    eq(panel.scale, "0.0425 0.0425 1", "as wide as before")
+    S.board.menu["Race panel larger"]("Red")
+    eq(S.board.xml[1].attributes.scale, "0.0489 0.0489 1", "15% wider")
+    assert(math.abs(onSave().json.edits.FDMonaco.panel.width - 460) < 1e-6, "saved")
+    S.board.menu["Race panel smaller"]("Red")
+    eq(S.board.xml[1].attributes.scale, "0.0425 0.0425 1")
+    -- The editor's own items join the layout ones while it is open, and go
+    -- again when it closes.
+    fdEdit({ color = "Red", steam_name = "RedPlayer" })
+    assert(S.board.menu["Pick up spaces here"], "editor items while it is open")
+    fdEdit({ color = "Red", steam_name = "RedPlayer" })
+    eq(S.board.menu["Pick up spaces here"], nil)
+    assert(S.board.menu["Put the race panel here"], "layout items stay")
 end
 
 function T.the_race_panel_goes_on_the_screen_for_a_map_without_a_spot()
