@@ -33,6 +33,7 @@ local TRACKS = {
     FDSotchi = require("fd.data.tracks.FDSotchi"),
     FDValencia = require("fd.data.tracks.FDValencia"),
     FDe01 = require("fd.data.tracks.FDe01"),
+    FDe02 = require("fd.data.tracks.FDe02"),
 }
 
 mod_packed = false

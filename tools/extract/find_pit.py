@@ -135,6 +135,15 @@ READING = {
         "boxes": ["white", "white", "yellow", "yellow", "green", "green", "red", "red", "blue", "blue"],
         "rows": (500, 1290),
     },
+    "FDe02": {
+        "ends": [[[931.0, 1201.0], [931.0, 1231.0]], [[398.0, 1201.0], [398.0, 1231.0]]],
+        "merges": [[975.0, 1222.0], [345.0, 1225.0]],
+        "first_box": 2,
+        "boxes": ["white", "white", "yellow", "yellow", "green", "green", "red", "red", "blue", "blue"],
+        "cols": (398, 931),
+        "area": (320, 1198, 1020, 1232),
+        "wall": "near",
+    },
 }
 
 # The two seats sharing each printed team colour, in running order: the

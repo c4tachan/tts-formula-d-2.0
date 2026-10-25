@@ -49,6 +49,36 @@ from tts_paths import MODS, TTS_DIR, documents_dir  # noqa: F401  (re-exported)
 # it records, so the mod places them on the board just the same.
 FULL_WIDTH = 1800
 
+# Where a board prints more road than its lap takes, the lap is drawn in
+# before anything is read, in board pixels: "grass" polygons painted over
+# the road it does not take, and "lines" drawn as red corner lines where
+# the board leaves a corner's edge unmarked on the way the lap comes.
+#
+# The two Zandvoort boards join into one circuit (FDe34 lays them side by
+# side), so each prints the roads that lead off to the other, and each
+# closes its own lap by a way of its own. Board 1 also has two ways from
+# Gerlach to the turn below Hunserug, each meeting that turn part way round.
+GRASS = (40, 100, 50)
+CORNER_RED = (45, 45, 215)
+LAP = {
+    "FDe02": {
+        "grass": [
+            # The link from Gerlach straight on into the turn below
+            # Hunserug: this lap goes round Hugenholtz instead.
+            [(800, 862), (962, 829), (962, 894), (918, 906), (890, 890), (860, 878), (830, 872), (800, 870)],
+            # The straight up off the board, and the road back down from it:
+            # this lap turns right through Toyotabocht between them.
+            [(805, 0), (910, 0), (910, 405), (805, 405)],
+            [(1088, 0), (1205, 0), (1280, 450), (1282, 464), (1159, 383)],
+        ],
+        "lines": [
+            # Hunserug runs into the turn's curved cells with no red line:
+            # their outer edge is where the turn starts.
+            [(1018, 696), (1045, 735), (1060, 790), (1055, 840), (1040, 872)],
+        ],
+    },
+}
+
 
 def board_image(map_id):
     maps = json.loads((ROOT / "tools" / "extract" / "maps.json").read_text(encoding="utf-8"))
@@ -67,6 +97,11 @@ def board_image(map_id):
             if im.shape[1] < FULL_WIDTH:
                 im = cv2.resize(im, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
                 hit["upscale"] = 2      # and its printed lines twice as wide
+            lap = LAP.get(map_id, {})
+            for poly in lap.get("grass", []):
+                cv2.fillPoly(im, [np.array(poly, np.int32) * hit["upscale"]], GRASS)
+            for poly in lap.get("lines", []):
+                cv2.polylines(im, [np.array(poly, np.int32) * hit["upscale"]], False, CORNER_RED, 5)
             return hit, im
     sys.exit(f"{hit['name']} is not in the TTS cache or tracks/raw/ -- run download_maps.py {map_id}")
 

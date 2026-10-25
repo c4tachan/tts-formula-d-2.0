@@ -77,19 +77,28 @@ def red_lines(im, main):
     return np.isin(lab, keep).astype(np.uint8), len(keep)
 
 
-def pieces(im, main):
+def pieces(im, main, spaces=()):
     """The road cut along its red lines: a label image and the lines.
 
     The road is shrunk a little first: where the track doubles back on
     itself, as at a hairpin, the two sides can touch through a gap in the
-    kerb and would join round the end of a line."""
+    kerb and would join round the end of a line.
+
+    A piece too small to be road is kept all the same if spaces of more than
+    one lane sit on it: a straight one cell long between two corners
+    (Zandvoort's, below Hunserug), which a scrap never is."""
     red, n_lines = red_lines(im, main)
     cut = cv2.dilate(red, np.ones((2 * CUT + 1, 2 * CUT + 1), np.uint8))
     inner = cv2.erode(main, np.ones((2 * SHRINK + 1, 2 * SHRINK + 1), np.uint8))
     road = (inner > 0) & (cut == 0)
     n, lab, st, _ = cv2.connectedComponentsWithStats(road.astype(np.uint8), connectivity=4)
+    lanes = {}
+    for s in spaces:
+        x, y = (int(round(v)) for v in s["pos"])
+        if 0 <= y < lab.shape[0] and 0 <= x < lab.shape[1]:
+            lanes.setdefault(int(lab[y, x]), set()).add(s["lane"])
     for i in range(1, n):
-        if st[i, cv2.CC_STAT_AREA] < MIN_PIECE:
+        if st[i, cv2.CC_STAT_AREA] < MIN_PIECE and len(lanes.get(i, ())) < 2:
             lab[lab == i] = 0
     return lab, n_lines
 
@@ -317,9 +326,9 @@ def main():
     _, band = paint_out_flag(track_img, road, line)
     main_road = track_proper(road, line, width)
 
-    lab, n_lines = pieces(im, main_road)
     # The pit lane is no part of the ring: find_pit.py codes it.
     spaces = [s for s in track["spaces"] if not s.get("pit")]
+    lab, n_lines = pieces(im, main_road, spaces)
     where = {s["id"]: piece_at(lab, *s["pos"]) for s in spaces}
     used = sorted(set(where.values()) - {0})
     print("1. %d red lines cut the road into %d pieces holding spaces" % (n_lines, len(used)))

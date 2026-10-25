@@ -7,7 +7,7 @@ local Moves = require("fd.core.moves")
 local Position = require("fd.core.position")
 
 local TRACKS = { "FDAustin", "FDBuddh", "FDHockenheim", "FDMonaco", "FDSebring", "FDSingapore", "FDSotchi", "FDValencia",
-                 "FDe01" }
+                 "FDe01", "FDe02" }
 
 local function eq(a, b, msg)
     if a ~= b then
