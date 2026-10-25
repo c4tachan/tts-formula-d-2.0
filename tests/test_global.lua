@@ -2149,10 +2149,10 @@ function T.the_dice_tray_moves_where_the_board_menu_says_and_is_saved()
     local FDMonaco = require("fd.data.tracks.FDMonaco")
     -- On the board's menu with the editor closed, for the host only.
     local spot = Track.worldOf(S.board, FDMonaco, 600, 900)
-    S.board.menu["Put the dice here"]("Blue", spot)
+    S.board.rightClick("Put the dice here", "Blue", spot)
     local _, middle = tray(S)
     assert(math.abs(middle.x - spot.x) > 1e-3, "not for a player who is not the host")
-    S.board.menu["Put the dice here"]("Red", spot)
+    S.board.rightClick("Put the dice here", "Red", spot)
     _, middle = tray(S)
     assert(math.abs(middle.x - spot.x) < 1e-6 and math.abs(middle.z - spot.z) < 1e-6, "moved to the spot")
     local saved = onSave().json.edits.FDMonaco
@@ -2217,7 +2217,7 @@ function T.the_race_panel_moves_and_resizes_from_the_board_menu()
     local Track = require("fd.tts.track")
     local FDMonaco = require("fd.data.tracks.FDMonaco")
     -- Monaco's own spot is 2474 / 2 - 935 = 302 pixels from its middle's x.
-    S.board.menu["Put the race panel here"]("Red", Track.worldOf(S.board, FDMonaco, 1237, 808))
+    S.board.rightClick("Put the race panel here", "Red", Track.worldOf(S.board, FDMonaco, 1237, 808))
     local panel = S.board.xml[1].attributes
     local x, y = panel.position:match("^(%S+) (%S+)")
     assert(math.abs(tonumber(x)) < 0.05 and math.abs(tonumber(y)) < 0.05, "centred on the board: " .. x .. " " .. y)

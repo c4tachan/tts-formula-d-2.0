@@ -1847,9 +1847,13 @@ boardMenu = function(on)
     tile.setLock(true)
     tile.interactable = (on or layoutOn) and true or false
     tile.clearContextMenu()
+    -- TTS tells a menu item where the object is, not where it was clicked:
+    -- that is the player's pointer, still where they right-clicked, as the
+    -- menu opens under it.
     local function item(label, fn)
-        tile.addContextMenuItem(label, function(color, pos)
-            if admin({ color = color }) then fn(color, pos) end
+        tile.addContextMenuItem(label, function(color)
+            local player = Player[color]
+            if player and admin({ color = color }) then fn(color, player.getPointerPosition()) end
         end)
     end
     item("Put the dice here", diceAt)
