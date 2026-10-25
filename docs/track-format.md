@@ -188,6 +188,12 @@ list can be read straight off the board into the track file instead.
 
 ## The dice and the race panel
 
+`tools/extract/find_dice_spot.py` gives a track its first `dice` and
+`dice_side`: the tray over the board's name logo (the Formula D name card,
+or the Formula Dé checkered title box), turned and nudged to keep the
+parked dice as clear of the track as it can. It leaves a track that has a
+spot already alone (`--force` replaces it).
+
 `dice` and `panel` are set in the game, from the board's right-click menu
 (the host only, editor open or not): **Put the dice here** moves the dice
 tray to where you clicked, **Turn the dice** moves the row of dice not in
