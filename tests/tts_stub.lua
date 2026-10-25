@@ -139,6 +139,8 @@ function Stub.object(name, props)
         loading = false,
         getXmlTable = function() return o.xml or {} end,
         setXmlTable = function(t) Stub.counts.ui = Stub.counts.ui + 1 o.xml = t end,
+        -- Only ever called with "" (fd.tts.hud), to clear it.
+        setXml = function(s) Stub.counts.ui = Stub.counts.ui + 1 o.xml = {} end,
         setAttribute = function(id, k, v)
             Stub.counts.ui = Stub.counts.ui + 1
             Stub.ui[id] = Stub.ui[id] or {}

@@ -1423,13 +1423,30 @@ end
 -- it, so it is drawn again; the setup menu says which map it is, turn order
 -- goes by its track, its pit boxes take their seats' colours, and the dice
 -- move to its name panel.
+-- Longest to wait for a reloaded board tile to be ready, in seconds. Past
+-- that it is drawn on regardless.
+local TILE_WAIT = 15
+
+--- Run `fn` once the board tile is back from a reload and has its image:
+-- calls into a tile still loading fail inside TTS ("Object reference not
+-- set to an instance of an object"), and stop the script there. A board
+-- not yet in the cache can take longer than the second the callers wait.
+local function whenTileReady(fn)
+    Wait.condition(fn, function()
+        local tile = Track.tile()
+        return tile ~= nil and not tile.spawning and not tile.loading_custom
+    end, TILE_WAIT, fn)
+end
+
 function fdMapChanged()
-    -- A new map means a reloaded tile, and that has lost its menu.
-    boardMenu(Editor.isOpen())
-    drawPits(useBoardTrack())
-    Track.drawIcons()
-    buildUi()
-    layDice()
+    whenTileReady(function()
+        drawPits(useBoardTrack())
+        Track.drawIcons()
+        buildUi()
+        layDice()
+        -- A new map means a reloaded tile, and that has lost its menu.
+        boardMenu(Editor.isOpen())
+    end)
 end
 
 function fdReset(player)
