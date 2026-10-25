@@ -1559,10 +1559,14 @@ drawPits = function(tile, track)
     Track.setLayer("pits", tile and track and Track.pits(tile, track) or nil)
 end
 
+-- How far from the tray, in image pixels, the point the parked dice face
+-- is put: any distance does, as only its direction counts.
+local DICE_FACING = 200
+
 --- Where the dice tray goes: on the map's name panel, if its track data
--- says where that is, otherwise the middle of the board face; and the
--- middle of the board face, for the dice to park on that side of it. Nil
--- without a board.
+-- says where that is, otherwise the middle of the board face; and a point
+-- the dice park on the side towards: the way the track's `dice_side` says,
+-- or else the middle of the board face. Nil without a board.
 local function diceCenter()
     local tile, track = boardTrack()
     tile = tile or Track.tile()
@@ -1572,7 +1576,10 @@ local function diceCenter()
     local b = tile.getBounds()
     local middle = { x = b.center.x, y = b.center.y + b.size.y / 2, z = b.center.z }
     if track and track.dice then
-        return Track.worldOf(tile, track, track.dice[1], track.dice[2]), middle
+        local _, dir = Editor.diceSide(track)
+        local x, y = track.dice[1], track.dice[2]
+        return Track.worldOf(tile, track, x, y),
+            Track.worldOf(tile, track, x + dir[1] * DICE_FACING, y + dir[2] * DICE_FACING)
     end
     return middle, middle
 end
@@ -1779,6 +1786,19 @@ local function panelAt(color, pos)
         color, LEVEL_RGB.info)
 end
 
+local function turnDice(color)
+    local tile, track = layoutTrack(color)
+    if not (tile and track) then return end
+    local side = Editor.turnDice(track)
+    if not side then
+        broadcastToColor("Put the dice on the board first (Put the dice here).", color, LEVEL_RGB.warn)
+        return
+    end
+    layDice()
+    broadcastToColor("The dice now line up along the tray's " .. side
+        .. " side (as the board image runs). Save the game to keep it.", color, LEVEL_RGB.info)
+end
+
 -- How much each step makes the race panel larger or smaller.
 local PANEL_STEP = 1.15
 
@@ -1807,6 +1827,7 @@ boardMenu = function(on)
         end)
     end
     item("Put the dice here", diceAt)
+    item("Turn the dice", turnDice)
     item("Put the race panel here", panelAt)
     item("Race panel larger", function(color) scalePanel(color, PANEL_STEP) end)
     item("Race panel smaller", function(color) scalePanel(color, 1 / PANEL_STEP) end)
@@ -1899,6 +1920,7 @@ local function registerEditorKeys()
         end
     end
     addHotkey("Board layout: put the dice here", layoutKey(diceAt))
+    addHotkey("Board layout: turn the dice", layoutKey(turnDice))
     addHotkey("Board layout: put the race panel here", layoutKey(panelAt))
     addHotkey("Board layout: race panel larger", layoutKey(function(color) scalePanel(color, PANEL_STEP) end))
     addHotkey("Board layout: race panel smaller", layoutKey(function(color) scalePanel(color, 1 / PANEL_STEP) end))

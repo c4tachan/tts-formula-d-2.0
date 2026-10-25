@@ -68,6 +68,8 @@ the only thing needing measurement in game is the tile itself — not each track
   "finish": { "line": ["i.s1.0", "m.s1.0", "o.s1.0"] }, // (below)
   "dice": [1505, 1468],          // optional: where the dice sit, clear of the track
                                  // (the map's name panel); default the board's middle
+  "dice_side": "up",             // optional: the tray side, on the image, the dice not in
+                                 // play line up along; default the side facing the middle
   "panel": { "pos": [2172, 1410], "width": 400 }, // optional: the race panel's centre
                                  // and width, on an empty patch; default on the screen
 
@@ -188,9 +190,10 @@ list can be read straight off the board into the track file instead.
 
 `dice` and `panel` are set in the game, from the board's right-click menu
 (the host only, editor open or not): **Put the dice here** moves the dice
-tray to where you clicked, **Put the race panel here** centres the panel
+tray to where you clicked, **Turn the dice** moves the row of dice not in
+play a quarter turn round the tray, **Put the race panel here** centres the panel
 there, and **Race panel larger** / **smaller** change its width by 15% a
-step (150 to 1600 pixels). The tray and panel move at once. The same four
+step (150 to 1600 pixels). The tray and panel move at once. The same five
 can be bound as keys under "Board layout" in Options > Game Keys. They are
 kept with the track's edits: save the game and `import_track.py` writes
 them into the track file with the rest.

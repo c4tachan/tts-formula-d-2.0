@@ -76,6 +76,7 @@ function Editor.trackFor(track)
     out.spaces = e.spaces
     out.start = e.start or track.start
     out.dice = e.dice or track.dice
+    out.dice_side = e.dice_side or track.dice_side
     out.panel = e.panel or track.panel
     out.byId = nil -- the track's own, for its own spaces
     return out
@@ -477,6 +478,45 @@ function Editor.setDice(track, px, py)
     e.dirty = true
 end
 
+-- The sides of the dice tray, on the image, a quarter turn apart clockwise,
+-- and the way each lies from the tray's centre (image y runs down).
+local SIDES = { "up", "right", "down", "left" }
+local SIDE_DIR = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
+
+--- Which side of the dice tray, on the image, the dice not in play line up
+-- along on `track`, and the way it lies from the tray as { dx, dy }; nil
+-- on a track that names no spot for the dice. Without a side of its own,
+-- the one facing the board's middle.
+function Editor.diceSide(track)
+    local t = Editor.trackFor(track)
+    if not t.dice then return nil end
+    local side = t.dice_side
+    if not SIDE_DIR[side] then
+        local dx = t.image.width / 2 - t.dice[1]
+        local dy = t.image.height / 2 - t.dice[2]
+        if math.abs(dy) >= math.abs(dx) then
+            side = dy < 0 and "up" or "down"
+        else
+            side = dx < 0 and "left" or "right"
+        end
+    end
+    return side, SIDE_DIR[side]
+end
+
+--- Turn the dice a quarter turn clockwise round their tray on `track`.
+-- Returns the side they now line up along, or nil if the track names no
+-- spot for the dice yet.
+function Editor.turnDice(track)
+    local side = Editor.diceSide(track)
+    if not side then return nil end
+    local e = working(track)
+    for i, s in ipairs(SIDES) do
+        if s == side then e.dice_side = SIDES[i % 4 + 1] end
+    end
+    e.dirty = true
+    return e.dice_side
+end
+
 --- Put the race panel's centre at (px, py) on `track`, at the width it has.
 function Editor.setPanel(track, px, py)
     local e = working(track)
@@ -640,7 +680,8 @@ function Editor.save()
                 end
                 spaces[i] = c
             end
-            out[id] = { spaces = spaces, nextId = e.nextId, start = e.start, dice = e.dice, panel = e.panel }
+            out[id] = { spaces = spaces, nextId = e.nextId, start = e.start, dice = e.dice,
+                        dice_side = e.dice_side, panel = e.panel }
         end
     end
     return out
@@ -674,7 +715,7 @@ function Editor.load(saved, strayMarkers)
                 sp.sector = sp.sector or sectorOf(sp.id)
             end
             edits[id] = { spaces = e.spaces, nextId = e.nextId or 1, dirty = true, start = e.start,
-                          dice = e.dice, panel = e.panel }
+                          dice = e.dice, dice_side = e.dice_side, panel = e.panel }
         end
     end
     for _, guid in ipairs(strayMarkers or {}) do

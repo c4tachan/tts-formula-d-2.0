@@ -114,6 +114,8 @@ def main():
         # the dice tray and the race panel go. Left alone if not set.
         if e.get("dice"):
             track["dice"] = [round(float(v)) for v in as_list(e["dice"])]
+        if e.get("dice_side"):
+            track["dice_side"] = e["dice_side"]
         if e.get("panel"):
             panel = e["panel"]
             track["panel"] = {"pos": [round(float(v)) for v in as_list(panel["pos"])],

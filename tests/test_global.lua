@@ -2165,6 +2165,34 @@ function T.the_dice_tray_moves_where_the_board_menu_says_and_is_saved()
     assert(math.abs(middle.x - spot.x) < 1e-6 and math.abs(middle.z - spot.z) < 1e-6, "still there")
 end
 
+function T.turning_the_dice_moves_their_row_a_quarter_round_the_tray()
+    local S = world()
+    -- Where the parked dice lie from the tray's middle, on average.
+    local function row()
+        local _, c = tray(S)
+        local x, z, n = 0, 0, 0
+        -- The six gear dice and the black one, the row's middle die the fourth.
+        for _, name in ipairs({ "First Gear Dice", "Second Gear Dice", "Third Gear Dice", "Fourth Gear Dice",
+                                "Fifth Gear Dice", "Sixth Gear Dice", "Damage Dice" }) do
+            local d = S.find(name)
+            x, z, n = x + d.pos.x - c.x, z + d.pos.z - c.z, n + 1
+        end
+        return x / n, z / n
+    end
+    local x0, z0 = row()
+    local sides = {}
+    for i = 1, 4 do
+        S.board.menu["Turn the dice"]("Red")
+        sides[i] = onSave().json.edits.FDMonaco.dice_side
+        local x, z = row()
+        -- A quarter turn: the row's offset is square to where it was.
+        assert(math.abs(x * x0 + z * z0) < 1e-6 * (x0 * x0 + z0 * z0) + 1e-6, "square to the last, turn " .. i)
+        x0, z0 = x, z
+    end
+    -- Monaco's dice sit low on the board, so face up it to start with.
+    eq(table.concat(sides, " "), "right down left up")
+end
+
 function T.the_race_panel_moves_and_resizes_from_the_board_menu()
     local S = world()
     local Track = require("fd.tts.track")
