@@ -666,7 +666,7 @@ T.pit = {
 
 -- Where the dice sit (image pixels): on the map's name panel, clear of
 -- the track. Without it they sit in the middle of the board.
-T.dice = { 2032, 264 }
+T.dice = { 2209, 192 }
 -- Which side of the tray, on the image, the dice not in play line up
 -- along: up, right, down or left. Without it, the side facing the
 -- board's middle.
