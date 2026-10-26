@@ -402,6 +402,11 @@ class TrackDoc:
             track["start"] = [g for g in track["start"] if g in ids]
         if track.get("pit"):
             self._pit_ends(track, spaces)
+        # Each corner's count of spaces, lane by lane, as its spaces now say.
+        for c in track.get("corners") or []:
+            members = [s for s in spaces if s.get("corner") == c["id"]]
+            c["spaces"] = len(members)
+            c["lanes"] = [sum(1 for s in members if s["lane"] == l) for l in range(1, int(track.get("lanes", 3)) + 1)]
         track["edited"] = True
         track["edited_from"] = edited_from
         return track
