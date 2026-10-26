@@ -117,6 +117,7 @@ function Stub.object(name, props)
     o.setDecals = function(d) o.decals = d end
     o.getDecals = function() return o.decals end
     o.getTransformUp = function() return o.up end
+    o.flip = function() o.up = vec(o.up.x, -o.up.y, o.up.z) end
     -- Local space is scaled like TTS's; rotation is left out apart from the
     -- flip a dashboard takes when turned face down.
     o.positionToWorld = function(p)

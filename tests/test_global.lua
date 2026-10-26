@@ -376,6 +376,87 @@ function T.the_setup_menu_chooses_the_map()
     assert(S.ui.fds_map.value:find("Austin"), "and the menu says so")
 end
 
+--- Every element with an id in `nodes`, by id.
+local function byId(nodes, out)
+    out = out or {}
+    for _, node in ipairs(nodes or {}) do
+        if node.attributes and node.attributes.id then out[node.attributes.id] = node end
+        byId(node.children, out)
+    end
+    return out
+end
+
+local ADVANCED = "Formula D advanced rules"
+
+function T.the_host_picks_the_rules_on_the_setup_menu()
+    local S = world()
+    joinRace("Red", S.beginner)
+    local list = byId(S.xml).fds_rulesets
+    assert(list, "a rules list on the setup menu")
+    eq(list.children[1].attributes.selected, "true", "the basic rules to begin with")
+    eq(list.children[2].value, ADVANCED)
+
+    fdSetupRules(Player.Blue, ADVANCED)
+    eq(state().rules, "beginner", "only the host chooses")
+    fdSetupRules(Player.Red, ADVANCED)
+    eq(state().rules, "advanced")
+    assert(S.logged("picks the " .. ADVANCED))
+    eq(state().cars.Red.wear.tires, 6, "Red starts afresh in the six zones")
+    eq(state().cars.Red.wear.wp, nil)
+    -- Red's dashboard is turned to the advanced face, a marker in each zone.
+    eq(S.beginner.up.y > 0, true, "flipped over")
+    eq(S.count("Wear Tracker"), 6)
+    assert(S.beginner.buttons[1].label:find("T6 B3 G3 C3 E3 S2"), S.beginner.buttons[1].label)
+    -- The screen dashboard and the standings show the zones.
+    local ui = byId(S.xml)
+    assert(ui.fdm_Red_tiresMark and ui.fdm_Red_handlingMark, "a marker per zone on screen")
+    assert(ui.fdm_Red_tires14, "the advanced face's 14 tire slots")
+    eq(ui.fdm_Red_wpMark, nil)
+    assert(byId(S.board.xml).fdr_r1_w_tires, "a standings column per zone")
+    eq(S.ui.fds_rules.value:find(ADVANCED, 1, true) ~= nil, true, "the menu says which rules")
+
+    fdUndo(Player.Red)
+    eq(state().rules, "beginner", "Undo takes the choice back")
+    eq(state().cars.Red.wear.wp, 18)
+    eq(S.beginner.up.y < 0, true, "and turns the dashboard back")
+    eq(S.count("Wear Tracker"), 1)
+    assert(byId(S.xml).fdm_Red_wpMark)
+end
+
+function T.each_zone_is_set_on_its_own_under_the_advanced_rules()
+    local S = world()
+    joinRace("Red", S.beginner)
+    fdSetupRules(Player.Red, ADVANCED)
+    fdUiWear(Player.Red, "brakes:1")
+    eq(state().cars.Red.wear.brakes, 1, "clicked on the screen dashboard")
+    eq(state().cars.Red.wear.tires, 6, "the other zones as they were")
+    local tires = getObjectFromGUID(state().cars.Red.tts.markers.wear.tires)
+    dropOn(S, tires, "tires", 4)
+    eq(state().cars.Red.wear.tires, 4, "the tire marker moved on the dashboard")
+    eq(state().cars.Red.wear.brakes, 1)
+    -- No WP -1/+1 button: there is no one pool of WP.
+    for _, b in ipairs(S.beginner.buttons) do
+        assert(b.click_function ~= "fdDashWear", "no WP button on the advanced face")
+    end
+end
+
+function T.the_rules_are_not_changed_during_a_race()
+    local S = redRacing()
+    fdSetupRules(Player.Red, ADVANCED)
+    eq(state().rules, "beginner")
+end
+
+function T.a_game_saved_under_the_advanced_rules_loads_under_them()
+    local S = world()
+    joinRace("Red", S.beginner)
+    fdSetupRules(Player.Red, ADVANCED)
+    local saved = onSave()
+    onLoad(saved)
+    eq(state().rules, "advanced")
+    eq(byId(S.xml).fds_rulesets.children[2].attributes.selected, "true")
+    assert(byId(S.xml).fdm_Red_tiresMark)
+end
+
 function T.the_start_falls_back_on_the_spare_dice_set()
     local S = world()
     local names = packDice(S)
@@ -2011,7 +2092,7 @@ function T.only_the_host_can_use_the_race_controls()
     for _, node in ipairs(S.xml) do walk(node, node.attributes.id) end
     for _, node in ipairs(S.board.xml) do walk(node, node.attributes.id) end
     eq(rows.fdr, 1, "Undo, on the race panel, is the host's")
-    eq(rows.fds, 4, "as are the setup menu's choices, Start race, the track tools and the editor line")
+    eq(rows.fds, 5, "as are the setup menu's choices, the rules, Start race, the track tools and the editor line")
 
     -- A click that gets through anyway does nothing.
     joinRace("Blue", S.advanced)
@@ -2514,6 +2595,26 @@ function T.the_map_cannot_change_during_the_grid_roll()
     onLoad(saved)
     fdSetupMap(Player.Red, "Formula D: Austin  (no track data)")
     eq(S.board.custom.image, Maps.byId.FDMonaco.url)
+end
+
+function T.a_race_runs_under_the_advanced_rules()
+    local S, red, blue = twoCars()
+    fdSetupRules(Player.Red, "Formula D advanced rules")
+    gridRoll(S, { Red = 4, Blue = 15 }) -- Blue on pole
+    fdStart(Player.Red)
+    eq(state().phase, "race")
+    assert(S.logged("BluePlayer rolls 10 on the black die %(start%): normal start"))
+    fdUiShift(Player.Blue, "1")
+    roll(S, 1, 2, "Blue")
+    moveOn(S, blue, "Blue")
+    eq(state().cars.Blue.wear.tires, 6, "a full roll costs nothing")
+    assert(S.logged("RedPlayer rolls 10 on the black die %(start%)"), "then Red's start")
+    fdUiShift(Player.Red, "1")
+    roll(S, 1, 1)
+    moveOn(S, red, "Red")
+    eq(state().round, 2)
+    eq(S.ui.fdr_r1_w_tires.value, "6", "the standings show each zone")
+    assert(S.advanced.buttons[1].label:find("T6 B3 G3 C3 E3 S2"), S.advanced.buttons[1].label)
 end
 
 return T

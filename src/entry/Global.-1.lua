@@ -11,7 +11,19 @@
 -- after its roll.
 
 local Race = require("fd.core.race")
-local Rules = require("fd.rules.beginner")
+-- The rulesets to choose from on the setup menu, in its order. The race
+-- state says which one it is raced under.
+local RULESETS = {
+    require("fd.rules.beginner"),
+    require("fd.rules.advanced"),
+}
+local function rulesFor(id)
+    for _, r in ipairs(RULESETS) do
+        if r.id == id then return r end
+    end
+    return RULESETS[1]
+end
+local Rules = RULESETS[1]
 local Maps = require("fd.data.maps")
 local Dice = require("fd.tts.dice")
 local Dashboard = require("fd.tts.dashboard")
@@ -197,6 +209,7 @@ function onLoad(saved_data)
         setup_packed = true
     end
 
+    Rules = rulesFor(saved.race and saved.race.rules)
     race = Race.new(Rules, saved.race)
     race.autoRolls = true
     turnsSet = nil
@@ -233,7 +246,11 @@ function buildUi()
     for _, m in ipairs(Maps.list) do
         maps[#maps + 1] = { id = m.id, name = m.name, ready = TRACKS[m.id] ~= nil, current = map ~= nil and map.id == m.id }
     end
-    panels[#panels + 1] = Setup.panel(maps)
+    local rulesets = {}
+    for i, r in ipairs(RULESETS) do
+        rulesets[i] = { name = r.name, current = r == Rules }
+    end
+    panels[#panels + 1] = Setup.panel(maps, rulesets)
     local track = map and TRACKS[map.id]
     Hud.build(Rules, panels, Track.tile(), track and Editor.trackFor(track), function()
         Mini.setReady()
@@ -346,8 +363,8 @@ local function syncDashboards(force)
                 car.tts.faceWarned = nil
             elseif not car.tts.faceWarned then
                 car.tts.faceWarned = true
-                broadcastToColor("Flip your dashboard to the beginner side to track wear on it.",
-                    car.color, LEVEL_RGB.warn)
+                broadcastToColor("Flip your dashboard to the " .. Dashboard.faceFor(Rules)
+                    .. " side to track wear on it.", car.color, LEVEL_RGB.warn)
             end
         end
     end
@@ -372,6 +389,9 @@ local function dashLabel(car)
         if not car.place then
             parts[#parts + 1] = car.gear > 0 and (Race.gearName(car.gear) .. " gear") or "on the grid"
             parts[#parts + 1] = Hud.wearSummary(race, car)
+            if car.spun then
+                parts[#parts + 1] = "SPUN: 1st gear"
+            end
             if car.lastRoll then
                 parts[#parts + 1] = "rolled " .. car.lastRoll
             end
@@ -817,6 +837,19 @@ local function markerOwner(guid)
     return nil
 end
 
+--- The guids of every car's dashboard markers, as a set.
+local function markerGuids()
+    local out = {}
+    for _, car in ipairs(race:cars()) do
+        local m = car.tts and car.tts.markers
+        if m then
+            if m.gear then out[m.gear] = true end
+            for _, g in pairs(m.wear or {}) do out[g] = true end
+        end
+    end
+    return out
+end
+
 local function shiftTo(color, gear)
     -- A shift starts somebody's turn: the last move's options are done with.
     clearReach()
@@ -863,7 +896,7 @@ function onObjectDrop(color, obj)
     end
     local owner = carOwning(obj.getGUID())
     if owner or CAR_NAMES[obj.getName()] then
-        local space, track = snapCar(obj)
+        local space, track, yaw = snapCar(obj)
         if owner then
             -- Put down during its move, the move is judged and charged:
             -- undoable, and the dashboards show the result. Put down after
@@ -872,6 +905,10 @@ function onObjectDrop(color, obj)
                 race:placed(owner.color, space and space.id, track)
                 race:putDown(owner.color)
             end)
+            -- A car that spins there is left pointing backwards.
+            if yaw and owner.spun then
+                obj.setRotationSmooth({ x = 0, y = yaw + 180, z = 0 }, false, true)
+            end
         end
         return
     end
@@ -1419,6 +1456,43 @@ function fdSetupLaps(player, value)
     end
 end
 
+--- The rules list on the setup menu: race under the rules picked, by their
+-- name. Before the race only; every car starts afresh in the new zones.
+function fdSetupRules(player, value)
+    local phase = race.state.phase
+    if not admin(player) or phase == "race" or phase == "grid" then
+        return
+    end
+    local rules = nil
+    for _, r in ipairs(RULESETS) do
+        if r.name == value then rules = r end
+    end
+    if not rules or rules == Rules then
+        return
+    end
+    printToAll(player.steam_name .. " picks the " .. rules.name, LEVEL_RGB.info)
+    clearReach()
+    act(function()
+        Rules = rules
+        race:setRules(rules)
+    end)
+    rulesChanged()
+end
+
+--- The race is under other rules than a moment ago (picked, or undone):
+-- the dashboards on the table are turned to the face for them, and the
+-- screen dashboards, the standings and the setup menu drawn again.
+function rulesChanged()
+    local face = Dashboard.faceFor(Rules)
+    for _, dash in ipairs(Dashboard.all()) do
+        if Dashboard.face(dash) ~= face then
+            dash.flip()
+            dashboardMoved(dash)
+        end
+    end
+    buildUi()
+end
+
 --- A new map is on the board. Reloading the tile took the race panel with
 -- it, so it is drawn again; the setup menu says which map it is, turn order
 -- goes by its track, its pit boxes take their seats' colours, and the dice
@@ -1464,9 +1538,22 @@ function fdUndo(player)
         broadcastToColor("Nothing to undo.", player.color, LEVEL_RGB.info)
         return
     end
-    race = Race.new(Rules, JSON.decode(last))
+    local state = JSON.decode(last)
+    local was, had = Rules, markerGuids()
+    Rules = rulesFor(state.rules)
+    race = Race.new(Rules, state)
     race.autoRolls = true
     pendingStart = nil
+    -- Markers put out since -- one per zone of other rules, say -- are not
+    -- the race's any more.
+    local kept = markerGuids()
+    for guid in pairs(had) do
+        local obj = not kept[guid] and getObjectFromGUID(guid)
+        if obj then obj.destruct() end
+    end
+    if Rules ~= was then
+        rulesChanged()
+    end
     useBoardTrack()
     clearReach()
     -- Undo puts the race back, not the pieces: the board still says where
@@ -1666,7 +1753,7 @@ snapCar = function(obj)
         return nil
     end
     setDown(obj, pos, yaw)
-    return space, track
+    return space, track, yaw
 end
 
 --- Once the grid roll has settled the order, set each claimed car down on
