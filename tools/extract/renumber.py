@@ -121,16 +121,6 @@ def codes(track):
     return {old: c for old, c in new.items() if old != c}
 
 
-def _sort_key(s):
-    order = {"i": 0, "m": 1, "o": 2, "p": 3, "b": 4}
-    parts = str(s["id"]).split(".")
-    if len(parts) != 3 or not parts[2].isdigit():
-        return (9, 0, str(s["id"]))
-    sector = parts[1]
-    return (order.get(parts[0], 9), int(sector[1:]) * 2 - (sector[0] == "s") if sector[1:].isdigit() else 0,
-            int(parts[2]))
-
-
 def rename(track, mapping):
     """Rename spaces in `track` by `mapping`, everywhere it names one."""
     if not mapping:
@@ -155,7 +145,8 @@ def rename(track, mapping):
             for k in ("space", "beside"):
                 if k in b:
                     b[k] = m(b[k])
-    track["spaces"].sort(key=_sort_key)
+    # By id, as the browser editor and import_track.py write them.
+    track["spaces"].sort(key=lambda s: str(s["id"]))
 
 
 def rename_files(mapping, tid, folder=TRACKS):
