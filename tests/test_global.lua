@@ -2165,6 +2165,24 @@ function T.the_dice_tray_moves_where_the_board_menu_says_and_is_saved()
     assert(math.abs(middle.x - spot.x) < 1e-6 and math.abs(middle.z - spot.z) < 1e-6, "still there")
 end
 
+function T.the_board_menu_drops_the_games_edits_for_the_track_file_when_asked_twice()
+    local S = world()
+    local Track = require("fd.tts.track")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    S.board.rightClick("Put the dice here", "Red", Track.worldOf(S.board, FDMonaco, 600, 900))
+    assert(onSave().json.edits.FDMonaco, "the game has edits to Monaco")
+    S.board.rightClick("Use the track file", "Blue")
+    assert(onSave().json.edits.FDMonaco, "not for a player who is not the host")
+    S.board.rightClick("Use the track file", "Red")
+    assert(onSave().json.edits.FDMonaco, "asked once: only a warning")
+    S.board.rightClick("Use the track file", "Red")
+    local edits = onSave().json.edits or {}
+    eq(edits.FDMonaco, nil, "asked twice: dropped")
+    local _, middle = tray(S)
+    local home = Track.worldOf(S.board, FDMonaco, FDMonaco.dice[1], FDMonaco.dice[2])
+    assert(math.abs(middle.x - home.x) < 1e-6 and math.abs(middle.z - home.z) < 1e-6, "dice back on the file's spot")
+end
+
 function T.the_board_takes_a_right_click_only_while_the_layout_or_editor_is_open()
     local S = world()
     local host = { color = "Red", steam_name = "RedPlayer" }

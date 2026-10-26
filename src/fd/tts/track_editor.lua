@@ -724,6 +724,11 @@ function Editor.load(saved, strayMarkers)
     end
 end
 
+--- Whether the game holds edits to track `id`, which it uses over the file.
+function Editor.hasEdits(id)
+    return edits[id] ~= nil
+end
+
 --- Forget the edits to a track: back to the file.
 function Editor.revert(id)
     edits[id] = nil

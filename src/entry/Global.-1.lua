@@ -1834,6 +1834,40 @@ end
 -- Whether the board is open for its layout to be set (fdLayout).
 local layoutOn = false
 
+-- Edits kept in the game are used over the track file, so a track fixed in
+-- the browser editor (tools/editor/) does not show until they are dropped.
+-- Asked twice, within this many seconds, as it cannot be undone.
+local DROP_CONFIRM = 10
+local dropAsked = {}    -- track id -> when the host first asked
+
+local function useTrackFile(color)
+    local track = trackOnBoard()
+    if not track then
+        broadcastToColor("No track data for the map on the board yet.", color, LEVEL_RGB.warn)
+        return
+    end
+    if not Editor.hasEdits(track.id) then
+        broadcastToColor(track.name .. " has no edits in this game: it uses its track file already.",
+            color, LEVEL_RGB.info)
+        return
+    end
+    local asked = dropAsked[track.id]
+    if not asked or os.time() - asked > DROP_CONFIRM then
+        dropAsked[track.id] = os.time()
+        broadcastToColor("This drops every edit to " .. track.name .. " made in this game -- spaces, grid, "
+            .. "dice and panel -- and uses its track file instead. Choose Use the track file again to confirm.",
+            color, LEVEL_RGB.warn)
+        return
+    end
+    dropAsked[track.id] = nil
+    Editor.revert(track.id)
+    layDice()
+    buildUi()
+    if Editor.isOpen() then editorStatus() end
+    broadcastToColor(track.name .. " now uses its track file. Save the game to keep it that way.",
+        color, LEVEL_RGB.info)
+end
+
 --- Right-click menu on the board: it knows where the player clicked, so
 -- nothing needs a key bound to it. The layout items are always there; the
 -- editor's (`on`) only while it is open.
@@ -1861,6 +1895,7 @@ boardMenu = function(on)
     item("Put the race panel here", panelAt)
     item("Race panel larger", function(color) scalePanel(color, PANEL_STEP) end)
     item("Race panel smaller", function(color) scalePanel(color, 1 / PANEL_STEP) end)
+    item("Use the track file", useTrackFile)
     if not on then return end
     item("Pick up spaces here", pickUpAt)
     item("Add a space here", addAt)
@@ -1878,7 +1913,8 @@ function fdLayout(player)
     boardMenu(Editor.isOpen())
     if layoutOn then
         broadcastToColor("Right-click the board: Put the dice here, Turn the dice, Put the race panel here, "
-            .. "Race panel larger / smaller. Press Layout again when done, and save the game to keep it.",
+            .. "Race panel larger / smaller, Use the track file (drop this game's edits to it). "
+            .. "Press Layout again when done, and save the game to keep it.",
             player.color, LEVEL_RGB.info)
     else
         broadcastToColor("Board layout closed. Save the game to keep it.", player.color, LEVEL_RGB.info)
