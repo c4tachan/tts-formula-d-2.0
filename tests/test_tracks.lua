@@ -63,7 +63,11 @@ function T.every_link_leads_forward()
                     local slack = across and P.cell / 2 or 0
                     -- A fork can point into a space printed level with it:
                     -- round a hairpin, or the outside of a bend, the lane
-                    -- beside has cells longer or out of step. Never behind.
+                    -- beside has cells longer or out of step, and the cell
+                    -- it points into can start a little behind this one's
+                    -- middle (Formula De Zandvoort nr. 2's first hairpin).
+                    -- Never as much as a quarter of a cell behind.
+                    if t.lane ~= s.lane and not across then slack = P.cell / 4 end
                     local ok = P.along[n] > P.along[s.id] - slack
                         or (t.lane ~= s.lane and P.along[n] == P.along[s.id])
                     assert(ok, s.id .. " -> " .. n .. " runs backwards")
