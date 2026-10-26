@@ -207,7 +207,12 @@ them into the track file with the rest.
 A fresh scan from `find_grid.py` has plain numbers for ids until
 `find_corners.py` runs; that step renames every link and the arrow reading in
 `tracks/<id>.arrows.json` to match. A space added in the editor is named
-after the space nearest it, with `+n` on the end, until the next run.
+after the space nearest it, with `+n` on the end, and a space moved to
+another lane keeps its old letter, until the codes are worked out again:
+`tools/extract/renumber.py` does that from the track file alone -- each
+lane followed round from the finish line, numbered within the sectors its
+spaces have -- renaming the space everywhere it is named, and the browser
+editor runs it on every save. It needs each lane to be one loop of links.
 
 ## Why pixels and not a hand-built graph
 

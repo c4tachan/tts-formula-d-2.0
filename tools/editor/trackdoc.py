@@ -32,8 +32,12 @@ import json
 import math
 import pathlib
 import re
+import sys
 
 from lupa import lua52
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "extract"))
+import renumber  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -409,19 +413,7 @@ class TrackDoc:
         pit = track["pit"]
         by_id = {s["id"]: s for s in spaces}
         in_pit = {s["id"] for s in spaces if s.get("pit") and not s.get("box")}
-        # The pit lane in order, entry to exit, as its links run: from the
-        # first space it had (or one nothing in the pit lane leads to), on
-        # down the pit lane. A space added to it falls into place.
-        led_to = {n for i in in_pit for n in by_id[i]["next"] if n in in_pit}
-        first = next((i for i in pit.get("spaces", []) if i in in_pit and i not in led_to), None)
-        first = first or next((i for i in sorted(in_pit, key=str) if i not in led_to), None)
-        lane, seen = [], set()
-        while first is not None and first not in seen:
-            lane.append(first)
-            seen.add(first)
-            first = next((n for n in by_id[first]["next"] if n in in_pit), None)
-        # Any it could not reach stay listed after, so nothing goes missing.
-        lane += [i for i in pit.get("spaces", []) if i in in_pit and i not in seen]
+        lane = renumber.pit_order(track)
         pit["spaces"] = lane
         pit["entry"] = sorted((s["id"] for s in spaces if not s.get("pit") and not s.get("box")
                                and any(n in in_pit for n in s["next"])), key=str)

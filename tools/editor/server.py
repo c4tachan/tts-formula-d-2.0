@@ -41,6 +41,7 @@ sys.path.insert(0, str(ROOT / "tools" / "extract"))
 
 import checks  # noqa: E402
 import render  # noqa: E402
+import renumber  # noqa: E402
 from trackdoc import OpError, TrackDoc  # noqa: E402
 
 TRACKS = ROOT / "tracks"
@@ -410,6 +411,23 @@ class Workspace:
             kind, tid = self.parse(key)
             path = self.track_path(key)
             track = doc.for_file("web editor (%s)" % stamp())
+            # Codes put right (tools/extract/renumber.py): a space added here
+            # is named after its neighbour, often in another lane, and one
+            # moved to another lane keeps its old letter.
+            renamed, unnumbered = {}, None
+            try:
+                renamed = renumber.codes(track)
+            except renumber.RenumberError as e:
+                unnumbered = str(e)
+            if renamed:
+                renumber.rename(track, renamed)
+                renumber.rename_files(renamed, tid, path.parent)
+                # The working copy takes the new codes; its undo steps name
+                # the old ones, and the files beside it no longer do.
+                renumber.rename(doc.track, renamed)
+                doc.undo_stack.clear()
+                doc.redo_stack.clear()
+                doc._recheck(relink=False)
             path.write_text(json.dumps(track, indent=1), encoding="utf-8")
             moved = doc.moved
             doc.dirty = False
@@ -417,7 +435,7 @@ class Workspace:
             self.forget(key)
             self.rev += 1
             self.last = {"author": author, "notes": ["saved %s" % rel(path)]}
-        out = {"path": rel(path), "adjacency": False}
+        out = {"path": rel(path), "adjacency": False, "renamed": renamed, "unnumbered": unnumbered}
         if kind == "real":
             gen = subprocess.run([sys.executable, str(EXTRACT / "gen_tracks.py")], capture_output=True,
                                  text=True, cwd=ROOT)
@@ -426,6 +444,12 @@ class Workspace:
                 # The spaces moved: which touch which is out of date.
                 self.adjacency(key)
                 out["adjacency"] = True
+        if renamed:
+            sample = ", ".join("%s -> %s" % kv for kv in list(renamed.items())[:4])
+            self.system("Renumbered %d space(s) whose codes were out of step with their lane or place: %s%s. "
+                        "Undo starts afresh from here." % (len(renamed), sample, " ..." if len(renamed) > 4 else ""))
+        if unnumbered:
+            self.system("Could not renumber the spaces, so some codes may not match their lanes: %s." % unnumbered)
         failing = [c for c in self.checks(key) if c["test"] != "adjacency"]
         out["failing"] = failing
         self.system("%s saved %s%s.%s" % (

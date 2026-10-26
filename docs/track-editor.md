@@ -33,7 +33,10 @@ in-game editor's exactly:
 
 **Save** writes `tracks/<id>.json` in the shape `import_track.py` writes
 from a game (`edited: true`, `edited_from: "web editor (…)"`) and
-regenerates the Lua modules. If spaces moved, came or went it also reruns
+regenerates the Lua modules. It first gives the spaces their codes again
+(`tools/extract/renumber.py`), so a space added as `m.c3.3+1` in the inside
+lane comes out as `i.c3.1`, and the spaces after it in its lane move up one.
+Undo starts afresh after a save that renamed spaces. If spaces moved, came or went it also reruns
 `find_adjacency.py`. After that, `pwsh tools/sync.ps1 push` and Save & Play
 as usual.
 

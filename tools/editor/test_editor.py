@@ -139,8 +139,43 @@ class Edits(unittest.TestCase):
         d.apply([{"op": "add", "pos": mid, "like": lane[3], "new_id": "p.new"}])
         d.apply([{"op": "link", "from": lane[3], "to": lane[4]}, {"op": "link", "from": lane[3], "to": "p.new"},
                  {"op": "link", "from": "p.new", "to": lane[4]}])
-        out = d.for_file("x")["pit"]["spaces"]
+        track = d.for_file("x")
+        out = track["pit"]["spaces"]
         self.assertEqual(out, lane[:4] + ["p.new"] + lane[4:])
+        # Renumbered, the pit lane's list is its new codes, each once, in order.
+        import renumber
+        mapping = renumber.codes(track)
+        self.assertEqual(mapping["p.new"], lane[4])
+        renumber.rename(track, mapping)
+        self.assertEqual(track["pit"]["spaces"], [mapping.get(i, i) for i in out])
+        self.assertEqual(track["pit"]["spaces"], renumber.pit_order(track))
+
+    def test_codes_follow_lanes_and_places(self):
+        import renumber
+        self.assertEqual(renumber.codes(copy.deepcopy(MONACO)), {}, "Monaco's codes are right as they are")
+        d = doc()
+        # A space added in the inside lane beside a middle-lane one.
+        a, b = d.find("i.c1.1"), d.find("i.c1.2")
+        mid = [(a["pos"][0] + b["pos"][0]) / 2, (a["pos"][1] + b["pos"][1]) / 2]
+        d.apply([{"op": "add", "pos": mid, "like": "m.c1.2"}, {"op": "lane", "id": "m.c1.2+1", "lane": 1},
+                 {"op": "rotate", "id": "m.c1.2+1", "rot": a["rot"]}])
+        # i.c1.1's links are set by hand: it is linked on to the new space.
+        if "i.c1.2" in d.find("i.c1.1")["next"]:
+            d.apply([{"op": "link", "from": "i.c1.1", "to": "i.c1.2"}])
+        if "m.c1.2+1" not in d.find("i.c1.1")["next"]:
+            d.apply([{"op": "link", "from": "i.c1.1", "to": "m.c1.2+1"}])
+        if "i.c1.2" not in d.find("m.c1.2+1")["next"]:
+            d.apply([{"op": "link", "from": "m.c1.2+1", "to": "i.c1.2"}])
+        track = d.for_file("x")
+        mapping = renumber.codes(track)
+        self.assertEqual(mapping["m.c1.2+1"], "i.c1.2")
+        self.assertEqual(mapping["i.c1.2"], "i.c1.3")
+        renumber.rename(track, mapping)
+        ids = {s["id"] for s in track["spaces"]}
+        self.assertFalse(any("+" in i for i in ids))
+        self.assertTrue(all(n in ids for s in track["spaces"] for n in s["next"]))
+        self.assertTrue(all(g in ids for g in track["start"]))
+        self.assertEqual(sorted(track["finish"]["line"]), sorted(MONACO["finish"]["line"]))
 
     def test_the_track_tests_run_on_the_working_copy(self):
         import checks
