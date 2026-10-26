@@ -361,6 +361,76 @@ function T.taken_out_of_the_box_the_stop_is_not_timed()
     eq(#r:pendingChecks(), 0, "back where it started: no stop, no die")
 end
 
+-- Slipstreaming ---------------------------------------------------------------------
+
+--- Two staggered lanes, `cells` long (as in test_moves), corner 1 over
+-- `corner` = { first, last, stops } if given.
+local function road(cells, corner)
+    local spaces = {}
+    for k = 0, cells - 1 do
+        local c = corner and k >= corner[1] and k <= corner[2] and 1 or nil
+        local last = k == cells - 1
+        spaces[#spaces + 1] = { id = "i" .. k, lane = 1, corner = c,
+            next = last and { "o" .. k } or { "i" .. (k + 1), "o" .. k } }
+        spaces[#spaces + 1] = { id = "o" .. k, lane = 2, corner = c,
+            next = last and {} or { "o" .. (k + 1), "i" .. (k + 1) } }
+    end
+    return { spaces = spaces, corners = corner and { { id = 1, stops = corner[3] } } or {} }
+end
+
+--- Red on i0 and Blue on i5, both last in 4th; Red rolls 4 in 4th.
+local function behindBlue(rules, track)
+    local r = Race.new(rules)
+    r:join("Red")
+    r:join("Blue")
+    r:startRace()
+    r:blackDie(10, "Red")
+    r:blackDie(10, "Blue")
+    r:placed("Red", "i0", track)
+    r:placed("Blue", "i5", track)
+    r:car("Red").rolledGear = 4
+    r:car("Blue").rolledGear = 4
+    r:drain()
+    rollDie(r, "Red", 4, 4)
+    return r
+end
+
+function T.a_car_slipstreams_past_the_one_ahead()
+    local track = road(14)
+    local r = behindBlue(Rules, track)
+    assert(hasEvent(r, "info", "can slipstream"), "told after the roll")
+    eq(r:reachable("Red", track).i6.slip, 1)
+    putDown(r, "Red", "i6", track)
+    local events = r:drain()
+    for _, e in ipairs(events) do
+        assert(not e.text:find("not a legal"), e.text)
+    end
+    eq(wear(r, "Red"), "T6 B3 G3 C3 E3 S2", "the 3 spaces cost nothing")
+    eq(r:car("Red").space, "i6")
+end
+
+function T.a_slipstream_into_a_corner_costs_a_brake()
+    local track = road(14, { 6, 9, 1 })
+    local r = behindBlue(Rules, track)
+    putDown(r, "Red", "i6", track)
+    eq(wear(r, "Red"), "T6 B2 G3 C3 E3 S2")
+    assert(hasEvent(r, "wear", "slipstreamed into a corner"))
+end
+
+function T.braking_a_slipstream_short_is_charged_as_braking()
+    local track = road(14)
+    local r = behindBlue(Rules, track)
+    putDown(r, "Red", "o5", track)
+    eq(wear(r, "Red"), "T6 B2 G3 C3 E3 S2", "a space short of the 3")
+end
+
+function T.the_basic_rules_have_no_slipstream()
+    local track = road(14)
+    local r = behindBlue(Beginner, track)
+    eq(r:reachable("Red", track).i6, nil)
+    assert(not hasEvent(r, "info", "can slipstream"))
+end
+
 -- Setup -----------------------------------------------------------------------------
 
 function T.switching_rules_starts_the_cars_afresh_in_the_new_zones()

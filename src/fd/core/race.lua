@@ -224,16 +224,18 @@ function Race:startMove(car, roll)
         car.move = nil
         return
     end
-    local occupied = {}
+    local occupied, gears = {}, {}
     for _, o in ipairs(self:cars()) do
         if o ~= car and o.space and not o.eliminated then
             occupied[#occupied + 1] = o.space
+            gears[o.space] = o.rolledGear
         end
     end
     -- Not state: lets the Global script show the new move's options.
     self.opened = car.color
     car.move = {
         from = car.space, roll = roll, stops = car.stops, occupied = occupied,
+        gears = gears,    -- space id -> gear of the car there, for slipstreaming
         charged = { wear = {} }, -- zone -> points charged for it so far
         crossed = false, -- whether a crossing of the line was counted for it
         pack = nil,      -- id of the collisions it set off, see checkCollisions
@@ -287,6 +289,21 @@ function Race:reachable(color, track, alone)
         })
         for id, o in pairs(reach or {}) do
             if free(id) then o.brake = 0 end
+        end
+        -- Where the ruleset has it, slipstreaming takes the car further.
+        local slip = self.rules.slipstream
+        if reach and slip and not alone and m.gears then
+            local more = Moves.slipstream(track, reach, {
+                occupied = occupied, gears = m.gears, gear = car.rolledGear, color = color,
+                minGear = slip.minGear, spaces = slip.spaces,
+                cost = function(o) return self:moveCost(o, before) end,
+            })
+            for id, o in pairs(more) do
+                local had = reach[id]
+                if not had or self:moveCost(o, before) < self:moveCost(had, before) then
+                    reach[id] = o
+                end
+            end
         end
         done[key] = reach or false
     end
@@ -401,6 +418,9 @@ local function moveReason(o)
     if o.overshoot > 0 then
         parts[#parts + 1] = string.format("overshot corner %s by %d", tostring(o.corner), o.overshoot)
     end
+    if (o.slipCorners or 0) > 0 then
+        parts[#parts + 1] = "slipstreamed into a corner"
+    end
     return table.concat(parts, ", ")
 end
 
@@ -450,6 +470,10 @@ function Race:judgeMove(car, track)
     if o then
         car.stops = o.stops
         effect = self.rules.moveWear(o, self:wearBefore(car))
+        if o.slip then
+            self:emit("info", string.format("%s slipstreams%s", self:label(car),
+                o.slip > 1 and (" " .. o.slip .. " times") or ""), car.color)
+        end
         self:chargeMove(car, effect, moveReason(o))
     else
         self:emit("warn", string.format("%s: that space is not a legal %d from %s -- nothing charged for the move",
@@ -1041,6 +1065,7 @@ function Race:rolled(color, gear, value)
     self:emit("roll", string.format("%s rolls %s in %s gear", who, tostring(value), gearName(gear)), color)
     if car.move then
         self:notePitOvershoot(car)
+        self:noteSlipstream(car)
     end
 
     -- Where the ruleset spares the pit lane, a roll from there sets off no
@@ -1502,6 +1527,23 @@ function Race:notePitOvershoot(car)
         self:emit("info", string.format("%s would go through corner %s without its stops, and an "
             .. "overshooting car must keep to its lane: no turning into the pits on this move",
             self:label(car), tostring(over)), car.color)
+    end
+end
+
+--- After a roll: if the move can end in a slipstream, say so -- the spaces
+-- it reaches that way are marked with the rest, and nothing else tells
+-- them apart.
+function Race:noteSlipstream(car)
+    if not (self.track and self.rules.slipstream) then
+        return
+    end
+    for _, o in pairs(self:reachable(car.color, self.track) or {}) do
+        if o.slip then
+            self:emit("info", string.format("%s can slipstream: ending the full roll right behind a car "
+                .. "in %s gear or higher goes %d spaces further, and those spaces are marked too",
+                self:label(car), gearName(self.rules.slipstream.minGear), self.rules.slipstream.spaces), car.color)
+            return
+        end
     end
 end
 

@@ -55,6 +55,12 @@ Rules.pitMaxGear = 4
 --- Zones a pit stop restores to their starting value: only the tires.
 Rules.pitRestores = { "tires" }
 
+-- Slipstreaming: a car ending its full roll right behind another, both in
+-- 4th or higher and the one behind in no lower a gear, may go 3 further
+-- round it (see Moves.slipstream). Carried into a corner, it loses a brake
+-- WP (see moveWear).
+Rules.slipstream = { minGear = 4, spaces = 3 }
+
 -- Most gears a car may drop in one shift.
 Rules.maxDownshift = 3
 
@@ -99,8 +105,8 @@ end
 --
 -- Braking costs a brake WP a space, the 4th space on a tire WP a space too
 -- (3 brake and 1-3 tire); 7 or more is out. Brake WP the car does not have
--- come out of its tires. Overshooting costs a tire WP a space, after the
--- braking.
+-- come out of its tires. A slipstream into a corner costs a brake WP too.
+-- Overshooting costs a tire WP a space, after the braking.
 function Rules.moveWear(o, wear)
     local w = {}
     local out = nil
@@ -108,8 +114,9 @@ function Rules.moveWear(o, wear)
     if b > MAX_BRAKE then
         out = string.format("could not brake %d spaces", b)
     end
-    if b > 0 then
-        local brakes = math.min(b, 3)
+    local slipped = o.slipCorners or 0
+    if b > 0 or slipped > 0 then
+        local brakes = math.min(b, 3) + slipped
         local tires = math.max(0, b - 3)
         local have = math.max(0, wear.brakes or 0)
         if brakes > have then

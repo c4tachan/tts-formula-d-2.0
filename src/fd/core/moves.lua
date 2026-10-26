@@ -207,6 +207,101 @@ function Moves.reach(track, fromId, roll, opts)
     return results
 end
 
+-- The most slipstreams one after another in a move: far more than a move
+-- can string together.
+local MAX_SLIPS = 6
+
+--- Where slipstreaming takes a car on from the options in `reach` (as
+-- Moves.reach gave them for its move). A move that ends its full roll
+-- directly behind another car -- the next space in its lane holds it --
+-- may go on `spaces` further, round that car, so long as both are in
+-- `minGear` or higher and the mover in no lower a gear than the car ahead.
+-- It may brake some of those spaces, and if it ends them behind another
+-- car, slipstream again. Not into the pit lane. Corners go by their arrows
+-- and stops, as in any move.
+--
+-- opts:
+--   occupied  id -> true for spaces with other cars on them
+--   gears     id -> the gear of the car on that space
+--   gear      the mover's gear
+--   minGear   lowest gear to slipstream in
+--   spaces    how far a slipstream goes
+--   cost, color   as for Moves.reach
+--
+-- Returns id -> option, for the spaces a slipstream gets to: a Moves.reach
+-- option for the whole move, `brake` the spaces short of the last
+-- slipstream, plus
+--   slip         how many times it slipstreamed
+--   slipCorners  how many of those took it into a corner
+function Moves.slipstream(track, reach, opts)
+    local byId = index(track)
+    local occupied = opts.occupied or {}
+    local gears = opts.gears or {}
+    local cost = opts.cost or Moves.defaultCost
+    local out = {}
+
+    --- The space of the car directly ahead of option `o`'s, if any.
+    local function ahead(o)
+        local s = byId[o.space]
+        if not s or s.pit then
+            return nil
+        end
+        for _, nid in ipairs(s.next or {}) do
+            local t = byId[nid]
+            if t and t.lane == s.lane and occupied[nid] then
+                return nid
+            end
+        end
+        return nil
+    end
+
+    local function from(o, depth)
+        -- A full roll only: braking to slipstream is not allowed.
+        if depth > MAX_SLIPS or o.brake > 0 or o.overshoot > 0 then
+            return
+        end
+        local id = ahead(o)
+        local g = id and gears[id]
+        if not (g and g >= opts.minGear and opts.gear >= g) then
+            return
+        end
+        local s = byId[o.space]
+        -- The move does not end here, so no stop is made here.
+        local made = (s.corner and o.stops > 0) and (o.stops - 1) or 0
+        local more = Moves.reach(track, o.space, opts.spaces, {
+            occupied = occupied, stops = made, color = opts.color, cost = cost,
+        })
+        for cid, c in pairs(more or {}) do
+            if cid ~= o.space then
+                local path = {}
+                for _, p in ipairs(o.path) do path[#path + 1] = p end
+                local into = false
+                for k = 2, #c.path do
+                    path[#path + 1] = c.path[k]
+                    local p = byId[c.path[k]]
+                    into = into or (p.corner ~= nil and p.corner ~= s.corner)
+                end
+                local n = {
+                    space = cid, moved = o.moved + c.moved, brake = c.brake,
+                    overshoot = c.overshoot, missed = c.missed, corner = c.corner, stops = c.stops,
+                    path = path, crossed = o.crossed or c.crossed,
+                    slip = (o.slip or 0) + 1, slipCorners = (o.slipCorners or 0) + (into and 1 or 0),
+                }
+                local had = out[cid]
+                if not had or cost(n) < cost(had) then
+                    out[cid] = n
+                end
+                from(n, depth + 1)
+            end
+        end
+    end
+
+    for _, o in pairs(reach) do
+        from(o, 1)
+    end
+    return out
+end
+
 --- Every space `roll` steps or fewer along the links from `fromId`, the
 -- rules of a move aside: through other cars and corners alike, and into the
 -- pit lane whether or not it is open. A pit box is still only its own car's

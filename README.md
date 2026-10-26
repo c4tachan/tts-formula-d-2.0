@@ -13,7 +13,7 @@ That original is preserved verbatim in [`reference/original-2020/`](reference/or
 |---|---|
 | Project scaffold, build pipeline | done |
 | Auto gear dice selection | done (shared dice set, results read automatically) |
-| Rules automation | Formula D basic rules, and the advanced rules but slipstreaming, damage markers and the optional rules |
+| Rules automation | Formula D basic rules, and the advanced rules but damage markers and the optional rules |
 | Track data | Monaco done: 497 spaces (detected, then hand-edited in game) and its 10 corners with their stop counts |
 | Space snapping + facings | done for Monaco |
 | Damage tracking | done: the basic rules' single 18 WP pool, the advanced rules' six zones |
@@ -102,11 +102,18 @@ for each (T B G C E S).
 - **Pit stops** give back the tires only, and the black die times them: 1-10
   is a quick stop, and the car moves half the roll (rounded up) out of the
   pits at once, in 4th; 11-20 is slow, and it waits for the next round.
+- **Slipstreaming:** a full roll that ends right behind a car, both in 4th or
+  higher and the one behind in no lower a gear, may go 3 spaces further round
+  it -- and on again if that ends behind another car. Those spaces are marked
+  with the rest of the move, so put the car down where the slipstream takes
+  it; the collision check is made there. Short of the 3 is braking, and a
+  slipstream into a corner costs a brake WP. Not in the basic rules, which
+  have no such rule.
 - A car is out when it loses its last body, engine or suspension WP, or more
   tire WP than it has. No brakes or gearbox left, it races on.
 
-Not yet automated: slipstreaming and the damage markers left on the track
-(place the car and the markers by hand), and the optional rules.
+Not yet automated: the damage markers left on the track (place them and
+roll for them by hand), and the optional rules.
 
 ### Playing
 
