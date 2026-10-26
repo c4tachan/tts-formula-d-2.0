@@ -39,24 +39,124 @@ from skimage.morphology import skeletonize
 LANES = 3  # widest point of the track; per-track once more maps are done
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-OUT = ROOT / "tools" / "extract" / "out"
+# Where the track files and the step images go. tools/editor/ runs the
+# scripts with these pointed at a scratch folder, so a detection run on a
+# board image -- one already mapped, or one dropped into the editor -- never
+# touches tracks/.
+TRACKS = pathlib.Path(os.environ.get("FD_TRACKS_DIR", ROOT / "tracks")).resolve()
+OUT = pathlib.Path(os.environ.get("FD_OUT_DIR", ROOT / "tools" / "extract" / "out")).resolve()
 from tts_paths import MODS, TTS_DIR, documents_dir  # noqa: F401  (re-exported)
+
+
+# Most boards are about 2470 px wide, and the tools' sizes in pixels are
+# set for that. A few come at half that (Buddh's, Sochi's): those are read
+# at twice their size. A track file's pixels are relative to the image size
+# it records, so the mod places them on the board just the same.
+FULL_WIDTH = 1800
+
+# Where a board prints more road than its lap takes, the lap is drawn in
+# before anything is read, in board pixels: "grass" polygons painted over
+# the road it does not take, and "lines" drawn as red corner lines where
+# the board leaves a corner's edge unmarked on the way the lap comes.
+#
+# The two Zandvoort boards join into one circuit (FDe34 lays them side by
+# side), so each prints the roads that lead off to the other, and each
+# closes its own lap by a way of its own. Board 1 also has two ways from
+# Gerlach to the turn below Hunserug, each meeting that turn part way round.
+GRASS = (40, 100, 50)
+CORNER_RED = (45, 45, 215)
+LAP = {
+    "FDe02": {
+        "grass": [
+            # The link from Gerlach straight on into the turn below
+            # Hunserug: this lap goes round Hugenholtz instead.
+            [(800, 862), (962, 829), (962, 894), (918, 906), (890, 890), (860, 878), (830, 872), (800, 870)],
+            # The straight up off the board, and the road back down from it:
+            # this lap turns right through Toyotabocht between them.
+            [(805, 0), (910, 0), (910, 405), (805, 405)],
+            [(1088, 0), (1205, 0), (1280, 450), (1282, 464), (1159, 383)],
+        ],
+        "lines": [
+            # Hunserug runs into the turn's curved cells with no red line:
+            # their outer edge is where the turn starts.
+            [(1018, 696), (1045, 735), (1060, 790), (1055, 840), (1040, 872)],
+        ],
+    },
+    "FDe03": {
+        # Its start band runs out to the track limits (checkered_band()).
+        "open_band": True,
+        "grass": [
+            # The hairpin's two legs carried on off the bottom edge, to board
+            # 1: this lap turns round the hairpin between them.
+            [(810, 1540), (912, 1540), (912, 1615), (810, 1615)],
+            # and the left one's lanes running on up beside the hairpin's
+            # exit, which merges into them on the slant.
+            [(826, 1545), (906, 1545), (882, 1505), (862, 1473), (845, 1440), (828, 1408)],
+            [(1195, 1555), (1305, 1555), (1305, 1615), (1195, 1615)],
+        ],
+    },
+}
 
 
 def board_image(map_id):
     maps = json.loads((ROOT / "tools" / "extract" / "maps.json").read_text(encoding="utf-8"))
     hit = next((m for m in maps if m["id"] == map_id), None)
+    # FD_BOARD_IMAGE reads that file instead: a board not in maps.json yet,
+    # FD_BOARD_CATEGORY saying whose colours it is printed in.
+    image = os.environ.get("FD_BOARD_IMAGE")
+    if not hit and image:
+        hit = {"id": map_id, "name": map_id, "url": "",
+               "category": os.environ.get("FD_BOARD_CATEGORY", "formula_d")}
     if not hit:
         sys.exit(f"unknown map id {map_id}")
-    key = re.sub(r"[^A-Za-z0-9]", "", hit["url"].split("ugc/")[-1])
-    for f in (MODS / "Images").iterdir():
-        if key in f.name:
-            im = cv2.imread(str(f))
-            if im is not None:
-                return hit, im
-    sys.exit(f"{hit['name']} is not in the TTS cache -- open it in game once")
+    if image:
+        found = [pathlib.Path(image)]
+    else:
+        key = re.sub(r"[^A-Za-z0-9]", "", hit["url"].split("ugc/")[-1])
+        # The TTS cache first, then what download_maps.py fetched into tracks/raw/.
+        images = MODS / "Images"
+        found = [f for f in images.iterdir() if key in f.name] if images.is_dir() else []
+        found += sorted((ROOT / "tracks" / "raw").glob(f"{map_id}.*"))
+    for f in found:
+        im = cv2.imread(str(f))
+        if im is not None:
+            PALETTE["palette"] = hit["category"]
+            PALETTE["open_band"] = LAP.get(map_id, {}).get("open_band", False)
+            hit = dict(hit, upscale=1)
+            if im.shape[1] < FULL_WIDTH:
+                im = cv2.resize(im, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+                hit["upscale"] = 2      # and its printed lines twice as wide
+            lap = LAP.get(map_id, {})
+            for poly in lap.get("grass", []):
+                cv2.fillPoly(im, [np.array(poly, np.int32) * hit["upscale"]], GRASS)
+            for poly in lap.get("lines", []):
+                cv2.polylines(im, [np.array(poly, np.int32) * hit["upscale"]], False, CORNER_RED, 5)
+            return hit, im
+    sys.exit(f"{hit['name']} is not in the TTS cache or tracks/raw/ -- run download_maps.py {map_id}")
 
 
+
+
+# Which board's colours asphalt() looks for: set by board_image(), which
+# every script calls before anything else, from the board's category.
+PALETTE = {"palette": "formula_d"}
+
+
+def asphalt(hsv):
+    """Grey enough to be the track's asphalt.
+
+    On the Formula D boards it is printed a cool lavender grey. The run-off
+    and service roads round some (Austin's) are as grey and as bright, but
+    warm -- olive to sand -- and the paddock on Sochi's a green-tinted grey;
+    joined onto the track they swallow it.
+
+    The Formula Dé boards print it a stronger blue-grey, from just short of
+    cyan to violet, and paler; their sea and sky are far bluer still."""
+    H, S, V = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+    if PALETTE["palette"] == "formula_de":
+        return (H >= 98) & (H <= 128) & (S >= 8) & (S < 100) & (V > 120) & (V < 240)
+    tinted = (H >= 10) & (H < 110) & (S >= 12)
+    return (S < 50) & (V > 105) & (V < 205) & ~tinted
 
 
 def road_mask(im):
@@ -72,14 +172,20 @@ def road_mask(im):
     """
     hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV).astype(int)
     S, V = hsv[..., 1], hsv[..., 2]
-    grey = ((S < 50) & (V > 105) & (V < 205)).astype(np.uint8) * 255
+    grey = asphalt(hsv).astype(np.uint8) * 255
     white = ((S < 60) & (V >= 205)).astype(np.uint8) * 255
     white = cv2.dilate(white, np.ones((3, 3), np.uint8))
     m = cv2.morphologyEx(grey, cv2.MORPH_CLOSE, np.ones((9, 9), np.uint8))
     m[white > 0] = 0
     m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
-    _, lab, stats, _ = cv2.connectedComponentsWithStats(m, 8)
-    return (lab == 1 + int(np.argmax(stats[1:, 4]))).astype(np.uint8)
+    # The largest piece -- and on a Formula Dé board any other sizeable one:
+    # there a stretch of road can be cut off by the flag and a corner line
+    # together (Monaco's climb to the Casino). On the Formula D boards the
+    # other big pieces are scenery (Sochi's paddock).
+    n, lab, stats, _ = cv2.connectedComponentsWithStats(m, 8)
+    big = stats[1:, 4].max()
+    keep = 0.1 if PALETTE["palette"] == "formula_de" else 1.0
+    return np.isin(lab, [i for i in range(1, n) if stats[i, 4] >= keep * big]).astype(np.uint8)
 
 
 def graph_of(points, radius=1.5, extra=()):
@@ -151,9 +257,29 @@ def path(pred, a, b):
     return out[::-1]
 
 
-def find_cycle(points, extra=()):
+def without_spurs(points, extra=()):
+    """The indices of the points that lie on a loop: the skeleton with every
+    spur pruned back, end by end, to where it branches off."""
+    adj = {i: set() for i in range(len(points))}
+    for i, j in list(cKDTree(points).query_pairs(1.5)) + list(extra):
+        adj[i].add(j)
+        adj[j].add(i)
+    tips = [i for i in adj if len(adj[i]) <= 1]
+    while tips:
+        i = tips.pop()
+        for j in adj.pop(i, ()):
+            adj[j].discard(i)
+            if len(adj[j]) == 1:
+                tips.append(j)
+    return np.array(sorted(adj))
+
+
+def find_cycle(points, extra=(), pruned=False):
     """The loop through `points`: two independent shortest paths between the
-    two most distant points, which together close the ring."""
+    two most distant points, which together close the ring.
+
+    The most distant point can be the tip of a spur, and there is no second
+    way back from a dead end. Then the spurs are pruned and it goes again."""
     g = graph_of(points, extra=extra)
     d0, p0 = dijkstra(g, indices=0, return_predecessors=True)
     finite = np.isfinite(d0)
@@ -174,6 +300,12 @@ def find_cycle(points, extra=()):
     g2 = graph_of(points[idx], extra=remapped)
     d2, p2 = dijkstra(g2, indices=remap[a], return_predecessors=True)
     second = path(p2, remap[a], remap[b])
+    if second is None and not pruned:
+        core = without_spurs(points, extra)
+        at = -np.ones(len(points), int)
+        at[core] = np.arange(len(core))
+        return find_cycle(points[core], [(at[i], at[j]) for i, j in extra if at[i] >= 0 and at[j] >= 0],
+                          pruned=True)
     if second is None:
         return points[first]
     second = idx[second]
@@ -242,7 +374,7 @@ def surface_mask(im):
     """
     hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV).astype(int)
     S, V = hsv[..., 1], hsv[..., 2]
-    grey = ((S < 50) & (V > 105) & (V < 205)).astype(np.uint8)
+    grey = asphalt(hsv).astype(np.uint8)
     white = ((S < 60) & (V >= 205)).astype(np.uint8)
     kerbs = keep_long(white, 60)
     marks = interior_marks(grey, (white - kerbs).astype(np.uint8))
@@ -482,20 +614,152 @@ def outer_edge(edge_pixels, line, norm, side, width, reverse, step=6.0, jump=2.5
 
 
 def racing_line(im):
-    """The middle of the road, as one closed loop, plus the road width."""
-    mask = road_mask(im)
+    """The middle of the road, as one closed loop, plus the road width.
+
+    On a Formula Dé board the asphalt alone is too broken up by its marks to
+    trace (Monaco's climb to the Casino comes apart in specks), and the
+    solid road surface is traced instead."""
+    mask = road_mask(im) if PALETTE["palette"] != "formula_de" else road_surface(im)
+    # Thin white grid lines can speckle the asphalt (Austin's); closing the
+    # specks keeps the skeleton in one piece without welding passes together.
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7)))
+    n, lab, st, _ = cv2.connectedComponentsWithStats((mask == 0).astype(np.uint8), 4)
+    mask[np.isin(lab, [i for i in range(1, n) if st[i, 4] < 400])] = 1
+    if PALETTE["palette"] == "formula_de":
+        # The dashed kerbs leave the edge scalloped, and every scallop a spur
+        # on the skeleton: smooth it off.
+        disc = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))
+        mask = cv2.morphologyEx(cv2.morphologyEx(mask, cv2.MORPH_OPEN, disc), cv2.MORPH_CLOSE, disc)
     dist = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
     skel = skeletonize(mask > 0)
     # The pit road is one lane wide (~25 px on Monaco) and the track three
     # (~73); cut between them, low enough to keep the track in one piece.
-    keep = skel & (dist * 2 > 35)
+    # The Formula Dé pit roads are wider (~35), and its tracks no narrower
+    # than two lanes (~50).
+    classic = PALETTE["palette"] == "formula_de"
+    keep = skel & (dist * 2 > (42 if classic else 35))
     lab = cv2.connectedComponents(keep.astype(np.uint8), 8)[1]
     sizes = np.bincount(lab[keep])
-    pts = np.argwhere(lab == int(np.argmax(sizes[1:])) + 1)
-    loop = find_cycle(pts, extra=bridge_ends(pts))
+    # The start/finish band always breaks the line, and on a busy board a
+    # corner line or two can as well (Austin's Turn 7): keep every sizeable
+    # piece, not just the longest, and let bridge_ends() join them up.
+    pieces = [i for i in range(1, len(sizes)) if sizes[i] >= 0.05 * sizes[1:].max()]
+    pts = np.argwhere(np.isin(lab, pieces))
+    # The solid surface a Formula Dé board is traced on has no gaps to
+    # bridge, and a bridge would only join the two legs of a hairpin.
+    loop = find_cycle(pts, extra=() if classic else bridge_ends(pts))
     line, length = resample(loop, 3.0)
     width = float(np.median([dist[int(round(y)), int(round(x))] * 2 for x, y in line]))
-    return smooth_closed(line, 7), length, width
+    return centre_line(smooth_closed(line, 7), road_surface(im, red=False), width), length, width
+
+
+def centre_line(line, surface, width, off=0.6, reach=0.45, widest=1.3, win=15, passes=2):
+    """Put the racing line back in the middle of the road where it has
+    strayed well off it.
+
+    The skeleton the line comes from runs through the asphalt alone, and
+    where a corner is thick with arrows (Austin's Turn 8) that is holes
+    enough to send it round one edge. The middle of the road is the ridge of
+    the solid surface's distance to its edge, looked for across the road
+    from each point -- `reach` of a road's width either side, but never past
+    the road's edge, or a hairpin's other leg would do. A point with less
+    than `off` of the ridge's distance is moved onto it, unless the road is
+    more than `widest` road widths across there: that is a pit lane opening
+    off the side, and its middle is no guide. The moves are eased in along
+    the lap, which leaves the ends of a long run short of the ridge; a
+    second pass takes them the rest of the way."""
+    d = cv2.distanceTransform((surface > 0).astype(np.uint8), cv2.DIST_L2, 5)
+    H, W = d.shape
+    steps = np.arange(-1.2 * width, 1.2 * width + 1, 1.0)
+    zero = int(np.argmin(np.abs(steps)))
+    near = np.abs(steps) <= reach * width
+    for _ in range(passes):
+        nrm = normals(line)
+        move = np.zeros(len(line))
+        for i, (p, n) in enumerate(zip(line, nrm)):
+            q = np.round(p + steps[:, None] * n).astype(int)
+            q[:, 0] = q[:, 0].clip(0, W - 1)
+            q[:, 1] = q[:, 1].clip(0, H - 1)
+            v = d[q[:, 1], q[:, 0]]
+            if v[zero] <= 0:
+                continue
+            lo, hi = zero, zero
+            while lo > 0 and v[lo - 1] > 0:
+                lo -= 1
+            while hi < len(v) - 1 and v[hi + 1] > 0:
+                hi += 1
+            if steps[hi] - steps[lo] > widest * width:
+                continue
+            look = np.flatnonzero(near[lo:hi + 1]) + lo
+            k = look[int(np.argmax(v[look]))]
+            if v[zero] < off * v[k]:
+                move[i] = steps[k]
+        if not move.any():
+            break
+        # Ease each move in and out over its neighbours, so the line bends
+        # onto the ridge rather than stepping.
+        around = np.arange(-win, win + 1)
+        grown = np.array([move[(i + around) % len(move)][np.abs(move[(i + around) % len(move)]).argmax()]
+                          for i in range(len(move))])
+        line = line + nrm * smooth_closed(grown, win)[:, None]
+    return line
+
+
+def road_surface(im, red=True):
+    """The road as one solid shape: asphalt and what is painted on it, the
+    kerbs, verges and scenery removed, and every mark enclosed by the road
+    (arrows, grid boxes, the start band) filled in. With `red`, the red
+    corner lines are road too -- and so, here and there, a red kerb, which
+    can join the two legs of a hairpin (Monaco's Loews)."""
+    hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV).astype(int)
+    S, V = hsv[..., 1], hsv[..., 2]
+    kerbs = cv2.dilate(keep_long((S < 60) & (V >= 205), 60), np.ones((3, 3), np.uint8))
+    m = surface_mask(im) | (corner_lines(im) if red else 0)
+    m = cv2.morphologyEx(m.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8))
+    m[kerbs > 0] = 0
+    n, lab, st, _ = cv2.connectedComponentsWithStats(m, 8)
+    m = (lab == 1 + int(np.argmax(st[1:, 4]))).astype(np.uint8)
+    n, lab, st, _ = cv2.connectedComponentsWithStats((1 - m).astype(np.uint8), 4)
+    for i in range(1, n):
+        if st[i, 4] < 3000:
+            m[lab == i] = 1
+    # A start band printed out to the white track limits on both sides
+    # (Zandvoort nr. 2's) is no hole the road closes round, and would cut it.
+    # Looked for only where LAP says so: on a board whose road mask takes in
+    # the scenery, car parks pass for one too.
+    return m | checkered_band(im, m) if PALETTE.get("open_band") else m
+
+
+def checkered_band(im, road):
+    """The start/finish band where it lies across the road: small white and
+    black squares packed together, none of them red, within the road closed
+    over a band's depth. Empty where there is none."""
+    gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+    bg = cv2.medianBlur(gray, 21).astype(np.float32)
+    reach = cv2.morphologyEx(road.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((31, 31), np.uint8)) > 0
+    squares = np.zeros(road.shape, np.uint8)
+    for mark in (gray - bg > 35, bg - gray > 35):
+        n, lab, st, _ = cv2.connectedComponentsWithStats((mark & reach).astype(np.uint8), 8)
+        squares |= np.isin(lab, [i for i in range(1, n) if 12 <= st[i, 4] <= 400]).astype(np.uint8)
+    band = cv2.morphologyEx(squares, cv2.MORPH_CLOSE, np.ones((9, 9), np.uint8))
+    hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV).astype(int)
+    red = ((hsv[..., 0] <= 10) | (hsv[..., 0] >= 170)) & (hsv[..., 1] > 90) & (hsv[..., 2] > 80)
+    n, lab, st, _ = cv2.connectedComponentsWithStats(band, 8)
+
+    def across(i):
+        # Lying across the road, it meets it on two sides, before and after;
+        # a patch of scenery beside the road meets it on one.
+        x, y, w, h = st[i, :4]
+        x0, y0 = max(x - 6, 0), max(y - 6, 0)
+        patch = (lab[y0:y + h + 6, x0:x + w + 6] == i).astype(np.uint8)
+        rim = cv2.dilate(patch, np.ones((7, 7), np.uint8)) & ~patch.astype(bool) & (road[y0:y + h + 6, x0:x + w + 6] > 0)
+        k, _, ks, _ = cv2.connectedComponentsWithStats(rim.astype(np.uint8), 8)
+        return sum(1 for j in range(1, k) if ks[j, 4] >= 20) >= 2
+
+    # Of the patches, the band is one the road does not already cover.
+    keep = [i for i in range(1, n) if 600 <= st[i, 4] <= 6000 and red[lab == i].mean() < 0.05
+            and (road[lab == i] == 0).mean() > 0.5 and across(i)]
+    return (np.isin(lab, keep) & reach).astype(np.uint8)
 
 
 def link(keep, info, lane, reverse, n_steps, reach=45):

@@ -1,7 +1,7 @@
 # Track data format
 
-*Monaco is the first track through the pipeline; its grid, finish line and
-pit lane are all marked.*
+*Monaco and Austin have been through the pipeline; their grids, finish
+lines and pit lanes are all marked.*
 
 Everything in objectives 3 and 5 (snapping, facings, movement limits,
 highlighting) reduces to one problem: the mod has no idea where the spaces are.
@@ -68,6 +68,8 @@ the only thing needing measurement in game is the tile itself — not each track
   "finish": { "line": ["i.s1.0", "m.s1.0", "o.s1.0"] }, // (below)
   "dice": [1505, 1468],          // optional: where the dice sit, clear of the track
                                  // (the map's name panel); default the board's middle
+  "dice_side": "up",             // optional: the tray side, on the image, the dice not in
+                                 // play line up along; default the side facing the middle
   "panel": { "pos": [2172, 1410], "width": 400 }, // optional: the race panel's centre
                                  // and width, on an empty patch; default on the screen
 
@@ -116,7 +118,8 @@ with the codes.
 
 Where the pit lane runs past the line, it has a space on the line too: the
 pit cell the checkered band would cross if it were carried on over the pit
-road. A car leaving the pits crosses the line there.
+road -- or, where the band would lie along a division (Austin), the cell
+just past it. A car leaving the pits crosses the line there.
 
 ## The pit lane
 
@@ -140,6 +143,10 @@ Each printed colour is shared by the two seats nearest it in hue -- white
 by White and Brown, yellow by Yellow and Orange, green by Green and Teal,
 red by Red and Pink, blue by Blue and Purple -- the first cell of the
 colour going to the first seat.
+
+The garages can lie on either side of the pit lane: on Monaco between it
+and the track, on Austin along its wall. `find_pit.py` takes the side
+where the ground beside the pit lane is coloured.
 
 A pit box is a space of its own (`b.<sector>.<n>`, `pit`, with `box` the
 seat it belongs to), at the middle of its garage half. It links both ways
@@ -176,10 +183,36 @@ the key on a space already on the grid takes it off; **Clear the grid** on
 the board's right-click menu starts again. `import_track.py` brings the list
 out with the rest of the edits.
 
+Where the grid boxes are printed with their numbers, as on Austin, the
+list can be read straight off the board into the track file instead.
+
+## The dice and the race panel
+
+`tools/extract/find_dice_spot.py` gives a track its first `dice` and
+`dice_side`: the tray over the board's name logo (the Formula D name card,
+or the Formula Dé checkered title box), turned and nudged to keep the
+parked dice as clear of the track as it can. It leaves a track that has a
+spot already alone (`--force` replaces it).
+
+`dice` and `panel` are set in the game, from the board's right-click menu
+(the host only, editor open or not): **Put the dice here** moves the dice
+tray to where you clicked, **Turn the dice** moves the row of dice not in
+play a quarter turn round the tray, **Put the race panel here** centres the panel
+there, and **Race panel larger** / **smaller** change its width by 15% a
+step (150 to 1600 pixels). The tray and panel move at once. The same five
+can be bound as keys under "Board layout" in Options > Game Keys. They are
+kept with the track's edits: save the game and `import_track.py` writes
+them into the track file with the rest.
+
 A fresh scan from `find_grid.py` has plain numbers for ids until
 `find_corners.py` runs; that step renames every link and the arrow reading in
 `tracks/<id>.arrows.json` to match. A space added in the editor is named
-after the space nearest it, with `+n` on the end, until the next run.
+after the space nearest it, with `+n` on the end, and a space moved to
+another lane keeps its old letter, until the codes are worked out again:
+`tools/extract/renumber.py` does that from the track file alone -- each
+lane followed round from the finish line, numbered within the sectors its
+spaces have -- renaming the space everywhere it is named, and the browser
+editor runs it on every save. It needs each lane to be one loop of links.
 
 ## Why pixels and not a hand-built graph
 
@@ -197,6 +230,21 @@ corner lines as grid lines, and cuts the road along its printed lines so each
 cell comes out as one piece. A cell's lane comes from where it sits on its own
 chord across the road, which stays right through corners where a traced racing
 line drifts.
+
+Boards differ in how the grid is printed. Monaco's is pale, and is read as
+rungs: the divisions across each lane, with gaps filled in where one is too
+faint to see. Austin's is printed dark and crisp, and reads better as cells
+(`--cells`): each patch of asphalt the lines enclose is a space. A patch
+spanning more than a lane is cells whose lines were painted out with the
+flag, and is cut up by lane and along the lap; one lane wide it is one cell
+however long, since the inside of a hairpin and the outside of a bend have
+cells twice the usual size. The choice is kept in the track file's
+`detect.read`, with `detect.reverse` for which way round the lap runs, so a
+rerun reads the board the same way.
+
+Austin's board also prints its run-off and service roads in the same grey
+as the track, but warm where the asphalt is cool, so only the cool grey
+counts as road (`detect_track.asphalt`).
 
 `tools/extract/find_corners.py` then finds the corners: it cuts the road along
 the red lines painted across it, which leaves a ring of pieces that are corners
@@ -240,6 +288,12 @@ beside them in order. Where the lanes have different numbers of spaces some
 space has to go without a fork, and the board prints a single arrow on exactly
 that one -- which is how a misread fork shows itself.
 
+A fork normally lands on a space ahead of it. The one exception is a
+hairpin's exit, where the lane on the inside has cells twice as long, and
+the one an arrow points into starts level with the fork. A fork the reading
+is sure of that finds nothing ahead may take a space squarely alongside, if
+no other fork has it and the links stay in order (Austin's Turns 1, 5 and 7).
+
 Elsewhere links are worked out from positions and facings
 (`fd.core.trackgraph`), the same rules the in-game editor uses; a space whose
 links were set by hand, or read off an arrow, keeps them (`fixed`).
@@ -262,7 +316,8 @@ either side pinch that border to nothing. It reads the spaces from
 Lua module. Rerun both after moving spaces. The check image goes to
 `out/<id>_adjacency.png`.
 
-Tracks are expected to need hand correction after extraction -- the editor in
-TTS is for that, and `tools/extract/import_track.py` brings the result back
-from a saved game. The advisory enforcement model means an imperfect track file
+Tracks are expected to need hand correction after extraction. The browser
+editor (`tools/editor/`, see [track-editor.md](track-editor.md)) writes the
+track file directly; the editor in TTS works too, and
+`tools/extract/import_track.py` brings its result back from a saved game. The advisory enforcement model means an imperfect track file
 degrades gracefully rather than blocking play, which is why it was chosen.

@@ -34,8 +34,10 @@ COLS = 3
 
 
 def tile(im, track, pos, cell, s):
+    """`im` is the board padded by HALF all round, so a space at its edge
+    still gets a whole tile."""
     x, y = [int(v) for v in s["pos"]]
-    c = cv2.resize(im[y - HALF:y + HALF, x - HALF:x + HALF].copy(), (HALF * 2 * ZOOM,) * 2,
+    c = cv2.resize(im[y:y + 2 * HALF, x:x + 2 * HALF].copy(), (HALF * 2 * ZOOM,) * 2,
                    interpolation=cv2.INTER_CUBIC)
     corner = np.array([x - HALF, y - HALF], float)
     for lane, n in fa.ahead_of(s, track["spaces"], pos, cell).items():
@@ -46,7 +48,7 @@ def tile(im, track, pos, cell, s):
             cv2.putText(c, str(n["id"]), (p[0] + 11, p[1] + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.55, colour, width)
     cv2.circle(c, (HALF * ZOOM, HALF * ZOOM), 6, (255, 0, 255), -1)
     for width, colour in ((5, (255, 255, 255)), (2, (0, 0, 0))):
-        cv2.putText(c, "%d L%d" % (s["id"], s["lane"]), (8, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.85, colour, width)
+        cv2.putText(c, "%s L%d" % (s["id"], s["lane"]), (8, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.85, colour, width)
     return c
 
 
@@ -71,8 +73,9 @@ def main():
 
     WORK.mkdir(parents=True, exist_ok=True)
     blank = np.full((HALF * 2 * ZOOM, HALF * 2 * ZOOM, 3), 255, np.uint8)
+    padded = cv2.copyMakeBorder(im, HALF, HALF, HALF, HALF, cv2.BORDER_CONSTANT, value=(255, 255, 255))
     for n, i in enumerate(range(0, len(order), PER_SHEET), 1):
-        tiles = [tile(im, track, pos, cell, s) for s in order[i:i + PER_SHEET]]
+        tiles = [tile(padded, track, pos, cell, s) for s in order[i:i + PER_SHEET]]
         tiles += [blank] * (-len(tiles) % COLS)
         rows = [np.hstack(tiles[k:k + COLS]) for k in range(0, len(tiles), COLS)]
         path = WORK / f"{map_id}_sheet_{n:02d}.png"

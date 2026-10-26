@@ -139,6 +139,8 @@ function Stub.object(name, props)
         loading = false,
         getXmlTable = function() return o.xml or {} end,
         setXmlTable = function(t) Stub.counts.ui = Stub.counts.ui + 1 o.xml = t end,
+        -- Only ever called with "" (fd.tts.hud), to clear it.
+        setXml = function(s) Stub.counts.ui = Stub.counts.ui + 1 o.xml = {} end,
         setAttribute = function(id, k, v)
             Stub.counts.ui = Stub.counts.ui + 1
             Stub.ui[id] = Stub.ui[id] or {}
@@ -154,10 +156,15 @@ function Stub.object(name, props)
     o.addContextMenuItem = function(label, fn) o.menu[label] = fn end
     o.clearContextMenu = function() o.menu = {} end
     --- Right-click the object and choose `label`, as `color`, at `pos`.
+    -- Right-clicked with the pointer at `pos`. As in TTS, the item is told
+    -- the object's own position, not where it was clicked: that is the
+    -- player's pointer.
     o.rightClick = function(label, color, pos)
         local fn = o.menu[label]
         if not fn then error("no menu item " .. label .. " on " .. o.name) end
-        return fn(color or "Red", pos or o.pos, o)
+        color = color or "Red"
+        if pos and Player[color] then Player[color].pointer = pos end
+        return fn(color, o.pos, o)
     end
     -- Functions called on the object's own script, by name, in order.
     o.calls = {}
@@ -325,6 +332,7 @@ function Stub.player(color, handPos, admin)
             if onPlayerChangeColor then onPlayerChangeColor(new) end
         end,
         broadcast = function(msg) Stub.log[#Stub.log + 1] = "broadcast to " .. p.color .. ": " .. msg end,
+        getPointerPosition = function() return p.pointer or vec(0, 1, 0) end,
         -- The hand zone faces into the table, square to its nearest edge.
         getHandTransform = function()
             local yaw = math.deg(math.atan2(-handPos.x, -handPos.z))

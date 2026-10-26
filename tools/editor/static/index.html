@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Track Editor</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header id="bar">
+  <div class="group">
+    <strong class="brand">Formula D tracks</strong>
+    <select id="trackPick" title="Track to edit -- everyone in the session is on the same one"></select>
+    <span id="dirty" class="pill" hidden>unsaved</span>
+  </div>
+  <div class="group">
+    <button id="undoBtn" title="Undo (Ctrl+Z)">Undo</button>
+    <button id="redoBtn" title="Redo (Ctrl+Y)">Redo</button>
+    <button id="saveBtn" class="primary" title="Write the track file and regenerate its Lua module (Ctrl+S)">Save</button>
+    <button id="revertBtn" title="Throw away unsaved edits">Revert</button>
+  </div>
+  <div class="group layers">
+    <label><input type="checkbox" id="lyBoard" checked> Board</label>
+    <label><input type="checkbox" id="lyCars" checked> Cars</label>
+    <select id="carStyle" title="How spaces are drawn: outlines and dots leave the printed arrows in view (hold H to hide them all)">
+      <option value="outline">outline</option><option value="dot">dot</option><option value="solid">solid</option>
+    </select>
+    <input type="range" id="carOpacity" min="15" max="100" value="100" title="Car opacity">
+    <label><input type="checkbox" id="lyLinks" checked> Links</label>
+    <label><input type="checkbox" id="lyIds" checked> Ids</label>
+    <label><input type="checkbox" id="lyUnder" checked> Step image</label>
+    <input type="range" id="underOpacity" min="0" max="100" value="85" title="Step image opacity">
+  </div>
+  <div class="group right">
+    <span id="claudeDot" class="dot" title="Whether Claude is listening for your messages"></span>
+    <span id="claudeState">Claude: not connected</span>
+  </div>
+</header>
+
+<main>
+  <section id="stage">
+    <svg id="board" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="3.5" markerHeight="3.5" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" class="arrowhead"></path>
+        </marker>
+        <marker id="arrowFixed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="3.5" markerHeight="3.5" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" class="arrowhead fixed"></path>
+        </marker>
+      </defs>
+      <image id="bg" preserveAspectRatio="none"></image>
+      <image id="under" preserveAspectRatio="none"></image>
+      <g id="gLayout"></g>
+      <g id="gCars"></g>
+      <g id="gLinks"></g>
+      <g id="gMarks"></g>
+      <g id="gIds"></g>
+      <g id="gNotes"></g>
+      <rect id="boxSel" hidden></rect>
+    </svg>
+    <div id="empty" class="empty">
+      <h2>No track open</h2>
+      <p>Pick one from the menu above, or drop a board image anywhere here to run the detector on it.</p>
+    </div>
+    <div id="dropHint" class="drop" hidden>Drop the board image to detect its track</div>
+    <div id="toast" hidden></div>
+  </section>
+
+  <aside id="side">
+    <nav id="tabs">
+      <button data-tab="space" class="on">Space</button>
+      <button data-tab="problems">Problems <span id="probCount" class="count">0</span></button>
+      <button data-tab="chat">Claude <span id="chatBadge" class="count" hidden>0</span></button>
+      <button data-tab="detect">Detect</button>
+      <button data-tab="help">Keys</button>
+    </nav>
+
+    <div class="tab on" id="tab-space">
+      <div id="spaceInfo" class="muted">Click a space to see it. Shift-click or shift-drag to select several.</div>
+      <div class="sub">
+        <h3>Board layout</h3>
+        <div class="row wrap">
+          <button id="diceBtn" title="Then click on the board">Put the dice here</button>
+          <button id="turnDiceBtn">Turn the dice</button>
+          <button id="panelBtn" title="Then click on the board">Put the race panel here</button>
+          <button id="panelSmaller">Panel −</button>
+          <button id="panelLarger">Panel +</button>
+        </div>
+        <div class="row wrap">
+          <button id="clearGridBtn">Clear the grid</button>
+          <button id="adjBtn" title="Rerun find_adjacency.py on the saved track">Rerun adjacency</button>
+        </div>
+        <div id="layoutInfo" class="muted small"></div>
+      </div>
+    </div>
+
+    <div class="tab" id="tab-problems">
+      <p class="muted small">Problems found by fd.core.trackgraph, the same checks as the in-game editor. Click one to go to it.</p>
+      <ol id="probList"></ol>
+      <h3>Track tests</h3>
+      <p class="muted small">tests/test_tracks.lua on the track as it stands: what the mod needs from a track file.</p>
+      <ol id="checkList"></ol>
+    </div>
+
+    <div class="tab" id="tab-chat">
+      <div id="chatLog"></div>
+      <form id="chatForm">
+        <textarea id="chatText" rows="3" placeholder="Ask Claude about what you have selected or are looking at. Enter sends, Shift+Enter for a new line."></textarea>
+        <div class="row">
+          <label class="small"><input type="checkbox" id="followClaude" checked> Follow Claude's pointer</label>
+          <button type="submit" class="primary">Send</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="tab" id="tab-detect">
+      <div class="sub">
+        <h3>Run the detector</h3>
+        <label class="field">Board
+          <select id="detSource"></select>
+        </label>
+        <label class="field">…or an image
+          <input type="file" id="detFile" accept="image/*">
+        </label>
+        <div class="row wrap">
+          <label class="field inline">Read as
+            <select id="detRead"><option value="rungs">rungs (pale grid)</option><option value="cells">cells (crisp grid)</option></select>
+          </label>
+          <label class="field inline">Palette
+            <select id="detCategory"><option value="formula_d">Formula D</option><option value="formula_de">Formula Dé</option></select>
+          </label>
+        </div>
+        <div class="row wrap small">
+          <label><input type="checkbox" id="detReverse"> Lap runs the other way</label>
+          <label><input type="checkbox" class="detStep" value="corners" checked> corners</label>
+          <label><input type="checkbox" class="detStep" value="arrows" checked> arrows</label>
+          <label><input type="checkbox" class="detStep" value="adjacency" checked> adjacency</label>
+        </div>
+        <div class="row">
+          <label class="small"><input type="checkbox" id="detFollow" checked> Show each step as it is drawn</label>
+          <button id="detRun" class="primary">Run</button>
+        </div>
+        <p class="muted small">Runs in a scratch folder (tools/extract/out/web/); tracks/ is untouched until you promote the draft.</p>
+      </div>
+      <div class="sub">
+        <h3>Steps <span id="jobState" class="muted small"></span></h3>
+        <div id="stageList" class="thumbs"></div>
+        <div class="row"><button id="underNone">Hide step image</button><button id="promoteBtn" hidden>Promote draft to tracks/</button></div>
+        <pre id="jobLog"></pre>
+      </div>
+    </div>
+
+    <div class="tab" id="tab-help">
+      <table class="keys">
+        <tr><td>Drag a space</td><td>move it (and everything selected)</td></tr>
+        <tr><td>Wheel while dragging</td><td>turn what you carry 15° a notch (Shift: 2°)</td></tr>
+        <tr><td>Drag the board</td><td>pan; wheel to zoom</td></tr>
+        <tr><td>Shift-click / Shift-drag</td><td>add to the selection / select a box</td></tr>
+        <tr><td>Ctrl-click a space</td><td>toggle a link from the selected space to it</td></tr>
+        <tr><td>Q / E</td><td>turn selected 15° (Shift: 2°)</td></tr>
+        <tr><td>Arrow keys</td><td>nudge selected 1 px (Shift: 5)</td></tr>
+        <tr><td>1 2 3</td><td>lane: inside, middle, outside (0: the pit lane's number)</td></tr>
+        <tr><td>A or double-click</td><td>add a space at the pointer</td></tr>
+        <tr><td>Delete</td><td>delete selected</td></tr>
+        <tr><td>U</td><td>links back to automatic</td></tr>
+        <tr><td>G</td><td>grid place on/off (pole first)</td></tr>
+        <tr><td>F</td><td>fit the board / the selection</td></tr>
+        <tr><td>Hold H</td><td>hide cars and links, to read what is printed under them</td></tr>
+        <tr><td>C</td><td>ask Claude about the selection</td></tr>
+        <tr><td>Ctrl+Z / Ctrl+Y / Ctrl+S</td><td>undo / redo / save</td></tr>
+        <tr><td>Esc</td><td>clear the selection, cancel a mode</td></tr>
+      </table>
+      <p class="muted small">Gold links were set by hand or read off a printed arrow (<code>fixed</code>): relinking leaves them alone. Red rings are problems. Cyan is your selection, magenta Claude's.</p>
+    </div>
+  </aside>
+</main>
+
+<footer id="status">
+  <span id="hoverInfo"></span>
+  <span id="modeInfo"></span>
+  <span id="coords" class="right"></span>
+</footer>
+<script src="/static/app.js"></script>
+</body>
+</html>

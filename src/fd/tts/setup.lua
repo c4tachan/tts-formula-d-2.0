@@ -90,6 +90,7 @@ function Setup.panel(maps)
     local tools = {
         button("fds_track", "Track", "fdTrack", { tooltip = "Show or hide the detected spaces on the board" }),
         button("fds_edit", "Edit track", "fdEdit", { tooltip = "Open or close the track editor for the map on the board" }),
+        button("fds_layout", "Layout", "fdLayout", { tooltip = "Let the board be right-clicked, to move the dice and the race panel" }),
         button("fds_apply", "Apply", "fdApply", { tooltip = "Put the space markers back into the track" }),
         button("fds_export", "Export", "fdExport", { tooltip = "How to get your edits into the repo" }),
         button("fds_reset", "Reset", "fdReset", { tooltip = "Back to setup, keeping the drivers (Undo restores it)" }),

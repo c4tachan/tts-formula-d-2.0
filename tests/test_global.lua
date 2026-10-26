@@ -341,7 +341,7 @@ end
 function T.the_setup_menu_chooses_the_map()
     local S = world()
     local Maps = require("fd.data.maps")
-    -- The list: Monaco first, as it has track data, then the rest, marked.
+    -- The list: the maps with track data first, then the rest, marked.
     local list = nil
     for _, node in ipairs(S.xml) do
         if node.attributes.id == "fds" then
@@ -353,13 +353,23 @@ function T.the_setup_menu_chooses_the_map()
         end
     end
     assert(list, "a map list on the setup menu")
-    eq(list.children[1].value, "Formula D: Monaco")
-    eq(list.children[1].attributes.selected, "true", "showing the map on the board")
-    eq(list.children[2].value:match("%(no track data%)$"), "(no track data)")
+    local at, marked = {}, false
+    for i, o in ipairs(list.children) do
+        at[o.value] = i
+        if o.value:match("%(no track data%)$") then
+            marked = true
+        else
+            assert(not marked, o.value .. " has track data, so comes before the maps without")
+        end
+    end
+    assert(at["Formula D: Austin"] and at["Formula D: Monaco"], "the maps with track data, unmarked")
+    eq(list.children[at["Formula D: Monaco"]].attributes.selected, "true", "showing the map on the board")
+    assert(at["Formula De Circuit 27: Detroit  (no track data)"], "the rest, marked")
+    eq(at["Formula D: Baltimore"] or at["Formula D: Baltimore  (no track data)"], nil, "no board of a circuit that is not F1")
 
-    fdSetupMap(Player.Blue, "Formula D: Austin  (no track data)")
+    fdSetupMap(Player.Blue, "Formula D: Austin")
     eq(S.board.custom.image, Maps.byId.FDMonaco.url, "only the host chooses")
-    fdSetupMap(Player.Red, "Formula D: Austin  (no track data)")
+    fdSetupMap(Player.Red, "Formula D: Austin")
     eq(S.board.custom.image, Maps.byId.FDAustin.url, "the host's choice goes on the board")
     eq(S.board.reloads, 1, "reloaded to show it")
     assert(S.logged("puts Formula D: Austin on the board"))
@@ -1491,7 +1501,8 @@ function T.the_editor_works_from_right_click_menus()
     eq(#Editor.trackFor(FDMonaco).spaces, #FDMonaco.spaces, "one deleted, one added")
 
     fdEdit({ color = "Red", steam_name = "RedPlayer" })
-    eq(next(S.board.menu), nil, "the board menu goes when the editor closes")
+    eq(S.board.menu["Add a space here"], nil, "the editor's items go when it closes")
+    assert(S.board.menu["Put the dice here"], "leaving the board layout's")
 end
 
 function T.deleting_every_marker_before_apply_is_still_saved()
@@ -2130,6 +2141,117 @@ function T.the_race_panel_lies_on_the_board_where_the_track_says()
     S.board.xml = {}
     fdMapChanged()
     eq(S.board.xml[1].attributes.id, "fdr")
+end
+
+function T.the_dice_tray_moves_where_the_board_menu_says_and_is_saved()
+    local S = world()
+    local Track = require("fd.tts.track")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    -- On the board's menu with the editor closed, for the host only.
+    local spot = Track.worldOf(S.board, FDMonaco, 600, 900)
+    S.board.rightClick("Put the dice here", "Blue", spot)
+    local _, middle = tray(S)
+    assert(math.abs(middle.x - spot.x) > 1e-3, "not for a player who is not the host")
+    S.board.rightClick("Put the dice here", "Red", spot)
+    _, middle = tray(S)
+    assert(math.abs(middle.x - spot.x) < 1e-6 and math.abs(middle.z - spot.z) < 1e-6, "moved to the spot")
+    local saved = onSave().json.edits.FDMonaco
+    eq(saved.dice[1], 600)
+    eq(saved.dice[2], 900)
+    -- And kept through a load, and a new map.
+    onLoad(onSave())
+    fdMapChanged()
+    _, middle = tray(S)
+    assert(math.abs(middle.x - spot.x) < 1e-6 and math.abs(middle.z - spot.z) < 1e-6, "still there")
+end
+
+function T.the_board_menu_drops_the_games_edits_for_the_track_file_when_asked_twice()
+    local S = world()
+    local Track = require("fd.tts.track")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    S.board.rightClick("Put the dice here", "Red", Track.worldOf(S.board, FDMonaco, 600, 900))
+    assert(onSave().json.edits.FDMonaco, "the game has edits to Monaco")
+    S.board.rightClick("Use the track file", "Blue")
+    assert(onSave().json.edits.FDMonaco, "not for a player who is not the host")
+    S.board.rightClick("Use the track file", "Red")
+    assert(onSave().json.edits.FDMonaco, "asked once: only a warning")
+    S.board.rightClick("Use the track file", "Red")
+    local edits = onSave().json.edits or {}
+    eq(edits.FDMonaco, nil, "asked twice: dropped")
+    local _, middle = tray(S)
+    local home = Track.worldOf(S.board, FDMonaco, FDMonaco.dice[1], FDMonaco.dice[2])
+    assert(math.abs(middle.x - home.x) < 1e-6 and math.abs(middle.z - home.z) < 1e-6, "dice back on the file's spot")
+end
+
+function T.the_board_takes_a_right_click_only_while_the_layout_or_editor_is_open()
+    local S = world()
+    local host = { color = "Red", steam_name = "RedPlayer" }
+    eq(S.board.interactable, false, "out of reach in a race")
+    fdLayout(host)
+    eq(S.board.interactable, true, "open to the layout menu")
+    eq(S.board.locked, true, "but locked, so it cannot be moved")
+    fdMapChanged()
+    eq(S.board.interactable, true, "and still, on a new map")
+    fdLayout(host)
+    eq(S.board.interactable, false, "out of reach again")
+    fdEdit(host)
+    eq(S.board.interactable, true, "open to the editor's menu")
+    fdEdit(host)
+    eq(S.board.interactable, false)
+    fdLayout({ color = "Blue", steam_name = "BluePlayer" })
+    eq(S.board.interactable, false, "not for a player who is not the host")
+end
+
+function T.turning_the_dice_moves_their_row_a_quarter_round_the_tray()
+    local S = world()
+    -- Where the parked dice lie from the tray's middle, on average.
+    local function row()
+        local _, c = tray(S)
+        local x, z, n = 0, 0, 0
+        -- The six gear dice and the black one, the row's middle die the fourth.
+        for _, name in ipairs({ "First Gear Dice", "Second Gear Dice", "Third Gear Dice", "Fourth Gear Dice",
+                                "Fifth Gear Dice", "Sixth Gear Dice", "Damage Dice" }) do
+            local d = S.find(name)
+            x, z, n = x + d.pos.x - c.x, z + d.pos.z - c.z, n + 1
+        end
+        return x / n, z / n
+    end
+    local x0, z0 = row()
+    local sides = {}
+    for i = 1, 4 do
+        S.board.menu["Turn the dice"]("Red")
+        sides[i] = onSave().json.edits.FDMonaco.dice_side
+        local x, z = row()
+        -- A quarter turn: the row's offset is square to where it was.
+        assert(math.abs(x * x0 + z * z0) < 1e-6 * (x0 * x0 + z0 * z0) + 1e-6, "square to the last, turn " .. i)
+        x0, z0 = x, z
+    end
+    -- Monaco's dice sit low on the board, so face up it to start with.
+    eq(table.concat(sides, " "), "right down left up")
+end
+
+function T.the_race_panel_moves_and_resizes_from_the_board_menu()
+    local S = world()
+    local Track = require("fd.tts.track")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    -- Monaco's own spot is 2474 / 2 - 935 = 302 pixels from its middle's x.
+    S.board.rightClick("Put the race panel here", "Red", Track.worldOf(S.board, FDMonaco, 1237, 808))
+    local panel = S.board.xml[1].attributes
+    local x, y = panel.position:match("^(%S+) (%S+)")
+    assert(math.abs(tonumber(x)) < 0.05 and math.abs(tonumber(y)) < 0.05, "centred on the board: " .. x .. " " .. y)
+    eq(panel.scale, "0.0425 0.0425 1", "as wide as before")
+    S.board.menu["Race panel larger"]("Red")
+    eq(S.board.xml[1].attributes.scale, "0.0489 0.0489 1", "15% wider")
+    assert(math.abs(onSave().json.edits.FDMonaco.panel.width - 460) < 1e-6, "saved")
+    S.board.menu["Race panel smaller"]("Red")
+    eq(S.board.xml[1].attributes.scale, "0.0425 0.0425 1")
+    -- The editor's own items join the layout ones while it is open, and go
+    -- again when it closes.
+    fdEdit({ color = "Red", steam_name = "RedPlayer" })
+    assert(S.board.menu["Pick up spaces here"], "editor items while it is open")
+    fdEdit({ color = "Red", steam_name = "RedPlayer" })
+    eq(S.board.menu["Pick up spaces here"], nil)
+    assert(S.board.menu["Put the race panel here"], "layout items stay")
 end
 
 function T.the_race_panel_goes_on_the_screen_for_a_map_without_a_spot()

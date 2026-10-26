@@ -177,7 +177,12 @@ function Hud.build(rules, extras, tile, track, onReady)
     local place = tile and placement(tile, track)
     local function placePanel()
         if not place then
-            if tile then tile.UI.setXmlTable({}) end
+            -- Take a panel left on the board off it. Only if there is one:
+            -- a tile just reloaded has none, and TTS fails inside on an
+            -- empty table ("Object reference not set to an instance of an
+            -- object"), so it is cleared with an empty string.
+            local had = tile and tile.UI.getXmlTable()
+            if had and #had > 0 then tile.UI.setXml("") end
             Ui.route("fdr", nil)
             ready = true
             return onReady()

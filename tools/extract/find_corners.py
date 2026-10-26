@@ -48,7 +48,7 @@ from collections import Counter
 import cv2
 import numpy as np
 
-from detect_track import OUT, board_image, corner_lines, racing_line
+from detect_track import OUT, TRACKS, board_image, corner_lines, racing_line
 from find_grid import paint_out_flag, track_only, track_proper
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -77,19 +77,28 @@ def red_lines(im, main):
     return np.isin(lab, keep).astype(np.uint8), len(keep)
 
 
-def pieces(im, main):
+def pieces(im, main, spaces=()):
     """The road cut along its red lines: a label image and the lines.
 
     The road is shrunk a little first: where the track doubles back on
     itself, as at a hairpin, the two sides can touch through a gap in the
-    kerb and would join round the end of a line."""
+    kerb and would join round the end of a line.
+
+    A piece too small to be road is kept all the same if spaces of more than
+    one lane sit on it: a straight one cell long between two corners
+    (Zandvoort's, below Hunserug), which a scrap never is."""
     red, n_lines = red_lines(im, main)
     cut = cv2.dilate(red, np.ones((2 * CUT + 1, 2 * CUT + 1), np.uint8))
     inner = cv2.erode(main, np.ones((2 * SHRINK + 1, 2 * SHRINK + 1), np.uint8))
     road = (inner > 0) & (cut == 0)
     n, lab, st, _ = cv2.connectedComponentsWithStats(road.astype(np.uint8), connectivity=4)
+    lanes = {}
+    for s in spaces:
+        x, y = (int(round(v)) for v in s["pos"])
+        if 0 <= y < lab.shape[0] and 0 <= x < lab.shape[1]:
+            lanes.setdefault(int(lab[y, x]), set()).add(s["lane"])
     for i in range(1, n):
-        if st[i, cv2.CC_STAT_AREA] < MIN_PIECE:
+        if st[i, cv2.CC_STAT_AREA] < MIN_PIECE and len(lanes.get(i, ())) < 2:
             lab[lab == i] = 0
     return lab, n_lines
 
@@ -119,7 +128,8 @@ def finish_piece(im, lab):
 
 
 def running_order(spaces, where):
-    """Pieces in the order a car meets them, following the links."""
+    """Pieces in the order a car meets them, following the links: each
+    piece's most common next piece, and every piece it leads to at all."""
     ahead = {}
     for s in spaces:
         a = where[s["id"]]
@@ -127,7 +137,24 @@ def running_order(spaces, where):
             b = where.get(n, 0)
             if a and b and b != a:
                 ahead.setdefault(a, Counter())[b] += 1
-    return {a: c.most_common(1)[0][0] for a, c in ahead.items()}
+    return {a: c.most_common(1)[0][0] for a, c in ahead.items()}, {a: set(c) for a, c in ahead.items()}
+
+
+def fit_in(ring, used, ahead, leads):
+    """Put into the ring each piece the walk round it missed: a small one
+    most of the spaces before it link straight past, as where a corner's
+    red lines lie close and the outer lanes' cells cross one (Sochi's
+    Turn 9). It goes between the piece that leads into it and the one it
+    leads on to, where those two are next to each other in the ring."""
+    for u in used:
+        if u in ring:
+            continue
+        c = ahead.get(u)
+        for i, p in enumerate(ring):
+            if ring[(i + 1) % len(ring)] == c and u in leads.get(p, ()):
+                ring.insert(i + 1, u)
+                break
+    return ring
 
 
 LANE_LETTER = {1: "i", 2: "m", 3: "o"}
@@ -291,17 +318,17 @@ def main():
     if "--paths" in sys.argv:
         paths = [[int(v) for v in pair.split("/")]
                  for pair in sys.argv[sys.argv.index("--paths") + 1].split(",")]
-    path = ROOT / "tracks" / f"{map_id}.json"
+    path = TRACKS / f"{map_id}.json"
     track = json.loads(path.read_text(encoding="utf-8"))
     info, im = board_image(map_id)
     track_img, road = track_only(im)
-    _, band = paint_out_flag(track_img, road)
     line, _, width = racing_line(im)
-    main_road = track_proper(road, line, width)
+    _, band = paint_out_flag(track_img, road, line)
+    main_road = track_proper(road, line, width, band)
 
-    lab, n_lines = pieces(im, main_road)
     # The pit lane is no part of the ring: find_pit.py codes it.
     spaces = [s for s in track["spaces"] if not s.get("pit")]
+    lab, n_lines = pieces(im, main_road, spaces)
     where = {s["id"]: piece_at(lab, *s["pos"]) for s in spaces}
     used = sorted(set(where.values()) - {0})
     print("1. %d red lines cut the road into %d pieces holding spaces" % (n_lines, len(used)))
@@ -310,21 +337,28 @@ def main():
         print("   spaces on no piece (left out of every corner): %s" % lost)
 
     # Walk the ring from the start/finish straight.
-    ahead = running_order(spaces, where)
+    ahead, leads = running_order(spaces, where)
     start = finish_piece(im, lab)
     ring, p = [start], ahead.get(start)
     while p and p != start and p not in ring:
         ring.append(p)
         p = ahead.get(p)
+    if p == start:
+        ring = fit_in(ring, used, ahead, leads)
     if p != start or len(ring) != len(used) or len(ring) % 2:
         sys.exit("the pieces do not make one ring of corners and straights (%d in the ring, %d with "
                  "spaces, ring closes: %s) -- check out/%s_7_corners.png" % (len(ring), len(used), p == start, map_id))
 
     corner_of = {piece: i // 2 + 1 for i, piece in enumerate(ring) if i % 2 == 1}
+    # A space on no piece takes the sector of the one before it in its lane
+    # (assign_codes), and with it the corner, if that sector is one.
+    codes = assign_codes(spaces, where, ring, band)
+    corner_by_space = {s["id"]: int(s["sector"][1:]) if s["sector"].startswith("c") else None
+                       for s in spaces}
     old = {c["id"]: c for c in track.get("corners", [])}
     corners = []
     for piece, cid in sorted(corner_of.items(), key=lambda kv: kv[1]):
-        members = [s["id"] for s in spaces if where[s["id"]] == piece]
+        members = [s["id"] for s in spaces if corner_by_space[s["id"]] == cid]
         was = old.get(cid, {})
         by_lane = Counter(s["lane"] for s in spaces if s["id"] in set(members))
         c = {"id": cid,
@@ -338,7 +372,7 @@ def main():
         corners.append(c)
         cv2.imwrite(str(WORK / f"{map_id}_flag_{cid}.png"), flag_crop(im, spaces, set(members)))
     for s in spaces:
-        s["corner"] = corner_of.get(where[s["id"]])
+        s["corner"] = corner_by_space[s["id"]]
     print("2. %d corners, %d spaces inside them, %d on the straights"
           % (len(corners), sum(c["spaces"] for c in corners), sum(1 for s in spaces if s["corner"] is None)))
     for c in corners:
@@ -372,12 +406,13 @@ def main():
     print("   ->", out.relative_to(ROOT))
 
     track["corners"] = corners
-    codes = assign_codes(spaces, where, ring, band)
-    recode(track, codes, ROOT / "tracks" / f"{map_id}.arrows.json")
+    recode(track, codes, TRACKS / f"{map_id}.arrows.json")
     # The finish line is where the codes start counting: the first cell of
-    # s1 in each lane, the one at or just past the band.
+    # s1 in each lane, the one at or just past the band -- the pit lane's
+    # too, but not a pit box that happens to be coded after it (Sebring's).
     track["finish"] = {**track.get("finish", {}),
-                       "line": [s["id"] for s in track["spaces"] if s["id"].split(".")[1:] == ["s1", "0"]]}
+                       "line": [s["id"] for s in track["spaces"]
+                                if s["id"].split(".")[1:] == ["s1", "0"] and not s.get("box")]}
     per = Counter(c.rsplit(".", 1)[0] for c in codes.values())
     print("4. codes given: %d spaces, %d lane-sectors, e.g. %s" % (len(codes), len(per), ", ".join(
         s["id"] for s in track["spaces"][:3])))

@@ -75,6 +75,9 @@ function Editor.trackFor(track)
     end
     out.spaces = e.spaces
     out.start = e.start or track.start
+    out.dice = e.dice or track.dice
+    out.dice_side = e.dice_side or track.dice_side
+    out.panel = e.panel or track.panel
     out.byId = nil -- the track's own, for its own spaces
     return out
 end
@@ -458,6 +461,82 @@ function Editor.clearGrid()
     return "Grid cleared (" .. #was .. " space(s)). Mark it again from pole."
 end
 
+-- The board layout: where the dice tray and the race panel go. Both are
+-- spots in image pixels kept with the track's edits, so they are saved with
+-- the game and import_track.py carries them into the track file. Unlike the
+-- spaces they can be set with the editor closed.
+
+-- The race panel's width in image pixels: where a track names none, and
+-- the most and least it can be made.
+local PANEL_WIDTH = 400
+local PANEL_MIN, PANEL_MAX = 150, 1600
+
+--- Put the dice tray at (px, py) on `track`.
+function Editor.setDice(track, px, py)
+    local e = working(track)
+    e.dice = { px, py }
+    e.dirty = true
+end
+
+-- The sides of the dice tray, on the image, a quarter turn apart clockwise,
+-- and the way each lies from the tray's centre (image y runs down).
+local SIDES = { "up", "right", "down", "left" }
+local SIDE_DIR = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
+
+--- Which side of the dice tray, on the image, the dice not in play line up
+-- along on `track`, and the way it lies from the tray as { dx, dy }; nil
+-- on a track that names no spot for the dice. Without a side of its own,
+-- the one facing the board's middle.
+function Editor.diceSide(track)
+    local t = Editor.trackFor(track)
+    if not t.dice then return nil end
+    local side = t.dice_side
+    if not SIDE_DIR[side] then
+        local dx = t.image.width / 2 - t.dice[1]
+        local dy = t.image.height / 2 - t.dice[2]
+        if math.abs(dy) >= math.abs(dx) then
+            side = dy < 0 and "up" or "down"
+        else
+            side = dx < 0 and "left" or "right"
+        end
+    end
+    return side, SIDE_DIR[side]
+end
+
+--- Turn the dice a quarter turn clockwise round their tray on `track`.
+-- Returns the side they now line up along, or nil if the track names no
+-- spot for the dice yet.
+function Editor.turnDice(track)
+    local side = Editor.diceSide(track)
+    if not side then return nil end
+    local e = working(track)
+    for i, s in ipairs(SIDES) do
+        if s == side then e.dice_side = SIDES[i % 4 + 1] end
+    end
+    e.dirty = true
+    return e.dice_side
+end
+
+--- Put the race panel's centre at (px, py) on `track`, at the width it has.
+function Editor.setPanel(track, px, py)
+    local e = working(track)
+    local was = e.panel or track.panel
+    e.panel = { pos = { px, py }, width = was and was.width or PANEL_WIDTH }
+    e.dirty = true
+end
+
+--- Make the race panel on `track` `factor` times as wide, within bounds.
+-- Returns its new width, or nil if the track names no spot for it yet.
+function Editor.scalePanel(track, factor)
+    local e = working(track)
+    local was = e.panel or track.panel
+    if not was then return nil end
+    local width = math.max(PANEL_MIN, math.min(PANEL_MAX, was.width * factor))
+    e.panel = { pos = { was.pos[1], was.pos[2] }, width = width }
+    e.dirty = true
+    return width
+end
+
 --- How many spaces are on the open track's grid.
 function Editor.gridCount()
     return open and #edits[open].start or 0
@@ -601,7 +680,8 @@ function Editor.save()
                 end
                 spaces[i] = c
             end
-            out[id] = { spaces = spaces, nextId = e.nextId, start = e.start }
+            out[id] = { spaces = spaces, nextId = e.nextId, start = e.start, dice = e.dice,
+                        dice_side = e.dice_side, panel = e.panel }
         end
     end
     return out
@@ -634,13 +714,19 @@ function Editor.load(saved, strayMarkers)
             for _, sp in ipairs(e.spaces or {}) do
                 sp.sector = sp.sector or sectorOf(sp.id)
             end
-            edits[id] = { spaces = e.spaces, nextId = e.nextId or 1, dirty = true, start = e.start }
+            edits[id] = { spaces = e.spaces, nextId = e.nextId or 1, dirty = true, start = e.start,
+                          dice = e.dice, dice_side = e.dice_side, panel = e.panel }
         end
     end
     for _, guid in ipairs(strayMarkers or {}) do
         local obj = getObjectFromGUID(guid)
         if obj then obj.destruct() end
     end
+end
+
+--- Whether the game holds edits to track `id`, which it uses over the file.
+function Editor.hasEdits(id)
+    return edits[id] ~= nil
 end
 
 --- Forget the edits to a track: back to the file.

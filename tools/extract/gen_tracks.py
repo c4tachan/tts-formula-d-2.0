@@ -8,6 +8,7 @@ to world space at load.
 Run:  python tools/extract/gen_tracks.py
 """
 import json
+import os
 import pathlib
 import sys
 
@@ -124,6 +125,10 @@ def lua_track(track, near=None):
           "-- Where the dice sit (image pixels): on the map's name panel, clear of",
           "-- the track. Without it they sit in the middle of the board.",
           ("T.dice = {{ {}, {} }}".format(*track["dice"]) if track.get("dice") else "T.dice = nil"),
+          "-- Which side of the tray, on the image, the dice not in play line up",
+          "-- along: up, right, down or left. Without it, the side facing the",
+          "-- board's middle.",
+          ('T.dice_side = "{}"'.format(track["dice_side"]) if track.get("dice_side") else "T.dice_side = nil"),
           "",
           "-- Where the race panel lies (image pixels): its centre and width, on an",
           "-- empty patch of the board. Without it the panel is on the screen.",
@@ -151,7 +156,11 @@ def main():
     # tracks/<id>.json only: <id>.arrows.json beside it is a reading of the
     # board's arrows, which find_arrows.py turns into the track's links, and
     # <id>.adjacency.json the spaces that touch, read in below.
-    files = sorted(f for f in TRACKS.glob("*.json") if f.stem.count(".") == 0)
+    # A detection run in a scratch folder (FD_TRACKS_DIR, set by
+    # tools/editor/) makes no track the mod has: nothing to generate.
+    if os.environ.get("FD_TRACKS_DIR"):
+        return 0
+    files =sorted(f for f in TRACKS.glob("*.json") if f.stem.count(".") == 0)
     if not files:
         sys.exit("no track files in tracks/")
     OUT.mkdir(parents=True, exist_ok=True)

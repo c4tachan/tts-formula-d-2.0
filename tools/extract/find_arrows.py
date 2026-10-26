@@ -43,8 +43,8 @@ import cv2
 import numpy as np
 from skimage.morphology import skeletonize
 
-from detect_track import OUT, board_image, edge_line, racing_line, surface_mask
-from find_grid import track_only, track_proper
+from detect_track import OUT, TRACKS, board_image, edge_line, racing_line, surface_mask
+from find_grid import ARROW_EXTENT, track_only, track_proper
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -90,6 +90,7 @@ def arrow_ink(im):
     n, lab, st, cen = cv2.connectedComponentsWithStats(core, 8)
     keep = [i for i in range(1, n)
             if st[i, cv2.CC_STAT_AREA] >= MIN_AREA and thick[lab == i].max() >= MIN_THICK
+            and max(st[i, cv2.CC_STAT_WIDTH], st[i, cv2.CC_STAT_HEIGHT]) <= ARROW_EXTENT
             and main[int(cen[i][1]), int(cen[i][0])] > 0]
     return lab, keep
 
@@ -415,6 +416,26 @@ def tidy(track, found, cell):
     return sorted(same | set(fixed)), dropped
 
 
+def next_by_code(spaces):
+    """Each coded space's successor down its own lane: the next code along
+    (see docs/track-format.md, Space codes), on into the next sector. Where
+    the cells are short, round a tight corner, the space a cell's length
+    ahead can be the one after (Valencia's Malvarrosa); the codes say which
+    is next. Spaces not yet coded (a fresh scan) have none."""
+    def key(sid):
+        lane, sector, n = sid.split(".")
+        return lane, int(sector[1:]) * 2 - (sector[0] == "s"), int(n)
+    lanes = {}
+    for s in spaces:
+        if isinstance(s["id"], str) and s["id"].count(".") == 2 and not s.get("pit"):
+            lanes.setdefault(s["id"][0], []).append(s["id"])
+    out = {}
+    for ids in lanes.values():
+        ids.sort(key=key)
+        out.update(zip(ids, ids[1:] + ids[:1]))
+    return out
+
+
 def from_reading(track, reading, cell):
     """Links from a reading of the board by eye (tracks/<id>.arrows.json).
 
@@ -431,9 +452,10 @@ def from_reading(track, reading, cell):
     runs = {}
     arrowed = {(int(k) if k.isdigit() else k): v for k, v in reading["forks"].items()}
     arrowed.update({i: 0 for i in reading.get("approach", [])})
+    following = next_by_code(spaces)
     for i, side in arrowed.items():
         src = sp[i]
-        on = ahead_of(src, spaces, pos, cell).get(src["lane"])
+        on = sp.get(following.get(i)) or ahead_of(src, spaces, pos, cell).get(src["lane"])
         if on is not None:
             out.add((i, on["id"]))
         if side:
@@ -452,11 +474,43 @@ def from_reading(track, reading, cell):
                 cost[(a, s["id"])] = far / cell
         pairs = matching(sources, targets, order, cost)
         for a in sources:
+            if a not in pairs:
+                level = level_target(a, sources, pairs, lane + side, spaces, sp, order, cell)
+                if level is not None:
+                    pairs[a] = level
+        for a in sources:
             if a in pairs:
                 out.add((a, pairs[a]))
             else:
                 dropped.append((a, None, "read as a fork, but no space is free for it"))
     return sorted(out), dropped
+
+
+def level_target(a, sources, pairs, lane, spaces, sp, order, cell):
+    """A space in `lane` squarely alongside `a`, for a fork the reading is
+    sure of that found nothing ahead to take.
+
+    At a hairpin's exit the lane on the inside has cells twice as long, and
+    the one the arrow points into starts level with this space and reaches
+    well ahead of it (Austin's Turns 1, 5 and 7). Only a space that no other
+    fork has taken, and that keeps the links in order with the forks either
+    side, will do; the nearest of those."""
+    here = order.get(a, 0)
+    before = [order.get(pairs[s], 0) for s in sources if s in pairs and order.get(s, 0) < here]
+    after = [order.get(pairs[s], 0) for s in sources if s in pairs and order.get(s, 0) > here]
+    lo, hi = max(before, default=-1), min(after, default=float("inf"))
+    taken = set(pairs.values())
+    best, best_d = None, None
+    for s in spaces:
+        if s["lane"] != lane or s["id"] in taken or not lo < order.get(s["id"], 0) < hi:
+            continue
+        v = np.array(s["pos"], float) - sp[a]["pos"]
+        far = float(np.hypot(*v))
+        if abs(np.dot(v, facing(sp[a]))) >= MIN_AHEAD * cell or far > TOUCHING * cell:
+            continue
+        if best_d is None or far < best_d:
+            best, best_d = s["id"], far
+    return best
 
 
 def cell_length(track):
@@ -487,7 +541,7 @@ def draw(im, lab, keep, spaces, found, misses, path):
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     map_id = args[0] if args else "FDMonaco"
-    path = ROOT / "tracks" / f"{map_id}.json"
+    path = TRACKS / f"{map_id}.json"
     track = json.loads(path.read_text(encoding="utf-8"))
     info, im = board_image(map_id)
     # The pit lane has no arrows, only the cars drawn on its stands: it is
@@ -525,7 +579,7 @@ def main():
     # arrow_sheets.py label each ring with its lane, not just its id -- the
     # likely cause of the misreads. And bring tracks/FDMonaco.arrows.json
     # into line with the hand-fixed links, or --write will undo them.
-    reading_path = ROOT / "tracks" / f"{map_id}.arrows.json"
+    reading_path = TRACKS / f"{map_id}.arrows.json"
     if reading_path.exists():
         reading = json.loads(reading_path.read_text(encoding="utf-8"))
         detected = found
@@ -558,7 +612,7 @@ def main():
           % (same, len(by_space) - same, len(corner - set(by_space))))
 
     draw(im, lab, keep, spaces, found, misses, OUT / f"{map_id}_8_arrows.png")
-    print("   -> tools/extract/out/%s_8_arrows.png" % map_id)
+    print("   ->", (OUT / f"{map_id}_8_arrows.png").relative_to(ROOT))
 
     if "--write" in sys.argv:
         for sid, dst in by_space.items():
@@ -568,10 +622,14 @@ def main():
         # on, or a lane either side -- in case an earlier run fixed them.
         if reading_path.exists():
             pos = np.array([s["pos"] for s in track["spaces"]])
+            following = next_by_code(track["spaces"])
             for sid in reading.get("blank", []):
                 s = spaces[sid]
                 s.pop("fixed", None)
-                s["next"] = sorted(o["id"] for o in ahead_of(s, track["spaces"], pos, cell).values())
+                choices = ahead_of(s, track["spaces"], pos, cell)
+                if following.get(sid) in spaces:
+                    choices[s["lane"]] = spaces[following[sid]]
+                s["next"] = sorted(o["id"] for o in choices.values())
         for s in track["spaces"]:
             s["next"] = sorted(s["next"] + into_pit.get(s["id"], []))
         track["spaces"] += pit

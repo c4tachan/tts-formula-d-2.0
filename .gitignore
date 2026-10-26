@@ -11,3 +11,6 @@ tools/extract/out/
 
 # Python environment for the extraction tools
 .venv/
+
+# Board images fetched by tools/extract/download_maps.py
+tracks/raw/

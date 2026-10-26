@@ -16,9 +16,10 @@ corner-point touch never makes. Three things keep that honest:
     whatever the border says.
   - A neighbour must be reachable without crossing a kerb or the white
     track limit, or the two legs of a hairpin come out joined. A kerb is a
-    long run of white, or red stripes beside white -- the red corner lines
-    on the asphalt have no white beside them, and the white paint on it
-    (grid boxes, numbers) is too short.
+    long run of white, or red stripes beside blocks of white -- the red
+    corner lines on the asphalt have no white beside them but the thin
+    halo of a grid line, and the white paint on it (grid boxes, numbers)
+    is too short.
   - The chequered flag is white too, and is not a kerb.
 
 Writes tracks/<id>.adjacency.json, beside the track file, and
@@ -35,7 +36,7 @@ import cv2
 import numpy as np
 from scipy.spatial import cKDTree
 
-from detect_track import OUT, ROOT, board_image, keep_long
+from detect_track import OUT, ROOT, TRACKS, board_image, keep_long
 from find_grid import paint_out_arrows, paint_out_flag, track_only
 
 REACH = 40    # px: how far from its centre a space's area reaches
@@ -74,7 +75,10 @@ def kerbs(im, road, flag):
     white = (hsv[..., 1] < 45) & (hsv[..., 2] >= 200)
     red = (hsv[..., 1] > 120) & ((hsv[..., 0] < 10) | (hsv[..., 0] > 170)) & (hsv[..., 2] > 120)
     k5 = np.ones((5, 5), np.uint8)
-    striped = (cv2.dilate(red.astype(np.uint8), k5) > 0) & (cv2.dilate(white.astype(np.uint8), k5) > 0)
+    # A kerb's white stripes are solid blocks; the halo beside a grid line
+    # (Austin's) is a pixel thin, and would make every red corner line a kerb.
+    blocks = cv2.morphologyEx(white.astype(np.uint8), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    striped = (cv2.dilate(red.astype(np.uint8), k5) > 0) & (cv2.dilate(blocks, k5) > 0)
     white &= cv2.dilate(flag.astype(np.uint8), np.ones((9, 9), np.uint8)) == 0
     barrier = (road == 0) | (keep_long(white, 60) > 0) | striped
     return cv2.morphologyEx(barrier.astype(np.uint8), cv2.MORPH_OPEN, np.ones((2, 2), np.uint8)) > 0
@@ -135,7 +139,7 @@ def draw(im, spaces, pairs, scale=2):
 
 def main():
     map_id = sys.argv[1] if len(sys.argv) > 1 else "FDMonaco"
-    track_path = ROOT / "tracks" / f"{map_id}.json"
+    track_path = TRACKS / f"{map_id}.json"
     if not track_path.exists():
         sys.exit(f"no track file {track_path.relative_to(ROOT)}")
     # No collisions in the pit lane, so it has no neighbours to find.
@@ -154,7 +158,7 @@ def main():
     if alone:
         print("no neighbours: " + ", ".join(alone))
 
-    out = ROOT / "tracks" / f"{map_id}.adjacency.json"
+    out = TRACKS / f"{map_id}.adjacency.json"
     out.write_text(json.dumps({
         "about": "Which spaces touch which, ignoring the arrows: every pair that shares an edge "
                  "on the board, in any direction. Written by tools/extract/find_adjacency.py "

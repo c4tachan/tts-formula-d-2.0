@@ -24,7 +24,21 @@ CATEGORY = {
 }
 ORDER = ["formula_d", "formula_de", "custom"]
 # Only these categories reach maps.json; the mod does not support the rest yet.
-SUPPORTED = {"formula_d"}
+SUPPORTED = {"formula_d", "formula_de"}
+# Of those, the boards that are not Formula 1 circuits are left out (#82):
+# the made-up ones, and those of circuits that never held a Grand Prix.
+NOT_F1 = {
+    "FDBaltimore", "FDChicago", "FDDocks", "FDDocksAlt", "FDNevada", "FDNewJersey",
+    "FDRaceCity", "FDRaceCityAlt",
+    "FDe23a", "FDe23b",     # Monterey (Laguna Seca)
+    "FDe24a", "FDe24b",     # Portland
+    "FDe25",                # Elkhart Lake
+    "FDe28a", "FDe28b",     # Lexington (Mid-Ohio)
+    "FDe29",                # Atlanta
+    "FDe30",                # Daytona
+    "FDe31",                # Zhuhai
+    "FDe33",                # Anniversary
+}
 
 # maps_custom["Name"] = "https://..."
 RE_ENTRY = re.compile(
@@ -112,7 +126,7 @@ def main():
         if ck not in known:
             problems.append(f"{ck[0]}[{ck[1]!r}]: URL never used by any handler")
 
-    maps = [m for m in maps if m["category"] in SUPPORTED]
+    maps = [m for m in maps if m["category"] in SUPPORTED and m["id"] not in NOT_F1]
     maps.sort(key=lambda m: (ORDER.index(m["category"]), m["id"]))
     OUT.write_text(json.dumps(maps, indent=2), encoding="utf-8")
 
