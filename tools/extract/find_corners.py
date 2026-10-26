@@ -48,7 +48,7 @@ from collections import Counter
 import cv2
 import numpy as np
 
-from detect_track import OUT, board_image, corner_lines, racing_line
+from detect_track import OUT, TRACKS, board_image, corner_lines, racing_line
 from find_grid import paint_out_flag, track_only, track_proper
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -318,7 +318,7 @@ def main():
     if "--paths" in sys.argv:
         paths = [[int(v) for v in pair.split("/")]
                  for pair in sys.argv[sys.argv.index("--paths") + 1].split(",")]
-    path = ROOT / "tracks" / f"{map_id}.json"
+    path = TRACKS / f"{map_id}.json"
     track = json.loads(path.read_text(encoding="utf-8"))
     info, im = board_image(map_id)
     track_img, road = track_only(im)
@@ -406,7 +406,7 @@ def main():
     print("   ->", out.relative_to(ROOT))
 
     track["corners"] = corners
-    recode(track, codes, ROOT / "tracks" / f"{map_id}.arrows.json")
+    recode(track, codes, TRACKS / f"{map_id}.arrows.json")
     # The finish line is where the codes start counting: the first cell of
     # s1 in each lane, the one at or just past the band -- the pit lane's
     # too, but not a pit box that happens to be coded after it (Sebring's).

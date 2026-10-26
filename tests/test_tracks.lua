@@ -6,8 +6,10 @@ local Graph = require("fd.core.trackgraph")
 local Moves = require("fd.core.moves")
 local Position = require("fd.core.position")
 
-local TRACKS = { "FDAustin", "FDBuddh", "FDHockenheim", "FDMonaco", "FDSebring", "FDSingapore", "FDSotchi", "FDValencia",
-                 "FDe01", "FDe02", "FDe03" }
+-- ONLY_TRACKS, where set, checks just those: the browser editor
+-- (tools/editor/checks.py) runs these tests on the track being edited.
+local TRACKS = ONLY_TRACKS or { "FDAustin", "FDBuddh", "FDHockenheim", "FDMonaco", "FDSebring", "FDSingapore",
+                 "FDSotchi", "FDValencia", "FDe01", "FDe02", "FDe03" }
 
 local function eq(a, b, msg)
     if a ~= b then

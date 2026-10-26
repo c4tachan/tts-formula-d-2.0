@@ -71,11 +71,35 @@ location, is the portable one.
 python tools/check_lua.py      # luaparser syntax check over src/
 python tools/test_lua.py       # lupa: rules + Global wiring tests
 python tools/test_lua.py --bench   # optional: UI updates / game calls per action
+python tools/editor/test_editor.py # when tools/editor/ or fd.core.trackgraph changed
 pwsh tools/sync.ps1 push
 ```
 
 TTS reports script errors only after the mod loads, so the syntax check is worth
 the two seconds.
+
+## Editing tracks with the user in the browser editor
+
+`tools/editor/server.py` serves a track editor at http://127.0.0.1:8765
+(docs/track-editor.md). When the user asks you to join it or work on a track
+with them there:
+
+- Start the server in the background if it is not up
+  (`python tools/editor/fdedit.py status` says), then arm a Monitor on
+  `python tools/editor/fdedit.py listen` with the longest timeout, and re-arm
+  it on expiry. Each line is a message from the user's chat panel, with their
+  selection, hover and view. Answer with `fdedit.py say`, not only in the
+  terminal: they are looking at the page.
+- Look before you edit: `fdedit.py snapshot <scratchpad>/x.png --view user`
+  (or `--around ID,..`, `--box`) and Read the PNG. Spaces are drawn as
+  outlines so the printed arrows show; add `--no-labels --no-links` to read
+  the print itself. `space ID`, `problems`, `spaces --box` give the data.
+- Edit through `fdedit.py` (`move`, `link`, `lane`, `unfix`, `ops '[...]'`),
+  never by writing the track file while the server has it open: the server's
+  working copy would overwrite yours. Batch related changes into one `ops`
+  call so they undo as one step. `select`/`focus` point the user at spaces,
+  `note` pins a remark on the board.
+- Saving is the user's call unless they ask you to (`fdedit.py save`).
 
 ## Design constraints to respect
 

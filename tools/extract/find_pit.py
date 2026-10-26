@@ -53,7 +53,7 @@ import cv2
 import numpy as np
 from scipy.ndimage import gaussian_filter1d, median_filter
 
-from detect_track import OUT, PALETTE, ROOT, asphalt, board_image, racing_line
+from detect_track import OUT, PALETTE, ROOT, TRACKS, asphalt, board_image, racing_line
 from find_grid import paint_out_flag, track_only, track_proper
 
 WORK = OUT / "_work"
@@ -473,7 +473,7 @@ def main():
     if map_id not in READING:
         sys.exit(f"no reading of {map_id}'s pit lane in READING -- read its ends off the board first")
     rd = READING[map_id]
-    path = ROOT / "tracks" / f"{map_id}.json"
+    path = TRACKS / f"{map_id}.json"
     track = json.loads(path.read_text(encoding="utf-8"))
     info, im = board_image(map_id)
     WORK.mkdir(parents=True, exist_ok=True)

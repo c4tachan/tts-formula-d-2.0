@@ -36,7 +36,7 @@ import cv2
 import numpy as np
 from scipy.spatial import cKDTree
 
-from detect_track import OUT, ROOT, board_image, keep_long
+from detect_track import OUT, ROOT, TRACKS, board_image, keep_long
 from find_grid import paint_out_arrows, paint_out_flag, track_only
 
 REACH = 40    # px: how far from its centre a space's area reaches
@@ -139,7 +139,7 @@ def draw(im, spaces, pairs, scale=2):
 
 def main():
     map_id = sys.argv[1] if len(sys.argv) > 1 else "FDMonaco"
-    track_path = ROOT / "tracks" / f"{map_id}.json"
+    track_path = TRACKS / f"{map_id}.json"
     if not track_path.exists():
         sys.exit(f"no track file {track_path.relative_to(ROOT)}")
     # No collisions in the pit lane, so it has no neighbours to find.
@@ -158,7 +158,7 @@ def main():
     if alone:
         print("no neighbours: " + ", ".join(alone))
 
-    out = ROOT / "tracks" / f"{map_id}.adjacency.json"
+    out = TRACKS / f"{map_id}.adjacency.json"
     out.write_text(json.dumps({
         "about": "Which spaces touch which, ignoring the arrows: every pair that shares an edge "
                  "on the board, in any direction. Written by tools/extract/find_adjacency.py "

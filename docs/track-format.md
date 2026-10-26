@@ -311,7 +311,8 @@ either side pinch that border to nothing. It reads the spaces from
 Lua module. Rerun both after moving spaces. The check image goes to
 `out/<id>_adjacency.png`.
 
-Tracks are expected to need hand correction after extraction -- the editor in
-TTS is for that, and `tools/extract/import_track.py` brings the result back
-from a saved game. The advisory enforcement model means an imperfect track file
+Tracks are expected to need hand correction after extraction. The browser
+editor (`tools/editor/`, see [track-editor.md](track-editor.md)) writes the
+track file directly; the editor in TTS works too, and
+`tools/extract/import_track.py` brings its result back from a saved game. The advisory enforcement model means an imperfect track file
 degrades gracefully rather than blocking play, which is why it was chosen.

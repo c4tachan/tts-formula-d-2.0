@@ -39,7 +39,12 @@ from skimage.morphology import skeletonize
 LANES = 3  # widest point of the track; per-track once more maps are done
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-OUT = ROOT / "tools" / "extract" / "out"
+# Where the track files and the step images go. tools/editor/ runs the
+# scripts with these pointed at a scratch folder, so a detection run on a
+# board image -- one already mapped, or one dropped into the editor -- never
+# touches tracks/.
+TRACKS = pathlib.Path(os.environ.get("FD_TRACKS_DIR", ROOT / "tracks")).resolve()
+OUT = pathlib.Path(os.environ.get("FD_OUT_DIR", ROOT / "tools" / "extract" / "out")).resolve()
 from tts_paths import MODS, TTS_DIR, documents_dir  # noqa: F401  (re-exported)
 
 
@@ -96,12 +101,22 @@ LAP = {
 def board_image(map_id):
     maps = json.loads((ROOT / "tools" / "extract" / "maps.json").read_text(encoding="utf-8"))
     hit = next((m for m in maps if m["id"] == map_id), None)
+    # FD_BOARD_IMAGE reads that file instead: a board not in maps.json yet,
+    # FD_BOARD_CATEGORY saying whose colours it is printed in.
+    image = os.environ.get("FD_BOARD_IMAGE")
+    if not hit and image:
+        hit = {"id": map_id, "name": map_id, "url": "",
+               "category": os.environ.get("FD_BOARD_CATEGORY", "formula_d")}
     if not hit:
         sys.exit(f"unknown map id {map_id}")
-    key = re.sub(r"[^A-Za-z0-9]", "", hit["url"].split("ugc/")[-1])
-    # The TTS cache first, then what download_maps.py fetched into tracks/raw/.
-    found = [f for f in (MODS / "Images").iterdir() if key in f.name]
-    found += sorted((ROOT / "tracks" / "raw").glob(f"{map_id}.*"))
+    if image:
+        found = [pathlib.Path(image)]
+    else:
+        key = re.sub(r"[^A-Za-z0-9]", "", hit["url"].split("ugc/")[-1])
+        # The TTS cache first, then what download_maps.py fetched into tracks/raw/.
+        images = MODS / "Images"
+        found = [f for f in images.iterdir() if key in f.name] if images.is_dir() else []
+        found += sorted((ROOT / "tracks" / "raw").glob(f"{map_id}.*"))
     for f in found:
         im = cv2.imread(str(f))
         if im is not None:

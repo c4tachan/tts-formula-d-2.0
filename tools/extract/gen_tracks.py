@@ -8,6 +8,7 @@ to world space at load.
 Run:  python tools/extract/gen_tracks.py
 """
 import json
+import os
 import pathlib
 import sys
 
@@ -155,7 +156,11 @@ def main():
     # tracks/<id>.json only: <id>.arrows.json beside it is a reading of the
     # board's arrows, which find_arrows.py turns into the track's links, and
     # <id>.adjacency.json the spaces that touch, read in below.
-    files = sorted(f for f in TRACKS.glob("*.json") if f.stem.count(".") == 0)
+    # A detection run in a scratch folder (FD_TRACKS_DIR, set by
+    # tools/editor/) makes no track the mod has: nothing to generate.
+    if os.environ.get("FD_TRACKS_DIR"):
+        return 0
+    files =sorted(f for f in TRACKS.glob("*.json") if f.stem.count(".") == 0)
     if not files:
         sys.exit("no track files in tracks/")
     OUT.mkdir(parents=True, exist_ok=True)

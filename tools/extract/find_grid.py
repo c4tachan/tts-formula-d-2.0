@@ -975,9 +975,9 @@ def main():
 
     # How this board is read, and which way round it runs: as passed, or as
     # the last run on it was.
-    from detect_track import ROOT
+    from detect_track import ROOT, TRACKS
     import json
-    existing = ROOT / "tracks" / f"{map_id}.json"
+    existing = TRACKS / f"{map_id}.json"
     detect = {}
     if existing.exists():
         detect = json.loads(existing.read_text(encoding="utf-8")).get("detect", {})
@@ -1016,7 +1016,7 @@ def main():
     cv2.imwrite(str(name("6_spaces")), vis)
 
     # 7. The track file
-    track_path = ROOT / "tracks" / f"{map_id}.json"
+    track_path = TRACKS / f"{map_id}.json"
     if write_track(info, im, spaces, line, reverse, read, track_path):
         print("7. %d spaces -> %s" % (len(spaces), track_path.relative_to(ROOT)))
     else:

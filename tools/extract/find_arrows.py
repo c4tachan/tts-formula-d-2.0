@@ -43,7 +43,7 @@ import cv2
 import numpy as np
 from skimage.morphology import skeletonize
 
-from detect_track import OUT, board_image, edge_line, racing_line, surface_mask
+from detect_track import OUT, TRACKS, board_image, edge_line, racing_line, surface_mask
 from find_grid import ARROW_EXTENT, track_only, track_proper
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -541,7 +541,7 @@ def draw(im, lab, keep, spaces, found, misses, path):
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     map_id = args[0] if args else "FDMonaco"
-    path = ROOT / "tracks" / f"{map_id}.json"
+    path = TRACKS / f"{map_id}.json"
     track = json.loads(path.read_text(encoding="utf-8"))
     info, im = board_image(map_id)
     # The pit lane has no arrows, only the cars drawn on its stands: it is
@@ -579,7 +579,7 @@ def main():
     # arrow_sheets.py label each ring with its lane, not just its id -- the
     # likely cause of the misreads. And bring tracks/FDMonaco.arrows.json
     # into line with the hand-fixed links, or --write will undo them.
-    reading_path = ROOT / "tracks" / f"{map_id}.arrows.json"
+    reading_path = TRACKS / f"{map_id}.arrows.json"
     if reading_path.exists():
         reading = json.loads(reading_path.read_text(encoding="utf-8"))
         detected = found
@@ -612,7 +612,7 @@ def main():
           % (same, len(by_space) - same, len(corner - set(by_space))))
 
     draw(im, lab, keep, spaces, found, misses, OUT / f"{map_id}_8_arrows.png")
-    print("   -> tools/extract/out/%s_8_arrows.png" % map_id)
+    print("   ->", (OUT / f"{map_id}_8_arrows.png").relative_to(ROOT))
 
     if "--write" in sys.argv:
         for sid, dst in by_space.items():
