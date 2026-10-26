@@ -637,7 +637,19 @@ class Workspace:
         env = dict(os.environ, PYTHONIOENCODING="utf-8")
         for k in ("FD_TRACKS_DIR", "FD_OUT_DIR", "FD_BOARD_IMAGE"):
             env.pop(k, None)
-        return self.run_job(Job(key, "adjacency", steps), env)
+
+        def on_done(job):
+            # The track tests read the adjacency file: what they said before
+            # it was rewritten is out of date.
+            with self.lock:
+                doc = self.docs.get(key)
+                if doc:
+                    doc._checked = None
+                self.rev += 1
+            if self.open == key:
+                self.push_state()
+
+        return self.run_job(Job(key, "adjacency", steps, on_done=on_done), env)
 
     def upload(self, name, data, category):
         tid = slug(name)
