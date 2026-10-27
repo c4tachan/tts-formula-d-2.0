@@ -187,9 +187,10 @@ def guids(node):
     return set()
 
 
-def rewrite_save(urls, ui):
-    """Write a copy of the latest save pointing at the repo; returns its path."""
-    path, data = find_save(skip=COPY)
+def point_at_repo(data, urls, ui):
+    """Point every asset URL in save `data` at the repo, in place. Returns the
+    number rewritten, the Steam URLs with no copy in the repo, and the GUIDs
+    with UI images that are not in the save."""
     unknown = set()
     count = 0
 
@@ -223,12 +224,23 @@ def rewrite_save(urls, ui):
 
     walk(data, "-1")
     missing = sorted(set(ui) - {"-1"} - guids(data))
+    return count, sorted(unknown), missing
+
+
+def report(count, unknown, missing):
     if missing:
         print(f"not in the save, so their UI images are not either: {', '.join(missing)}")
     if unknown:
         print(f"{len(unknown)} Steam URLs have no copy in the repo and were left as they are:")
-        for u in sorted(unknown):
+        for u in unknown:
             print("  " + u)
+
+
+def rewrite_save(urls, ui):
+    """Write a copy of the latest save pointing at the repo; returns its path."""
+    path, data = find_save(skip=COPY)
+    count, unknown, missing = point_at_repo(data, urls, ui)
+    report(count, unknown, missing)
     data["SaveName"] = data.get("SaveName", "").strip() + " (repo assets)"
     out = path.with_name(path.stem + COPY + ".json")
     out.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -239,7 +251,9 @@ def rewrite_save(urls, ui):
     return out
 
 
-def main():
+def repo_urls():
+    """The repo's pinned copies: (steam key -> URL, GUID -> [(UI image name,
+    URL)], Steam URL the Lua names -> URL)."""
     files = repo_files()
     url_of = pins(files.values())
     urls = {key: url_of[p] for key, p in files.items()}
@@ -257,6 +271,11 @@ def main():
 
     names, files_by_name = ui_names()
     ui = {guid: [(n, url_of[RAW / files_by_name[n]]) for n in ns] for guid, ns in names.items()}
+    return urls, ui, copies
+
+
+def main():
+    urls, ui, copies = repo_urls()
     write_lua(copies, ui)
     print(f"wrote {LUA.relative_to(ROOT)}: {len(copies)} copies, "
           + ", ".join(f"{len(v)} UI images for {g}" for g, v in sorted(ui.items())))

@@ -1,0 +1,6952 @@
+{
+  "SaveName": "Formula D",
+  "EpochTime": 1793135746,
+  "Date": "10/27/2026 5:15:46 PM",
+  "VersionNumber": "v14.2.2",
+  "GameMode": "Formula D",
+  "GameType": "Game",
+  "GameComplexity": "Low Complexity",
+  "PlayingTime": [
+    0,
+    120
+  ],
+  "PlayerCounts": [
+    0,
+    10
+  ],
+  "Tags": [
+    "Dice Games",
+    "Board Games",
+    "Dice",
+    "Rules",
+    "Scripting",
+    "User Interfaces",
+    "English",
+    "racing",
+    "formula 1",
+    "f1"
+  ],
+  "Gravity": 0.5035497,
+  "PlayArea": 0.5,
+  "Table": "Table_Custom",
+  "TableURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Table.png",
+  "Sky": "Sky_Cathedral",
+  "SkyURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Sky.jpg",
+  "Note": "",
+  "TabStates": {
+    "0": {
+      "title": "Rules",
+      "body": "",
+      "color": "Grey",
+      "visibleColor": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5
+      },
+      "id": 0
+    },
+    "1": {
+      "title": "White",
+      "body": "",
+      "color": "White",
+      "visibleColor": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 1.0
+      },
+      "id": 1
+    },
+    "2": {
+      "title": "Brown",
+      "body": "",
+      "color": "Brown",
+      "visibleColor": {
+        "r": 0.443,
+        "g": 0.231,
+        "b": 0.09
+      },
+      "id": 2
+    },
+    "3": {
+      "title": "Red",
+      "body": "",
+      "color": "Red",
+      "visibleColor": {
+        "r": 0.856,
+        "g": 0.1,
+        "b": 0.094
+      },
+      "id": 3
+    },
+    "4": {
+      "title": "Orange",
+      "body": "",
+      "color": "Orange",
+      "visibleColor": {
+        "r": 0.956,
+        "g": 0.392,
+        "b": 0.113
+      },
+      "id": 4
+    },
+    "5": {
+      "title": "Yellow",
+      "body": "",
+      "color": "Yellow",
+      "visibleColor": {
+        "r": 0.905,
+        "g": 0.898,
+        "b": 0.172
+      },
+      "id": 5
+    },
+    "6": {
+      "title": "Green",
+      "body": "",
+      "color": "Green",
+      "visibleColor": {
+        "r": 0.192,
+        "g": 0.701,
+        "b": 0.168
+      },
+      "id": 6
+    },
+    "7": {
+      "title": "Blue",
+      "body": "",
+      "color": "Blue",
+      "visibleColor": {
+        "r": 0.118,
+        "g": 0.53,
+        "b": 1.0
+      },
+      "id": 7
+    },
+    "8": {
+      "title": "Teal",
+      "body": "",
+      "color": "Teal",
+      "visibleColor": {
+        "r": 0.129,
+        "g": 0.694,
+        "b": 0.607
+      },
+      "id": 8
+    },
+    "9": {
+      "title": "Purple",
+      "body": "",
+      "color": "Purple",
+      "visibleColor": {
+        "r": 0.627,
+        "g": 0.125,
+        "b": 0.941
+      },
+      "id": 9
+    },
+    "10": {
+      "title": "Pink",
+      "body": "",
+      "color": "Pink",
+      "visibleColor": {
+        "r": 0.96,
+        "g": 0.439,
+        "b": 0.807
+      },
+      "id": 10
+    },
+    "11": {
+      "title": "Black",
+      "body": "",
+      "color": "Black",
+      "visibleColor": {
+        "r": 0.25,
+        "g": 0.25,
+        "b": 0.25
+      },
+      "id": 11
+    }
+  },
+  "Grid": {
+    "Type": 0,
+    "Lines": false,
+    "Color": {
+      "r": 0.0,
+      "g": 0.0,
+      "b": 0.0
+    },
+    "Opacity": 0.75,
+    "ThickLines": false,
+    "Snapping": false,
+    "Offset": false,
+    "BothSnapping": false,
+    "xSize": 2.0,
+    "ySize": 2.0,
+    "PosOffset": {
+      "x": 0.0,
+      "y": 1.0,
+      "z": 0.0
+    }
+  },
+  "Lighting": {
+    "LightIntensity": 0.54,
+    "LightColor": {
+      "r": 1.0,
+      "g": 0.9804,
+      "b": 0.8902
+    },
+    "AmbientIntensity": 1.3,
+    "AmbientType": 0,
+    "AmbientSkyColor": {
+      "r": 0.5,
+      "g": 0.5,
+      "b": 0.5
+    },
+    "AmbientEquatorColor": {
+      "r": 0.5,
+      "g": 0.5,
+      "b": 0.5
+    },
+    "AmbientGroundColor": {
+      "r": 0.5,
+      "g": 0.5,
+      "b": 0.5
+    },
+    "ReflectionIntensity": 1.0,
+    "LutIndex": 0,
+    "LutContribution": 1.0
+  },
+  "Hands": {
+    "Enable": true,
+    "DisableUnused": false,
+    "Hiding": 0
+  },
+  "ComponentTags": {
+    "labels": []
+  },
+  "Turns": {
+    "Enable": false,
+    "Type": 0,
+    "TurnOrder": [],
+    "Reverse": false,
+    "SkipEmpty": false,
+    "DisableInteractions": false,
+    "PassTurns": true,
+    "TurnColor": ""
+  },
+  "DecalPallet": [],
+  "LuaScript": "",
+  "LuaScriptState": "{\"edits\":[],\"markers\":[],\"race\":{\"cars\":[],\"checks\":[],\"damage\":[],\"finishers\":[],\"laps\":1,\"lastMark\":0,\"lastPack\":0,\"order\":[],\"packs\":[],\"phase\":\"setup\",\"round\":0,\"rules\":\"beginner\"},\"sp\":false}",
+  "XmlUI": "",
+  "CustomUIAssets": [
+    {
+      "Type": 0,
+      "Name": "fdDashboard",
+      "URL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Advanced_Dashboard_DiffuseURL.jpg"
+    }
+  ],
+  "ObjectStates": [
+    {
+      "GUID": "72566c",
+      "Name": "HandTrigger",
+      "Transform": {
+        "posX": 23.656,
+        "posY": -6.191329,
+        "posZ": 38.453,
+        "rotX": 0.0,
+        "rotY": 179.8,
+        "rotZ": 0.0,
+        "scaleX": 15.4822416,
+        "scaleY": 11.8970528,
+        "scaleZ": 6.410155
+      },
+      "Nickname": "",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.117999978,
+        "g": 0.53,
+        "b": 1.0,
+        "a": 0.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": false,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "FogColor": "Blue",
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": ""
+    },
+    {
+      "GUID": "a52bf6",
+      "Name": "HandTrigger",
+      "Transform": {
+        "posX": 0.0,
+        "posY": -6.191329,
+        "posZ": -38.425,
+        "rotX": 0.0,
+        "rotY": 0.0,
+        "rotZ": 0.0,
+        "scaleX": 15.3268919,
+        "scaleY": 11.8970528,
+        "scaleZ": 6.35014534
+      },
+      "Nickname": "",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.442999959,
+        "g": 0.230999947,
+        "b": 0.0899999961,
+        "a": 0.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": false,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "FogColor": "Brown",
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": ""
+    },
+    {
+      "GUID": "d30d72",
+      "Name": "HandTrigger",
+      "Transform": {
+        "posX": -23.67,
+        "posY": -6.191329,
+        "posZ": 38.432,
+        "rotX": 0.0,
+        "rotY": 180.0,
+        "rotZ": 0.0,
+        "scaleX": 15.3268747,
+        "scaleY": 11.8970528,
+        "scaleZ": 6.35014534
+      },
+      "Nickname": "",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.191999972,
+        "g": 0.701,
+        "b": 0.167999953,
+        "a": 0.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": false,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "FogColor": "Green",
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": ""
+    },
+    {
+      "GUID": "1a8300",
+      "Name": "HandTrigger",
+      "Transform": {
+        "posX": -55.66,
+        "posY": -6.191329,
+        "posZ": -11.732,
+        "rotX": 0.0,
+        "rotY": 90.0,
+        "rotZ": 0.0,
+        "scaleX": 15.3162012,
+        "scaleY": 11.8970528,
+        "scaleZ": 6.471333
+      },
+      "Nickname": "",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.9559999,
+        "g": 0.39199996,
+        "b": 0.112999953,
+        "a": 0.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": false,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "FogColor": "Orange",
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": ""
+    },
+    {
+      "GUID": "9b6a35",
+      "Name": "HandTrigger",
+      "Transform": {
+        "posX": 55.643,
+        "posY": -6.191329,
+        "posZ": -11.732,
+        "rotX": 0.0,
+        "rotY": 270.0,
+        "rotZ": 0.0,
+        "scaleX": 15.3161821,
+        "scaleY": 11.8970528,
+        "scaleZ": 6.471333
+      },
+      "Nickname": "",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.96,
+        "g": 0.438999981,
+        "b": 0.807,
+        "a": 0.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": false,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "FogColor": "Pink",
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": ""
+    },
+    {
+      "GUID": "03ba30",
+      "Name": "HandTrigger",
+      "Transform": {
+        "posX": 55.579,
+        "posY": -6.191329,
+        "posZ": 11.732,
+        "rotX": 0.0,
+        "rotY": 270.0,
+        "rotZ": 0.0,
+        "scaleX": 15.3161879,
+        "scaleY": 11.8970528,
+        "scaleZ": 6.471333
+      },
+      "Nickname": "",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.627,
+        "g": 0.124999978,
+        "b": 0.941,
+        "a": 0.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": false,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "FogColor": "Purple",
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": ""
+    },
+    {
+      "GUID": "8441f6",
+      "Name": "HandTrigger",
+      "Transform": {
+        "posX": -23.67,
+        "posY": -6.191329,
+        "posZ": -38.425,
+        "rotX": 0.0,
+        "rotY": 0.0,
+        "rotZ": 0.0,
+        "scaleX": 15.3268948,
+        "scaleY": 11.8970528,
+        "scaleZ": 6.35014534
+      },
+      "Nickname": "",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.856,
+        "g": 0.09999997,
+        "b": 0.09399996,
+        "a": 0.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": false,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "FogColor": "Red",
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": ""
+    },
+    {
+      "GUID": "04dc08",
+      "Name": "HandTrigger",
+      "Transform": {
+        "posX": -0.014,
+        "posY": -6.191329,
+        "posZ": 38.453,
+        "rotX": 0.0,
+        "rotY": 179.800049,
+        "rotZ": 0.0,
+        "scaleX": 15.4795084,
+        "scaleY": 11.8970528,
+        "scaleZ": 6.408773
+      },
+      "Nickname": "",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.128999949,
+        "g": 0.694,
+        "b": 0.606999934,
+        "a": 0.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": false,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "FogColor": "Teal",
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": ""
+    },
+    {
+      "GUID": "35577a",
+      "Name": "HandTrigger",
+      "Transform": {
+        "posX": 23.67,
+        "posY": -6.191329,
+        "posZ": -38.256,
+        "rotX": 0.0,
+        "rotY": 0.0,
+        "rotZ": 0.0,
+        "scaleX": 15.3268747,
+        "scaleY": 11.8970547,
+        "scaleZ": 6.705048
+      },
+      "Nickname": "",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 0.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": false,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "FogColor": "White",
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": ""
+    },
+    {
+      "GUID": "a2e60b",
+      "Name": "HandTrigger",
+      "Transform": {
+        "posX": -55.66,
+        "posY": -6.191329,
+        "posZ": 11.732,
+        "rotX": 0.0,
+        "rotY": 90.0,
+        "rotZ": 0.0,
+        "scaleX": 15.3161945,
+        "scaleY": 11.8970528,
+        "scaleZ": 6.471333
+      },
+      "Nickname": "",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.905,
+        "g": 0.898,
+        "b": 0.171999961,
+        "a": 0.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": false,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "FogColor": "Yellow",
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": ""
+    },
+    {
+      "GUID": "0fde3b",
+      "Name": "Bag",
+      "Transform": {
+        "posX": -0.0125592351,
+        "posY": -26.91376,
+        "posZ": 0.533181548,
+        "rotX": 6.83018925e-06,
+        "rotY": 26.1031837,
+        "rotZ": 265.521423,
+        "scaleX": 1.0,
+        "scaleY": 1.0,
+        "scaleZ": 1.0
+      },
+      "Nickname": "Memory Bag - Setup Board",
+      "Description": "By Directsun",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.0,
+        "g": 0.0,
+        "b": 0.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": true,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "MaterialIndex": -1,
+      "MeshIndex": -1,
+      "Number": 0,
+      "Bag": {
+        "Order": 0
+      },
+      "LuaScript": "",
+      "LuaScriptState": "{\"ml\":{\"1bb99e\":{\"lock\":true,\"pos\":{\"x\":66.9307,\"y\":-0.0106,\"z\":-1.0489},\"rot\":{\"x\":-0.0003,\"y\":0.0002,\"z\":-0.0001}},\"346d99\":{\"lock\":true,\"pos\":{\"x\":58.4688,\"y\":-0.011,\"z\":-26.4877},\"rot\":{\"x\":0,\"y\":0,\"z\":0}},\"38e023\":{\"lock\":false,\"pos\":{\"x\":69.9155,\"y\":0.6175,\"z\":-13.6488},\"rot\":{\"x\":359.9052,\"y\":247.7567,\"z\":180}},\"39dfe8\":{\"lock\":false,\"pos\":{\"x\":66.7383,\"y\":0.5509,\"z\":-13.6501},\"rot\":{\"x\":16.1764,\"y\":221.9695,\"z\":117.6601}},\"47c309\":{\"lock\":false,\"pos\":{\"x\":60.8986,\"y\":0.444,\"z\":-13.7463},\"rot\":{\"x\":270,\"y\":29.9621,\"z\":0}},\"490aa3\":{\"lock\":true,\"pos\":{\"x\":72.6391,\"y\":-0.0127,\"z\":-33.0344},\"rot\":{\"x\":0,\"y\":0,\"z\":0}},\"4eb678\":{\"lock\":true,\"pos\":{\"x\":57.1156,\"y\":-0.0127,\"z\":15.943},\"rot\":{\"x\":0,\"y\":0,\"z\":0}},\"632ae8\":{\"lock\":true,\"pos\":{\"x\":70.75,\"y\":0,\"z\":0},\"rot\":{\"x\":0,\"y\":180,\"z\":180}},\"6e3283\":{\"lock\":false,\"pos\":{\"x\":72.2397,\"y\":0.6272,\"z\":-10.7717},\"rot\":{\"x\":307.3773,\"y\":32.0151,\"z\":18}},\"71d89b\":{\"lock\":true,\"pos\":{\"x\":58.3115,\"y\":-0.0127,\"z\":7.6473},\"rot\":{\"x\":0,\"y\":344.9754,\"z\":0}},\"75d86c\":{\"lock\":true,\"pos\":{\"x\":72.5404,\"y\":-0.0127,\"z\":-23.2718},\"rot\":{\"x\":0,\"y\":0,\"z\":0}},\"89b174\":{\"lock\":false,\"pos\":{\"x\":63.5591,\"y\":0.4003,\"z\":-13.6909},\"rot\":{\"x\":35.2644,\"y\":217.2139,\"z\":225}},\"98b2d2\":{\"lock\":true,\"pos\":{\"x\":72.4791,\"y\":-0.022,\"z\":-26.399},\"rot\":{\"x\":1.0102,\"y\":0.0553,\"z\":357.8255}},\"a8062d\":{\"lock\":false,\"pos\":{\"x\":57.6139,\"y\":0.2393,\"z\":-13.585},\"rot\":{\"x\":305.2644,\"y\":351.2955,\"z\":125.2644}},\"a845cd\":{\"lock\":true,\"pos\":{\"x\":72.2185,\"y\":-0.0127,\"z\":7.5652},\"rot\":{\"x\":0,\"y\":0,\"z\":0}},\"ac4939\":{\"lock\":true,\"pos\":{\"x\":77.9702,\"y\":-0.0127,\"z\":-6.1546},\"rot\":{\"x\":0,\"y\":0,\"z\":0}},\"aec6e7\":{\"lock\":false,\"pos\":{\"x\":72.7193,\"y\":0.7326,\"z\":-13.7147},\"rot\":{\"x\":332.3304,\"y\":254.7847,\"z\":338.0917}},\"b66c02\":{\"lock\":true,\"pos\":{\"x\":58.4181,\"y\":-0.011,\"z\":-29.7406},\"rot\":{\"x\":0,\"y\":0,\"z\":0}},\"edfadc\":{\"lock\":false,\"pos\":{\"x\":57.3691,\"y\":-0.0127,\"z\":22.8053},\"rot\":{\"x\":0,\"y\":0,\"z\":0}},\"f04a8d\":{\"lock\":true,\"pos\":{\"x\":72.6149,\"y\":-0.2466,\"z\":-29.7817},\"rot\":{\"x\":0.457,\"y\":359.9403,\"z\":359.168}}}}",
+      "XmlUI": ""
+    },
+    {
+      "GUID": "bbc10d",
+      "Name": "Infinite_Bag",
+      "Transform": {
+        "posX": 3.92520237,
+        "posY": -27.9124165,
+        "posZ": -5.0,
+        "rotX": 1.54754343e-08,
+        "rotY": -1.52932735e-05,
+        "rotZ": 2.30936038e-07,
+        "scaleX": 0.6500003,
+        "scaleY": 0.6500003,
+        "scaleZ": 0.6500003
+      },
+      "Nickname": "Damage Marker Bag",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.8986643,
+        "g": 0.0116532389,
+        "b": 0.0116532389
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": true,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "MaterialIndex": -1,
+      "MeshIndex": -1,
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "ContainedObjects": [
+        {
+          "GUID": "f5cccf",
+          "Name": "Custom_Model",
+          "Transform": {
+            "posX": 18.173727,
+            "posY": 3.05320477,
+            "posZ": -17.8531055,
+            "rotX": 11.8029728,
+            "rotY": 359.81134,
+            "rotZ": 356.094543,
+            "scaleX": 1.0,
+            "scaleY": 1.0,
+            "scaleZ": 1.0
+          },
+          "Nickname": "Damage Marker",
+          "Description": "",
+          "GMNotes": "",
+          "AltLookAngle": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "ColorDiffuse": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0
+          },
+          "LayoutGroupSortIndex": 0,
+          "Value": 0,
+          "Locked": false,
+          "Grid": true,
+          "Snap": true,
+          "IgnoreFoW": false,
+          "MeasureMovement": false,
+          "DragSelectable": true,
+          "Autoraise": true,
+          "Sticky": true,
+          "Tooltip": true,
+          "GridProjection": false,
+          "HideWhenFaceDown": false,
+          "Hands": false,
+          "CustomMesh": {
+            "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Damage_Marker_MeshURL.obj",
+            "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Damage_Marker_DiffuseURL.jpg",
+            "NormalURL": "",
+            "ColliderURL": "",
+            "Convex": true,
+            "MaterialIndex": 1,
+            "TypeIndex": 0,
+            "CastShadows": true
+          },
+          "LuaScript": "",
+          "LuaScriptState": "",
+          "XmlUI": ""
+        }
+      ],
+      "XmlUI": ""
+    },
+    {
+      "GUID": "1bb99e",
+      "Name": "Infinite_Bag",
+      "Transform": {
+        "posX": 66.9307,
+        "posY": -0.0105999708,
+        "posZ": -1.0489,
+        "rotX": -0.0003,
+        "rotY": 0.0002,
+        "rotZ": -0.0001,
+        "scaleX": 0.625000358,
+        "scaleY": 0.625000358,
+        "scaleZ": 0.625000358
+      },
+      "Nickname": "Formula 1 Black Bag",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 1.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": true,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "MaterialIndex": -1,
+      "MeshIndex": -1,
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": "",
+      "ContainedObjects": [
+        {
+          "GUID": "048a54",
+          "Name": "Custom_Model",
+          "Transform": {
+            "posX": 66.27289,
+            "posY": 1.29931688,
+            "posZ": -1.52659369,
+            "rotX": 355.674683,
+            "rotY": 91.49647,
+            "rotZ": 351.903931,
+            "scaleX": 1.5,
+            "scaleY": 1.5,
+            "scaleZ": 1.5
+          },
+          "Nickname": "Formula 1 Solid",
+          "Description": "",
+          "GMNotes": "",
+          "AltLookAngle": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "ColorDiffuse": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0
+          },
+          "LayoutGroupSortIndex": 0,
+          "Value": 0,
+          "Locked": false,
+          "Grid": true,
+          "Snap": true,
+          "IgnoreFoW": false,
+          "MeasureMovement": false,
+          "DragSelectable": true,
+          "Autoraise": true,
+          "Sticky": true,
+          "Tooltip": true,
+          "GridProjection": false,
+          "HideWhenFaceDown": false,
+          "Hands": false,
+          "CustomMesh": {
+            "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Formula_1_Solid_MeshURL.obj",
+            "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Formula_1_Solid_DiffuseURL.jpg",
+            "NormalURL": "",
+            "ColliderURL": "",
+            "Convex": true,
+            "MaterialIndex": 1,
+            "TypeIndex": 0,
+            "CastShadows": true
+          },
+          "LuaScript": "function onload()\r\n    color = self.held_by_color\r\n    if color != nil then\r\n        colorRGB = stringColorToRGB(color)\r\n        self.setColorTint(colorRGB)\r\n    end\r\n\r\n    damageButtonparams = {\r\n        click_function = \"spawnDamage\",\r\n        function_owner = self,\r\n        label          = \"Damage\",\r\n        position       = {0, 0.1, -0.45},\r\n        rotation       = {0, 0, 0},\r\n        width          = 150,\r\n        height         = 50,\r\n        font_size      = 30,\r\n        color          = {1, 0, 0},\r\n        font_color     = {1, 1, 1},\r\n        tooltip        = \"Click here to spawn a damage marker beneath the vehicle.\",\r\n    }\r\n    self.createButton(damageButtonparams)\r\nend\r\n\r\nlocal tokenBagGUID = \"bbc10d\"\r\n\r\nfunction spawnDamage()\r\n    local bagObject = getObjectFromGUID(tokenBagGUID)\r\n    local targetPos = self.getPosition()\r\n    local sourceRot = self.getRotation()\r\n    \tlocal targetRot = {sourceRot[\"x\"], sourceRot[\"y\"] + 90, sourceRot[\"z\"]}\r\n\t\r\n    \tself.setPositionSmooth({targetPos[\"x\"], targetPos[\"y\"] + 0.5, targetPos[\"z\"]}, true, false)\r\n\t\r\n    local newToken = bagObject.takeObject({position=targetPos, rotation=targetRot, smooth=false})\r\n\r\nend\r\n\r\n",
+          "LuaScriptState": "",
+          "XmlUI": ""
+        }
+      ]
+    },
+    {
+      "GUID": "346d99",
+      "Name": "Infinite_Bag",
+      "Transform": {
+        "posX": 58.4688,
+        "posY": -0.0109999776,
+        "posZ": -26.4877,
+        "rotX": 0.0,
+        "rotY": 0.0,
+        "rotZ": 0.0,
+        "scaleX": 0.6500003,
+        "scaleY": 0.6500003,
+        "scaleZ": 0.6500003
+      },
+      "Nickname": "Sun Marker Bag",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.8260743,
+        "g": 0.7962602,
+        "b": 0.266554236
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": true,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "MaterialIndex": -1,
+      "MeshIndex": -1,
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": "",
+      "ContainedObjects": [
+        {
+          "GUID": "2c951f",
+          "Name": "Custom_Model",
+          "Transform": {
+            "posX": -46.8267,
+            "posY": 2.32336164,
+            "posZ": -30.7359238,
+            "rotX": 346.867432,
+            "rotY": 0.126795113,
+            "rotZ": 357.335754,
+            "scaleX": 1.0,
+            "scaleY": 1.0,
+            "scaleZ": 1.0
+          },
+          "Nickname": "Tire Type Marker - Sun",
+          "Description": "",
+          "GMNotes": "",
+          "AltLookAngle": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "ColorDiffuse": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0
+          },
+          "LayoutGroupSortIndex": 0,
+          "Value": 0,
+          "Locked": false,
+          "Grid": true,
+          "Snap": true,
+          "IgnoreFoW": false,
+          "MeasureMovement": false,
+          "DragSelectable": true,
+          "Autoraise": true,
+          "Sticky": true,
+          "Tooltip": true,
+          "GridProjection": false,
+          "HideWhenFaceDown": false,
+          "Hands": false,
+          "CustomMesh": {
+            "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Tire_Type_Marker_-_Sun_MeshURL.obj",
+            "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Tire_Type_Marker_-_Sun_DiffuseURL.jpg",
+            "NormalURL": "",
+            "ColliderURL": "",
+            "Convex": true,
+            "MaterialIndex": 1,
+            "TypeIndex": 0,
+            "CastShadows": true
+          },
+          "LuaScript": "",
+          "LuaScriptState": "",
+          "XmlUI": ""
+        }
+      ]
+    },
+    {
+      "GUID": "490aa3",
+      "Name": "Infinite_Bag",
+      "Transform": {
+        "posX": 72.6391,
+        "posY": -0.0127000213,
+        "posZ": -33.0344,
+        "rotX": 0.0,
+        "rotY": 0.0,
+        "rotZ": 0.0,
+        "scaleX": 0.75,
+        "scaleY": 0.75,
+        "scaleZ": 0.75
+      },
+      "Nickname": "",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.3058885,
+        "g": 0.372555166,
+        "b": 1.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": true,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "MaterialIndex": -1,
+      "MeshIndex": -1,
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": "",
+      "ContainedObjects": [
+        {
+          "GUID": "eafacd",
+          "Name": "Deck",
+          "Transform": {
+            "posX": 72.75529,
+            "posY": 1.62878323,
+            "posZ": -33.0992241,
+            "rotX": 0.175662518,
+            "rotY": 180.009781,
+            "rotZ": 180.477448,
+            "scaleX": 1.75,
+            "scaleY": 1.0,
+            "scaleZ": 1.75
+          },
+          "Nickname": "",
+          "Description": "",
+          "GMNotes": "",
+          "AltLookAngle": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "ColorDiffuse": {
+            "r": 0.7132586,
+            "g": 0.7132586,
+            "b": 0.7132586
+          },
+          "LayoutGroupSortIndex": 0,
+          "Value": 0,
+          "Locked": false,
+          "Grid": true,
+          "Snap": true,
+          "IgnoreFoW": false,
+          "MeasureMovement": false,
+          "DragSelectable": true,
+          "Autoraise": true,
+          "Sticky": true,
+          "Tooltip": true,
+          "GridProjection": false,
+          "HideWhenFaceDown": false,
+          "Hands": false,
+          "SidewaysCard": false,
+          "DeckIDs": [
+            200,
+            202,
+            203,
+            201
+          ],
+          "CustomDeck": {
+            "2": {
+              "FaceURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Deck_FaceURL.jpg",
+              "BackURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Deck_FaceURL.jpg",
+              "NumWidth": 10,
+              "NumHeight": 7,
+              "BackIsHidden": false,
+              "UniqueBack": true,
+              "Type": 0
+            }
+          },
+          "LuaScript": "",
+          "LuaScriptState": "",
+          "XmlUI": "",
+          "ContainedObjects": [
+            {
+              "GUID": "21187b",
+              "Name": "Card",
+              "Transform": {
+                "posX": 14.6787119,
+                "posY": 1.182002,
+                "posZ": -17.6532249,
+                "rotX": -0.003930768,
+                "rotY": 180.000259,
+                "rotZ": 180.008041,
+                "scaleX": 1.75,
+                "scaleY": 1.0,
+                "scaleZ": 1.75
+              },
+              "Nickname": "",
+              "Description": "",
+              "GMNotes": "",
+              "AltLookAngle": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "ColorDiffuse": {
+                "r": 0.7132586,
+                "g": 0.7132586,
+                "b": 0.7132586
+              },
+              "LayoutGroupSortIndex": 0,
+              "Value": 0,
+              "Locked": false,
+              "Grid": true,
+              "Snap": true,
+              "IgnoreFoW": false,
+              "MeasureMovement": false,
+              "DragSelectable": true,
+              "Autoraise": true,
+              "Sticky": true,
+              "Tooltip": true,
+              "GridProjection": false,
+              "HideWhenFaceDown": false,
+              "Hands": true,
+              "CardID": 200,
+              "SidewaysCard": false,
+              "CustomDeck": {
+                "2": {
+                  "FaceURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Deck_FaceURL.jpg",
+                  "BackURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Deck_FaceURL.jpg",
+                  "NumWidth": 10,
+                  "NumHeight": 7,
+                  "BackIsHidden": false,
+                  "UniqueBack": true,
+                  "Type": 0
+                }
+              },
+              "LuaScript": "",
+              "LuaScriptState": "",
+              "XmlUI": ""
+            },
+            {
+              "GUID": "21187b",
+              "Name": "Card",
+              "Transform": {
+                "posX": 30.2696075,
+                "posY": 1.09487653,
+                "posZ": -30.5446453,
+                "rotX": -6.221367e-08,
+                "rotY": 179.97522,
+                "rotZ": 180.0,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "scaleZ": 1.0
+              },
+              "Nickname": "",
+              "Description": "",
+              "GMNotes": "",
+              "AltLookAngle": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "ColorDiffuse": {
+                "r": 0.713235259,
+                "g": 0.713235259,
+                "b": 0.713235259
+              },
+              "LayoutGroupSortIndex": 0,
+              "Value": 0,
+              "Locked": false,
+              "Grid": true,
+              "Snap": true,
+              "IgnoreFoW": false,
+              "MeasureMovement": false,
+              "DragSelectable": true,
+              "Autoraise": true,
+              "Sticky": true,
+              "Tooltip": true,
+              "GridProjection": false,
+              "Hands": true,
+              "CardID": 202,
+              "SidewaysCard": false,
+              "LuaScript": "",
+              "LuaScriptState": "",
+              "XmlUI": "",
+              "ContainedObjects": []
+            },
+            {
+              "GUID": "21187b",
+              "Name": "Card",
+              "Transform": {
+                "posX": 30.2696075,
+                "posY": 1.09487653,
+                "posZ": -30.5446453,
+                "rotX": -6.221367e-08,
+                "rotY": 179.97522,
+                "rotZ": 180.0,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "scaleZ": 1.0
+              },
+              "Nickname": "",
+              "Description": "",
+              "GMNotes": "",
+              "AltLookAngle": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "ColorDiffuse": {
+                "r": 0.713235259,
+                "g": 0.713235259,
+                "b": 0.713235259
+              },
+              "LayoutGroupSortIndex": 0,
+              "Value": 0,
+              "Locked": false,
+              "Grid": true,
+              "Snap": true,
+              "IgnoreFoW": false,
+              "MeasureMovement": false,
+              "DragSelectable": true,
+              "Autoraise": true,
+              "Sticky": true,
+              "Tooltip": true,
+              "GridProjection": false,
+              "Hands": true,
+              "CardID": 203,
+              "SidewaysCard": false,
+              "LuaScript": "",
+              "LuaScriptState": "",
+              "XmlUI": "",
+              "ContainedObjects": []
+            },
+            {
+              "GUID": "21187b",
+              "Name": "Card",
+              "Transform": {
+                "posX": 30.2696075,
+                "posY": 1.09487653,
+                "posZ": -30.5446453,
+                "rotX": -6.221367e-08,
+                "rotY": 179.97522,
+                "rotZ": 180.0,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "scaleZ": 1.0
+              },
+              "Nickname": "",
+              "Description": "",
+              "GMNotes": "",
+              "AltLookAngle": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "ColorDiffuse": {
+                "r": 0.713235259,
+                "g": 0.713235259,
+                "b": 0.713235259
+              },
+              "LayoutGroupSortIndex": 0,
+              "Value": 0,
+              "Locked": false,
+              "Grid": true,
+              "Snap": true,
+              "IgnoreFoW": false,
+              "MeasureMovement": false,
+              "DragSelectable": true,
+              "Autoraise": true,
+              "Sticky": true,
+              "Tooltip": true,
+              "GridProjection": false,
+              "Hands": true,
+              "CardID": 201,
+              "SidewaysCard": false,
+              "LuaScript": "",
+              "LuaScriptState": "",
+              "XmlUI": "",
+              "ContainedObjects": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "GUID": "4eb678",
+      "Name": "Infinite_Bag",
+      "Transform": {
+        "posX": 57.1156,
+        "posY": -0.0127000213,
+        "posZ": 15.943,
+        "rotX": 0.0,
+        "rotY": 0.0,
+        "rotZ": 0.0,
+        "scaleX": 0.75,
+        "scaleY": 0.75,
+        "scaleZ": 0.75
+      },
+      "Nickname": "Advanced Dashboard Bag",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.3058885,
+        "g": 0.372555166,
+        "b": 1.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": true,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "MaterialIndex": -1,
+      "MeshIndex": -1,
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": "",
+      "ContainedObjects": [
+        {
+          "GUID": "e9c03d",
+          "Name": "Custom_Model",
+          "Transform": {
+            "posX": -12.7782726,
+            "posY": 3.52303815,
+            "posZ": -29.74997,
+            "rotX": 359.925446,
+            "rotY": 177.8849,
+            "rotZ": 359.849945,
+            "scaleX": 1.0,
+            "scaleY": 1.0,
+            "scaleZ": 1.0
+          },
+          "Nickname": "Advanced Dashboard",
+          "Description": "",
+          "GMNotes": "",
+          "AltLookAngle": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "ColorDiffuse": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0
+          },
+          "LayoutGroupSortIndex": 0,
+          "Value": 0,
+          "Locked": false,
+          "Grid": true,
+          "Snap": true,
+          "IgnoreFoW": false,
+          "MeasureMovement": false,
+          "DragSelectable": true,
+          "Autoraise": true,
+          "Sticky": true,
+          "Tooltip": true,
+          "GridProjection": false,
+          "HideWhenFaceDown": false,
+          "Hands": false,
+          "CustomMesh": {
+            "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Advanced_Dashboard_MeshURL.obj",
+            "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Advanced_Dashboard_DiffuseURL.jpg",
+            "NormalURL": "",
+            "ColliderURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Advanced_Dashboard_ColliderURL.obj",
+            "Convex": false,
+            "MaterialIndex": 1,
+            "TypeIndex": 4,
+            "CastShadows": true
+          },
+          "LuaScript": "",
+          "LuaScriptState": "",
+          "XmlUI": "",
+          "AttachedSnapPoints": [
+            {
+              "Position": {
+                "x": 2.48337746,
+                "y": 0.3836751,
+                "z": -2.025683
+              }
+            },
+            {
+              "Position": {
+                "x": 4.22580338,
+                "y": 0.383675069,
+                "z": -1.21766269
+              }
+            },
+            {
+              "Position": {
+                "x": 2.468012,
+                "y": 0.383674979,
+                "z": -0.402479947
+              }
+            },
+            {
+              "Position": {
+                "x": 4.19789553,
+                "y": 0.383675069,
+                "z": 0.344779938
+              }
+            },
+            {
+              "Position": {
+                "x": 2.451436,
+                "y": 0.383674979,
+                "z": 1.1575954
+              }
+            },
+            {
+              "Position": {
+                "x": 4.2049427,
+                "y": 0.383675069,
+                "z": 1.93792832
+              }
+            },
+            {
+              "Position": {
+                "x": 0.9551008,
+                "y": 0.383674979,
+                "z": -2.32454419
+              }
+            },
+            {
+              "Position": {
+                "x": 0.107319191,
+                "y": 0.383674979,
+                "z": -2.31510544
+              }
+            },
+            {
+              "Position": {
+                "x": -0.759243965,
+                "y": 0.383674979,
+                "z": -2.306217
+              }
+            },
+            {
+              "Position": {
+                "x": -1.62505162,
+                "y": 0.383674979,
+                "z": -2.33942342
+              }
+            },
+            {
+              "Position": {
+                "x": -2.4879992,
+                "y": 0.383674979,
+                "z": -2.29898667
+              }
+            },
+            {
+              "Position": {
+                "x": -3.33286715,
+                "y": 0.383675128,
+                "z": -2.31061029
+              }
+            },
+            {
+              "Position": {
+                "x": -4.18536,
+                "y": 0.383675,
+                "z": -2.301531
+              }
+            },
+            {
+              "Position": {
+                "x": -4.194649,
+                "y": 0.383675,
+                "z": -1.57496977
+              }
+            },
+            {
+              "Position": {
+                "x": -3.33983684,
+                "y": 0.383674979,
+                "z": -1.53255045
+              }
+            },
+            {
+              "Position": {
+                "x": -2.48580241,
+                "y": 0.383674979,
+                "z": -1.52018154
+              }
+            },
+            {
+              "Position": {
+                "x": -1.620264,
+                "y": 0.383674979,
+                "z": -1.53758848
+              }
+            },
+            {
+              "Position": {
+                "x": -0.771915257,
+                "y": 0.383674979,
+                "z": -1.56561041
+              }
+            },
+            {
+              "Position": {
+                "x": 0.105430864,
+                "y": 0.383674979,
+                "z": -1.55269074
+              }
+            },
+            {
+              "Position": {
+                "x": 0.9680347,
+                "y": 0.383674979,
+                "z": -1.55025411
+              }
+            },
+            {
+              "Position": {
+                "x": -4.21499157,
+                "y": 0.383675,
+                "z": -0.7837072
+              }
+            },
+            {
+              "Position": {
+                "x": -3.342668,
+                "y": 0.383674979,
+                "z": -0.7799435
+              }
+            },
+            {
+              "Position": {
+                "x": -2.488786,
+                "y": 0.383674979,
+                "z": -0.7671245
+              }
+            },
+            {
+              "Position": {
+                "x": -1.6334542,
+                "y": 0.383674979,
+                "z": -0.782984138
+              }
+            },
+            {
+              "Position": {
+                "x": -0.7669277,
+                "y": 0.383674979,
+                "z": -0.789046049
+              }
+            },
+            {
+              "Position": {
+                "x": 0.09948547,
+                "y": 0.383674979,
+                "z": -0.7759448
+              }
+            },
+            {
+              "Position": {
+                "x": 0.957769036,
+                "y": 0.383674979,
+                "z": -0.772673368
+              }
+            },
+            {
+              "Position": {
+                "x": 0.946903169,
+                "y": 0.383674979,
+                "z": 0.0139080519
+              }
+            },
+            {
+              "Position": {
+                "x": 0.07219349,
+                "y": 0.3836751,
+                "z": -0.00240058918
+              }
+            },
+            {
+              "Position": {
+                "x": -0.7836024,
+                "y": 0.3836751,
+                "z": -0.009017201
+              }
+            },
+            {
+              "Position": {
+                "x": -1.62891746,
+                "y": 0.383674979,
+                "z": -0.0153519372
+              }
+            },
+            {
+              "Position": {
+                "x": -2.48300242,
+                "y": 0.383674979,
+                "z": 0.00537163159
+              }
+            },
+            {
+              "Position": {
+                "x": -3.360795,
+                "y": 0.3836751,
+                "z": -0.0201709233
+              }
+            },
+            {
+              "Position": {
+                "x": -4.209156,
+                "y": 0.383675,
+                "z": -0.0266758483
+              }
+            },
+            {
+              "Position": {
+                "x": -4.21041346,
+                "y": 0.383675,
+                "z": 0.7922155
+              }
+            },
+            {
+              "Position": {
+                "x": -4.205721,
+                "y": 0.383675,
+                "z": 1.5623349
+              }
+            },
+            {
+              "Position": {
+                "x": -4.22759151,
+                "y": 0.383674979,
+                "z": 2.318382
+              }
+            },
+            {
+              "Position": {
+                "x": -3.36376977,
+                "y": 0.383674979,
+                "z": 2.32713
+              }
+            },
+            {
+              "Position": {
+                "x": -3.36691856,
+                "y": 0.383674979,
+                "z": 1.523125
+              }
+            },
+            {
+              "Position": {
+                "x": -3.35832238,
+                "y": 0.383674979,
+                "z": 0.750131249
+              }
+            },
+            {
+              "Position": {
+                "x": -2.49301529,
+                "y": 0.383674979,
+                "z": 0.747901
+              }
+            },
+            {
+              "Position": {
+                "x": -2.50586963,
+                "y": 0.3836751,
+                "z": 1.56887162
+              }
+            },
+            {
+              "Position": {
+                "x": -2.50858068,
+                "y": 0.383674979,
+                "z": 2.30902553
+              }
+            },
+            {
+              "Position": {
+                "x": -1.65272462,
+                "y": 0.383674979,
+                "z": 2.33537364
+              }
+            },
+            {
+              "Position": {
+                "x": -1.64461052,
+                "y": 0.383674979,
+                "z": 1.55825233
+              }
+            },
+            {
+              "Position": {
+                "x": -1.63602257,
+                "y": 0.383674979,
+                "z": 0.7355149
+              }
+            },
+            {
+              "Position": {
+                "x": -0.7804104,
+                "y": 0.383674979,
+                "z": 0.772883654
+              }
+            },
+            {
+              "Position": {
+                "x": -0.7840682,
+                "y": 0.383674979,
+                "z": 1.58520389
+              }
+            },
+            {
+              "Position": {
+                "x": -0.8043708,
+                "y": 0.3836751,
+                "z": 2.325977
+              }
+            },
+            {
+              "Position": {
+                "x": 0.9343702,
+                "y": 0.383674979,
+                "z": 0.7610281
+              }
+            },
+            {
+              "Position": {
+                "x": 0.0889486,
+                "y": 0.383674979,
+                "z": 0.766305268
+              }
+            },
+            {
+              "Position": {
+                "x": 0.07042472,
+                "y": 0.383674979,
+                "z": 1.55312216
+              }
+            },
+            {
+              "Position": {
+                "x": 0.07130111,
+                "y": 0.383674979,
+                "z": 2.33550143
+              }
+            },
+            {
+              "Position": {
+                "x": 0.9332796,
+                "y": 0.383674979,
+                "z": 2.3492887
+              }
+            },
+            {
+              "Position": {
+                "x": 0.9424139,
+                "y": 0.383674979,
+                "z": 1.56034946
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "GUID": "632ae8",
+      "Name": "Custom_Tile",
+      "Transform": {
+        "posX": 70.75,
+        "posY": 0.0,
+        "posZ": 0.0,
+        "rotX": 0.0,
+        "rotY": 180.0,
+        "rotZ": 180.0,
+        "scaleX": 16.0,
+        "scaleY": 1.0,
+        "scaleZ": 37.5
+      },
+      "Nickname": "Setup Board",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 1.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": true,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "CustomImage": {
+        "ImageURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Setup_Board_ImageURL.png",
+        "ImageSecondaryURL": "",
+        "ImageScalar": 1.0,
+        "WidthScale": 0.0,
+        "CustomTile": {
+          "Type": 0,
+          "Thickness": 1.0,
+          "Stackable": false,
+          "Stretch": false
+        }
+      },
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": ""
+    },
+    {
+      "GUID": "6e3283",
+      "Name": "Die_20",
+      "Transform": {
+        "posX": 16.1327381,
+        "posY": 1.57000041,
+        "posZ": -15.937623,
+        "rotX": 307.37738,
+        "rotY": 117.352516,
+        "rotZ": 162.000061,
+        "scaleX": 1.5,
+        "scaleY": 1.5,
+        "scaleZ": 1.5
+      },
+      "Nickname": "Damage Dice",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.0,
+        "g": 0.0,
+        "b": 0.08244572
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": false,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "MaterialIndex": 0,
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": "",
+      "RotationValues": [
+        {
+          "Value": "1",
+          "Rotation": {
+            "x": -11.0,
+            "y": 60.0,
+            "z": 17.0
+          }
+        },
+        {
+          "Value": "2",
+          "Rotation": {
+            "x": 52.0,
+            "y": -60.0,
+            "z": -17.0
+          }
+        },
+        {
+          "Value": "3",
+          "Rotation": {
+            "x": -11.0,
+            "y": -180.0,
+            "z": 90.0
+          }
+        },
+        {
+          "Value": "4",
+          "Rotation": {
+            "x": -11.0,
+            "y": -180.0,
+            "z": 162.0
+          }
+        },
+        {
+          "Value": "5",
+          "Rotation": {
+            "x": -11.0,
+            "y": -60.0,
+            "z": 234.0
+          }
+        },
+        {
+          "Value": "6",
+          "Rotation": {
+            "x": -11.0,
+            "y": -180.0,
+            "z": 306.0
+          }
+        },
+        {
+          "Value": "7",
+          "Rotation": {
+            "x": 52.0,
+            "y": -60.0,
+            "z": 55.0
+          }
+        },
+        {
+          "Value": "8",
+          "Rotation": {
+            "x": 52.0,
+            "y": -60.0,
+            "z": 198.0
+          }
+        },
+        {
+          "Value": "9",
+          "Rotation": {
+            "x": 52.0,
+            "y": -60.0,
+            "z": 127.0
+          }
+        },
+        {
+          "Value": "10",
+          "Rotation": {
+            "x": 52.0,
+            "y": -180.0,
+            "z": -90.0
+          }
+        },
+        {
+          "Value": "11",
+          "Rotation": {
+            "x": 308.0,
+            "y": 0.0,
+            "z": 90.0
+          }
+        },
+        {
+          "Value": "12",
+          "Rotation": {
+            "x": 306.0,
+            "y": -240.0,
+            "z": -52.0
+          }
+        },
+        {
+          "Value": "13",
+          "Rotation": {
+            "x": -52.0,
+            "y": -240.0,
+            "z": 18.0
+          }
+        },
+        {
+          "Value": "14",
+          "Rotation": {
+            "x": 307.0,
+            "y": 120.0,
+            "z": 233.0
+          }
+        },
+        {
+          "Value": "15",
+          "Rotation": {
+            "x": 11.0,
+            "y": 120.0,
+            "z": -234.0
+          }
+        },
+        {
+          "Value": "16",
+          "Rotation": {
+            "x": 11.0,
+            "y": 0.0,
+            "z": 54.0
+          }
+        },
+        {
+          "Value": "17",
+          "Rotation": {
+            "x": 11.0,
+            "y": -120.0,
+            "z": -17.0
+          }
+        },
+        {
+          "Value": "18",
+          "Rotation": {
+            "x": 11.0,
+            "y": 0.0,
+            "z": -90.0
+          }
+        },
+        {
+          "Value": "19",
+          "Rotation": {
+            "x": -52.0,
+            "y": -240.0,
+            "z": -198.0
+          }
+        },
+        {
+          "Value": "20",
+          "Rotation": {
+            "x": 11.0,
+            "y": 0.0,
+            "z": -162.0
+          }
+        }
+      ]
+    },
+    {
+      "GUID": "71d89b",
+      "Name": "Infinite_Bag",
+      "Transform": {
+        "posX": 58.3115,
+        "posY": -0.0127000213,
+        "posZ": 7.6473,
+        "rotX": 0.0,
+        "rotY": 344.9754,
+        "rotZ": 0.0,
+        "scaleX": 0.75,
+        "scaleY": 0.75,
+        "scaleZ": 0.75
+      },
+      "Nickname": "Gear Stick Bag",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.3058885,
+        "g": 0.372555166,
+        "b": 1.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": true,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "MaterialIndex": -1,
+      "MeshIndex": -1,
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": "",
+      "ContainedObjects": [
+        {
+          "GUID": "08cb87",
+          "Name": "Custom_Model",
+          "Transform": {
+            "posX": 10.2358685,
+            "posY": 3.04185,
+            "posZ": -29.4483337,
+            "rotX": 359.196075,
+            "rotY": 14.9978971,
+            "rotZ": 0.677913,
+            "scaleX": 1.0,
+            "scaleY": 1.0,
+            "scaleZ": 1.0
+          },
+          "Nickname": "Gear Stick",
+          "Description": "",
+          "GMNotes": "",
+          "AltLookAngle": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "ColorDiffuse": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.13403061
+          },
+          "LayoutGroupSortIndex": 0,
+          "Value": 0,
+          "Locked": false,
+          "Grid": true,
+          "Snap": true,
+          "IgnoreFoW": false,
+          "MeasureMovement": false,
+          "DragSelectable": true,
+          "Autoraise": true,
+          "Sticky": true,
+          "Tooltip": true,
+          "GridProjection": false,
+          "HideWhenFaceDown": false,
+          "Hands": false,
+          "CustomMesh": {
+            "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Gear_Stick_MeshURL.obj",
+            "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Advanced_Dashboard_DiffuseURL.jpg",
+            "NormalURL": "",
+            "ColliderURL": "",
+            "Convex": true,
+            "MaterialIndex": 1,
+            "TypeIndex": 0,
+            "CastShadows": true
+          },
+          "LuaScript": "",
+          "LuaScriptState": "",
+          "XmlUI": ""
+        }
+      ]
+    },
+    {
+      "GUID": "75d86c",
+      "Name": "Infinite_Bag",
+      "Transform": {
+        "posX": 72.5404,
+        "posY": -0.0127000213,
+        "posZ": -23.2718,
+        "rotX": 0.0,
+        "rotY": 0.0,
+        "rotZ": 0.0,
+        "scaleX": 0.75,
+        "scaleY": 0.75,
+        "scaleZ": 0.75
+      },
+      "Nickname": "Driver Card Set Bag",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.0363027044,
+        "g": 0.5075479,
+        "b": 0.177612036
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": true,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "MaterialIndex": -1,
+      "MeshIndex": -1,
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": "",
+      "ContainedObjects": [
+        {
+          "GUID": "6c349b",
+          "Name": "Bag",
+          "Transform": {
+            "posX": 47.0278931,
+            "posY": 3.23962641,
+            "posZ": -31.3498173,
+            "rotX": 359.8671,
+            "rotY": 209.979919,
+            "rotZ": 0.607942939,
+            "scaleX": 1.0,
+            "scaleY": 1.0,
+            "scaleZ": 1.0
+          },
+          "Nickname": "Formula D Drivers Cards",
+          "Description": "",
+          "GMNotes": "",
+          "AltLookAngle": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "ColorDiffuse": {
+            "r": 0.941191554,
+            "g": 0.488786638,
+            "b": 0.0
+          },
+          "LayoutGroupSortIndex": 0,
+          "Value": 0,
+          "Locked": false,
+          "Grid": true,
+          "Snap": true,
+          "IgnoreFoW": false,
+          "MeasureMovement": false,
+          "DragSelectable": true,
+          "Autoraise": true,
+          "Sticky": true,
+          "Tooltip": true,
+          "GridProjection": false,
+          "HideWhenFaceDown": false,
+          "Hands": false,
+          "MaterialIndex": -1,
+          "MeshIndex": -1,
+          "LuaScript": "",
+          "LuaScriptState": "",
+          "XmlUI": "",
+          "ContainedObjects": [
+            {
+              "GUID": "",
+              "Name": "Custom_Model",
+              "Transform": {
+                "posX": 46.8844872,
+                "posY": 3.45583987,
+                "posZ": -29.7951927,
+                "rotX": 1.13829887,
+                "rotY": 182.998108,
+                "rotZ": 356.4655,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "scaleZ": 1.0
+              },
+              "Nickname": "Li Tsu White Team",
+              "Description": "",
+              "GMNotes": "",
+              "AltLookAngle": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "ColorDiffuse": {
+                "r": 0.9999999,
+                "g": 0.9999999,
+                "b": 0.9999999
+              },
+              "LayoutGroupSortIndex": 0,
+              "Value": 0,
+              "Locked": false,
+              "Grid": true,
+              "Snap": true,
+              "IgnoreFoW": false,
+              "MeasureMovement": false,
+              "DragSelectable": true,
+              "Autoraise": true,
+              "Sticky": true,
+              "Tooltip": true,
+              "GridProjection": false,
+              "CustomMesh": {
+                "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Li_Tsu_White_Team_MeshURL.obj",
+                "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Li_Tsu_White_Team_DiffuseURL.png",
+                "NormalURL": "",
+                "ColliderURL": "",
+                "Convex": true,
+                "MaterialIndex": 1,
+                "TypeIndex": 5,
+                "CastShadows": true
+              },
+              "LuaScript": "",
+              "LuaScriptState": "",
+              "XmlUI": ""
+            },
+            {
+              "GUID": "",
+              "Name": "Custom_Model",
+              "Transform": {
+                "posX": 47.409008,
+                "posY": 3.51584029,
+                "posZ": -29.88646,
+                "rotX": 359.967163,
+                "rotY": 179.451965,
+                "rotZ": 0.865568459,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "scaleZ": 1.0
+              },
+              "Nickname": "Montoya Blue Team",
+              "Description": "",
+              "GMNotes": "",
+              "AltLookAngle": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "ColorDiffuse": {
+                "r": 0.9999999,
+                "g": 0.9999999,
+                "b": 0.9999999
+              },
+              "LayoutGroupSortIndex": 0,
+              "Value": 0,
+              "Locked": false,
+              "Grid": true,
+              "Snap": true,
+              "IgnoreFoW": false,
+              "MeasureMovement": false,
+              "DragSelectable": true,
+              "Autoraise": true,
+              "Sticky": true,
+              "Tooltip": true,
+              "GridProjection": false,
+              "CustomMesh": {
+                "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Li_Tsu_White_Team_MeshURL.obj",
+                "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Montoya_Blue_Team_DiffuseURL.png",
+                "NormalURL": "",
+                "ColliderURL": "",
+                "Convex": true,
+                "MaterialIndex": 1,
+                "TypeIndex": 5,
+                "CastShadows": true
+              },
+              "LuaScript": "",
+              "LuaScriptState": "",
+              "XmlUI": ""
+            },
+            {
+              "GUID": "",
+              "Name": "Custom_Model",
+              "Transform": {
+                "posX": 47.189003,
+                "posY": 3.49857879,
+                "posZ": -29.7291374,
+                "rotX": 359.506836,
+                "rotY": 179.628052,
+                "rotZ": 0.6486398,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "scaleZ": 1.0
+              },
+              "Nickname": "Jack Blue Team",
+              "Description": "",
+              "GMNotes": "",
+              "AltLookAngle": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "ColorDiffuse": {
+                "r": 0.9999999,
+                "g": 0.9999999,
+                "b": 0.9999999
+              },
+              "LayoutGroupSortIndex": 0,
+              "Value": 0,
+              "Locked": false,
+              "Grid": true,
+              "Snap": true,
+              "IgnoreFoW": false,
+              "MeasureMovement": false,
+              "DragSelectable": true,
+              "Autoraise": true,
+              "Sticky": true,
+              "Tooltip": true,
+              "GridProjection": false,
+              "CustomMesh": {
+                "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Li_Tsu_White_Team_MeshURL.obj",
+                "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Jack_Blue_Team_DiffuseURL.png",
+                "NormalURL": "",
+                "ColliderURL": "",
+                "Convex": true,
+                "MaterialIndex": 1,
+                "TypeIndex": 5,
+                "CastShadows": true
+              },
+              "LuaScript": "",
+              "LuaScriptState": "",
+              "XmlUI": ""
+            },
+            {
+              "GUID": "",
+              "Name": "Custom_Model",
+              "Transform": {
+                "posX": 47.2287178,
+                "posY": 3.47616434,
+                "posZ": -29.8379745,
+                "rotX": 0.168433368,
+                "rotY": 179.282013,
+                "rotZ": 359.652435,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "scaleZ": 1.0
+              },
+              "Nickname": "Stanley Yellow Team",
+              "Description": "",
+              "GMNotes": "",
+              "AltLookAngle": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "ColorDiffuse": {
+                "r": 0.9999999,
+                "g": 0.9999999,
+                "b": 0.9999999
+              },
+              "LayoutGroupSortIndex": 0,
+              "Value": 0,
+              "Locked": false,
+              "Grid": true,
+              "Snap": true,
+              "IgnoreFoW": false,
+              "MeasureMovement": false,
+              "DragSelectable": true,
+              "Autoraise": true,
+              "Sticky": true,
+              "Tooltip": true,
+              "GridProjection": false,
+              "CustomMesh": {
+                "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Li_Tsu_White_Team_MeshURL.obj",
+                "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Stanley_Yellow_Team_DiffuseURL.png",
+                "NormalURL": "",
+                "ColliderURL": "",
+                "Convex": true,
+                "MaterialIndex": 1,
+                "TypeIndex": 5,
+                "CastShadows": true
+              },
+              "LuaScript": "",
+              "LuaScriptState": "",
+              "XmlUI": ""
+            },
+            {
+              "GUID": "",
+              "Name": "Custom_Model",
+              "Transform": {
+                "posX": 46.95243,
+                "posY": 3.50886917,
+                "posZ": -29.85,
+                "rotX": 359.9351,
+                "rotY": 179.702652,
+                "rotZ": 1.60692132,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "scaleZ": 1.0
+              },
+              "Nickname": "Jenny Red Team",
+              "Description": "",
+              "GMNotes": "",
+              "AltLookAngle": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "ColorDiffuse": {
+                "r": 0.9999999,
+                "g": 0.9999999,
+                "b": 0.9999999
+              },
+              "LayoutGroupSortIndex": 0,
+              "Value": 0,
+              "Locked": false,
+              "Grid": true,
+              "Snap": true,
+              "IgnoreFoW": false,
+              "MeasureMovement": false,
+              "DragSelectable": true,
+              "Autoraise": true,
+              "Sticky": true,
+              "Tooltip": true,
+              "GridProjection": false,
+              "CustomMesh": {
+                "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Li_Tsu_White_Team_MeshURL.obj",
+                "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Jenny_Red_Team_DiffuseURL.png",
+                "NormalURL": "",
+                "ColliderURL": "",
+                "Convex": true,
+                "MaterialIndex": 1,
+                "TypeIndex": 5,
+                "CastShadows": true
+              },
+              "LuaScript": "",
+              "LuaScriptState": "",
+              "XmlUI": ""
+            },
+            {
+              "GUID": "",
+              "Name": "Custom_Model",
+              "Transform": {
+                "posX": 47.1239471,
+                "posY": 3.481226,
+                "posZ": -29.6341114,
+                "rotX": 359.9825,
+                "rotY": 178.996338,
+                "rotZ": 1.01725292,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "scaleZ": 1.0
+              },
+              "Nickname": "Diane White Team",
+              "Description": "",
+              "GMNotes": "",
+              "AltLookAngle": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "ColorDiffuse": {
+                "r": 0.9999999,
+                "g": 0.9999999,
+                "b": 0.9999999
+              },
+              "LayoutGroupSortIndex": 0,
+              "Value": 0,
+              "Locked": false,
+              "Grid": true,
+              "Snap": true,
+              "IgnoreFoW": false,
+              "MeasureMovement": false,
+              "DragSelectable": true,
+              "Autoraise": true,
+              "Sticky": true,
+              "Tooltip": true,
+              "GridProjection": false,
+              "CustomMesh": {
+                "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Li_Tsu_White_Team_MeshURL.obj",
+                "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Diane_White_Team_DiffuseURL.png",
+                "NormalURL": "",
+                "ColliderURL": "",
+                "Convex": true,
+                "MaterialIndex": 1,
+                "TypeIndex": 5,
+                "CastShadows": true
+              },
+              "LuaScript": "",
+              "LuaScriptState": "",
+              "XmlUI": ""
+            },
+            {
+              "GUID": "",
+              "Name": "Custom_Model",
+              "Transform": {
+                "posX": 47.1432457,
+                "posY": 3.50224853,
+                "posZ": -29.7334366,
+                "rotX": 359.5439,
+                "rotY": 180.46785,
+                "rotZ": 2.25384641,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "scaleZ": 1.0
+              },
+              "Nickname": "Julien Green Team",
+              "Description": "",
+              "GMNotes": "",
+              "AltLookAngle": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "ColorDiffuse": {
+                "r": 0.9999999,
+                "g": 0.9999999,
+                "b": 0.9999999
+              },
+              "LayoutGroupSortIndex": 0,
+              "Value": 0,
+              "Locked": false,
+              "Grid": true,
+              "Snap": true,
+              "IgnoreFoW": false,
+              "MeasureMovement": false,
+              "DragSelectable": true,
+              "Autoraise": true,
+              "Sticky": true,
+              "Tooltip": true,
+              "GridProjection": false,
+              "CustomMesh": {
+                "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Li_Tsu_White_Team_MeshURL.obj",
+                "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Julien_Green_Team_DiffuseURL.png",
+                "NormalURL": "",
+                "ColliderURL": "",
+                "Convex": true,
+                "MaterialIndex": 1,
+                "TypeIndex": 5,
+                "CastShadows": true
+              },
+              "LuaScript": "",
+              "LuaScriptState": "",
+              "XmlUI": ""
+            },
+            {
+              "GUID": "",
+              "Name": "Custom_Model",
+              "Transform": {
+                "posX": 46.8119354,
+                "posY": 4.011253,
+                "posZ": -30.8321152,
+                "rotX": 359.385284,
+                "rotY": 179.995239,
+                "rotZ": 0.121001609,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "scaleZ": 1.0
+              },
+              "Nickname": "Temana Yellow Team",
+              "Description": "",
+              "GMNotes": "",
+              "AltLookAngle": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "ColorDiffuse": {
+                "r": 0.9999999,
+                "g": 0.9999999,
+                "b": 0.9999999
+              },
+              "LayoutGroupSortIndex": 0,
+              "Value": 0,
+              "Locked": false,
+              "Grid": true,
+              "Snap": true,
+              "IgnoreFoW": false,
+              "MeasureMovement": false,
+              "DragSelectable": true,
+              "Autoraise": true,
+              "Sticky": true,
+              "Tooltip": true,
+              "GridProjection": false,
+              "CustomMesh": {
+                "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Li_Tsu_White_Team_MeshURL.obj",
+                "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Temana_Yellow_Team_DiffuseURL.png",
+                "NormalURL": "",
+                "ColliderURL": "",
+                "Convex": true,
+                "MaterialIndex": 1,
+                "TypeIndex": 5,
+                "CastShadows": true
+              },
+              "LuaScript": "",
+              "LuaScriptState": "",
+              "XmlUI": ""
+            },
+            {
+              "GUID": "",
+              "Name": "Custom_Model",
+              "Transform": {
+                "posX": 46.5838661,
+                "posY": 4.00232649,
+                "posZ": -30.5484676,
+                "rotX": 359.0327,
+                "rotY": 180.0161,
+                "rotZ": 359.457367,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "scaleZ": 1.0
+              },
+              "Nickname": "Dimitri Red Team",
+              "Description": "",
+              "GMNotes": "",
+              "AltLookAngle": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "ColorDiffuse": {
+                "r": 0.9999999,
+                "g": 0.9999999,
+                "b": 0.9999999
+              },
+              "LayoutGroupSortIndex": 0,
+              "Value": 0,
+              "Locked": false,
+              "Grid": true,
+              "Snap": true,
+              "IgnoreFoW": false,
+              "MeasureMovement": false,
+              "DragSelectable": true,
+              "Autoraise": true,
+              "Sticky": true,
+              "Tooltip": true,
+              "GridProjection": false,
+              "CustomMesh": {
+                "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Li_Tsu_White_Team_MeshURL.obj",
+                "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Dimitri_Red_Team_DiffuseURL.png",
+                "NormalURL": "",
+                "ColliderURL": "",
+                "Convex": true,
+                "MaterialIndex": 1,
+                "TypeIndex": 5,
+                "CastShadows": true
+              },
+              "LuaScript": "",
+              "LuaScriptState": "",
+              "XmlUI": ""
+            },
+            {
+              "GUID": "17286a",
+              "Name": "Custom_Model",
+              "Transform": {
+                "posX": 18.0969467,
+                "posY": 3.06884027,
+                "posZ": -32.1816139,
+                "rotX": 359.624847,
+                "rotY": 180.000656,
+                "rotZ": 359.4737,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "scaleZ": 1.0
+              },
+              "Nickname": "Derek Green Team",
+              "Description": "",
+              "GMNotes": "",
+              "AltLookAngle": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "ColorDiffuse": {
+                "r": 1.0,
+                "g": 1.0,
+                "b": 1.0
+              },
+              "LayoutGroupSortIndex": 0,
+              "Value": 0,
+              "Locked": false,
+              "Grid": true,
+              "Snap": true,
+              "IgnoreFoW": false,
+              "MeasureMovement": false,
+              "DragSelectable": true,
+              "Autoraise": true,
+              "Sticky": true,
+              "Tooltip": true,
+              "GridProjection": false,
+              "HideWhenFaceDown": false,
+              "Hands": false,
+              "CustomMesh": {
+                "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Li_Tsu_White_Team_MeshURL.obj",
+                "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Derek_Green_Team_DiffuseURL.png",
+                "NormalURL": "",
+                "ColliderURL": "",
+                "Convex": true,
+                "MaterialIndex": 1,
+                "TypeIndex": 5,
+                "CastShadows": true
+              },
+              "LuaScript": "",
+              "LuaScriptState": "",
+              "XmlUI": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "GUID": "98b2d2",
+      "Name": "Infinite_Bag",
+      "Transform": {
+        "posX": 72.4791,
+        "posY": -0.0220000148,
+        "posZ": -26.399,
+        "rotX": 1.0102,
+        "rotY": 0.05529998,
+        "rotZ": 357.8255,
+        "scaleX": 0.75,
+        "scaleY": 0.75,
+        "scaleZ": 0.75
+      },
+      "Nickname": "Beginner Rulebook Bag",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.3058885,
+        "g": 0.372555166,
+        "b": 1.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": true,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "MaterialIndex": -1,
+      "MeshIndex": -1,
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": "",
+      "ContainedObjects": [
+        {
+          "GUID": "0b52c0",
+          "Name": "Custom_PDF",
+          "Transform": {
+            "posX": 72.06107,
+            "posY": 1.54984641,
+            "posZ": -26.5291252,
+            "rotX": 0.04466948,
+            "rotY": 179.998734,
+            "rotZ": 359.750854,
+            "scaleX": 3.2506578,
+            "scaleY": 1.0,
+            "scaleZ": 3.2506578
+          },
+          "Nickname": "Rulebook Beginner",
+          "Description": "",
+          "GMNotes": "",
+          "AltLookAngle": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "ColorDiffuse": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0
+          },
+          "LayoutGroupSortIndex": 0,
+          "Value": 0,
+          "Locked": false,
+          "Grid": true,
+          "Snap": true,
+          "IgnoreFoW": false,
+          "MeasureMovement": false,
+          "DragSelectable": true,
+          "Autoraise": true,
+          "Sticky": true,
+          "Tooltip": true,
+          "GridProjection": false,
+          "HideWhenFaceDown": false,
+          "Hands": false,
+          "CustomPDF": {
+            "PDFUrl": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/c55a976c849fc2a4a0ef501b93ed5d3c12d96717/assets/raw/Rulebook_Beginner_PDFUrl.pdf",
+            "PDFPassword": "",
+            "PDFPage": 0,
+            "PDFPageOffset": 0
+          },
+          "LuaScript": "",
+          "LuaScriptState": "",
+          "XmlUI": ""
+        }
+      ]
+    },
+    {
+      "GUID": "a845cd",
+      "Name": "Infinite_Bag",
+      "Transform": {
+        "posX": 72.2185,
+        "posY": -0.0127000213,
+        "posZ": 7.5652,
+        "rotX": 0.0,
+        "rotY": 0.0,
+        "rotZ": 0.0,
+        "scaleX": 0.75,
+        "scaleY": 0.75,
+        "scaleZ": 0.75
+      },
+      "Nickname": "Wear Tracker Bag",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.3058885,
+        "g": 0.372555166,
+        "b": 1.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": true,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "MaterialIndex": -1,
+      "MeshIndex": -1,
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": "",
+      "ContainedObjects": [
+        {
+          "GUID": "832f9e",
+          "Name": "Custom_Model",
+          "Transform": {
+            "posX": 48.9689331,
+            "posY": 2.9670155,
+            "posZ": 7.62852049,
+            "rotX": 354.24707,
+            "rotY": 0.007814676,
+            "rotZ": 357.5674,
+            "scaleX": 1.0,
+            "scaleY": 1.0,
+            "scaleZ": 1.0
+          },
+          "Nickname": "Wear Tracker",
+          "Description": "",
+          "GMNotes": "",
+          "AltLookAngle": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "ColorDiffuse": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.129243165
+          },
+          "LayoutGroupSortIndex": 0,
+          "Value": 0,
+          "Locked": false,
+          "Grid": true,
+          "Snap": true,
+          "IgnoreFoW": false,
+          "MeasureMovement": false,
+          "DragSelectable": true,
+          "Autoraise": true,
+          "Sticky": true,
+          "Tooltip": true,
+          "GridProjection": false,
+          "HideWhenFaceDown": false,
+          "Hands": false,
+          "CustomMesh": {
+            "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Wear_Tracker_MeshURL.obj",
+            "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Advanced_Dashboard_DiffuseURL.jpg",
+            "NormalURL": "",
+            "ColliderURL": "",
+            "Convex": true,
+            "MaterialIndex": 1,
+            "TypeIndex": 0,
+            "CastShadows": true
+          },
+          "LuaScript": "",
+          "LuaScriptState": "",
+          "XmlUI": ""
+        }
+      ]
+    },
+    {
+      "GUID": "ac4939",
+      "Name": "Infinite_Bag",
+      "Transform": {
+        "posX": 77.9702,
+        "posY": -0.0127000213,
+        "posZ": -6.1546,
+        "rotX": 0.0,
+        "rotY": 0.0,
+        "rotZ": 0.0,
+        "scaleX": 0.75,
+        "scaleY": 0.75,
+        "scaleZ": 0.75
+      },
+      "Nickname": "Dice Set Bag",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.3058885,
+        "g": 0.372555166,
+        "b": 1.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": true,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "MaterialIndex": -1,
+      "MeshIndex": -1,
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": "",
+      "ContainedObjects": [
+        {
+          "GUID": "76e692",
+          "Name": "Bag",
+          "Transform": {
+            "posX": 57.33826,
+            "posY": 1.42643011,
+            "posZ": -9.910136,
+            "rotX": 0.7455629,
+            "rotY": 359.991455,
+            "rotZ": 0.176447541,
+            "scaleX": 0.75,
+            "scaleY": 0.75,
+            "scaleZ": 0.75
+          },
+          "Nickname": "Dice Set",
+          "Description": "",
+          "GMNotes": "",
+          "AltLookAngle": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "ColorDiffuse": {
+            "r": 0.7058823,
+            "g": 0.366520882,
+            "b": 0.0
+          },
+          "LayoutGroupSortIndex": 0,
+          "Value": 0,
+          "Locked": false,
+          "Grid": true,
+          "Snap": true,
+          "IgnoreFoW": false,
+          "MeasureMovement": false,
+          "DragSelectable": true,
+          "Autoraise": true,
+          "Sticky": true,
+          "Tooltip": true,
+          "GridProjection": false,
+          "HideWhenFaceDown": false,
+          "Hands": false,
+          "MaterialIndex": -1,
+          "MeshIndex": -1,
+          "LuaScript": "",
+          "LuaScriptState": "",
+          "XmlUI": "",
+          "ContainedObjects": [
+            {
+              "GUID": "aec6e7",
+              "Name": "Custom_Model",
+              "Transform": {
+                "posX": 50.5718842,
+                "posY": 3.05125713,
+                "posZ": 2.578973,
+                "rotX": 326.211426,
+                "rotY": 254.1605,
+                "rotZ": 337.4442,
+                "scaleX": 0.625,
+                "scaleY": 0.625,
+                "scaleZ": 0.625
+              },
+              "Nickname": "Sixth Gear Dice",
+              "Description": "",
+              "GMNotes": "",
+              "AltLookAngle": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "ColorDiffuse": {
+                "r": 0.9999998,
+                "g": 0.992166,
+                "b": 0.9999998
+              },
+              "LayoutGroupSortIndex": 0,
+              "Value": 0,
+              "Locked": false,
+              "Grid": false,
+              "Snap": false,
+              "IgnoreFoW": false,
+              "MeasureMovement": false,
+              "DragSelectable": true,
+              "Autoraise": true,
+              "Sticky": true,
+              "Tooltip": true,
+              "GridProjection": false,
+              "HideWhenFaceDown": false,
+              "Hands": false,
+              "CustomMesh": {
+                "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Sixth_Gear_Dice_MeshURL.obj",
+                "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Sixth_Gear_Dice_DiffuseURL.jpg",
+                "NormalURL": "",
+                "ColliderURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Sixth_Gear_Dice_ColliderURL.obj",
+                "Convex": true,
+                "MaterialIndex": 0,
+                "TypeIndex": 2,
+                "CastShadows": true
+              },
+              "LuaScript": "",
+              "LuaScriptState": "",
+              "XmlUI": ""
+            },
+            {
+              "GUID": "38e023",
+              "Name": "Custom_Model",
+              "Transform": {
+                "posX": 53.1896477,
+                "posY": 2.84966469,
+                "posZ": 7.31442928,
+                "rotX": 299.286072,
+                "rotY": 93.40213,
+                "rotZ": 313.1537,
+                "scaleX": 0.625,
+                "scaleY": 0.625,
+                "scaleZ": 0.625
+              },
+              "Nickname": "Fifth Gear Dice",
+              "Description": "",
+              "GMNotes": "",
+              "AltLookAngle": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "ColorDiffuse": {
+                "r": 0.9999998,
+                "g": 0.992165744,
+                "b": 0.9999998
+              },
+              "LayoutGroupSortIndex": 0,
+              "Value": 0,
+              "Locked": false,
+              "Grid": false,
+              "Snap": false,
+              "IgnoreFoW": false,
+              "MeasureMovement": false,
+              "DragSelectable": true,
+              "Autoraise": true,
+              "Sticky": true,
+              "Tooltip": true,
+              "GridProjection": false,
+              "HideWhenFaceDown": false,
+              "Hands": false,
+              "CustomMesh": {
+                "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Fifth_Gear_Dice_MeshURL.obj",
+                "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Fifth_Gear_Dice_DiffuseURL.jpg",
+                "NormalURL": "",
+                "ColliderURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Fifth_Gear_Dice_ColliderURL.obj",
+                "Convex": false,
+                "MaterialIndex": 0,
+                "TypeIndex": 2,
+                "CastShadows": true
+              },
+              "LuaScript": "",
+              "LuaScriptState": "",
+              "XmlUI": ""
+            },
+            {
+              "GUID": "47c309",
+              "Name": "Custom_Model",
+              "Transform": {
+                "posX": 50.2925,
+                "posY": 2.68358636,
+                "posZ": -0.236601189,
+                "rotX": 270.04425,
+                "rotY": 29.7185078,
+                "rotZ": 0.0,
+                "scaleX": 0.625,
+                "scaleY": 0.625,
+                "scaleZ": 0.625
+              },
+              "Nickname": "Second Gear Dice",
+              "Description": "",
+              "GMNotes": "",
+              "AltLookAngle": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "ColorDiffuse": {
+                "r": 0.9999998,
+                "g": 0.992166,
+                "b": 0.9999998
+              },
+              "LayoutGroupSortIndex": 0,
+              "Value": 0,
+              "Locked": false,
+              "Grid": false,
+              "Snap": false,
+              "IgnoreFoW": false,
+              "MeasureMovement": false,
+              "DragSelectable": true,
+              "Autoraise": true,
+              "Sticky": true,
+              "Tooltip": true,
+              "GridProjection": false,
+              "HideWhenFaceDown": false,
+              "Hands": false,
+              "CustomMesh": {
+                "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Second_Gear_Dice_MeshURL.obj",
+                "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Second_Gear_Dice_DiffuseURL.jpg",
+                "NormalURL": "",
+                "ColliderURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Second_Gear_Dice_ColliderURL.obj",
+                "Convex": false,
+                "MaterialIndex": 0,
+                "TypeIndex": 2,
+                "CastShadows": true
+              },
+              "LuaScript": "",
+              "LuaScriptState": "",
+              "XmlUI": ""
+            },
+            {
+              "GUID": "a8062d",
+              "Name": "Custom_Model",
+              "Transform": {
+                "posX": 50.43715,
+                "posY": 2.47144341,
+                "posZ": -2.88847113,
+                "rotX": 305.264374,
+                "rotY": 178.966461,
+                "rotZ": 125.264412,
+                "scaleX": 0.75,
+                "scaleY": 0.75,
+                "scaleZ": 0.75
+              },
+              "Nickname": "First Gear Dice",
+              "Description": "",
+              "GMNotes": "",
+              "AltLookAngle": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "ColorDiffuse": {
+                "r": 0.9999998,
+                "g": 0.992166,
+                "b": 0.9999998
+              },
+              "LayoutGroupSortIndex": 0,
+              "Value": 0,
+              "Locked": false,
+              "Grid": false,
+              "Snap": false,
+              "IgnoreFoW": false,
+              "MeasureMovement": false,
+              "DragSelectable": true,
+              "Autoraise": true,
+              "Sticky": true,
+              "Tooltip": true,
+              "GridProjection": false,
+              "HideWhenFaceDown": false,
+              "Hands": false,
+              "CustomMesh": {
+                "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/First_Gear_Dice_MeshURL.obj",
+                "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/First_Gear_Dice_DiffuseURL.jpg",
+                "NormalURL": "",
+                "ColliderURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/First_Gear_Dice_ColliderURL.obj",
+                "Convex": false,
+                "MaterialIndex": 0,
+                "TypeIndex": 2,
+                "CastShadows": true
+              },
+              "LuaScript": "",
+              "LuaScriptState": "",
+              "XmlUI": ""
+            },
+            {
+              "GUID": "89b174",
+              "Name": "Custom_Model",
+              "Transform": {
+                "posX": 51.5263557,
+                "posY": 2.63237953,
+                "posZ": -5.234233,
+                "rotX": 35.26125,
+                "rotY": 278.549377,
+                "rotZ": 314.999725,
+                "scaleX": 0.75,
+                "scaleY": 0.75,
+                "scaleZ": 0.75
+              },
+              "Nickname": "Third Gear Dice",
+              "Description": "",
+              "GMNotes": "",
+              "AltLookAngle": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "ColorDiffuse": {
+                "r": 0.9999998,
+                "g": 0.992166,
+                "b": 0.9999998
+              },
+              "LayoutGroupSortIndex": 0,
+              "Value": 0,
+              "Locked": false,
+              "Grid": false,
+              "Snap": false,
+              "IgnoreFoW": false,
+              "MeasureMovement": false,
+              "DragSelectable": true,
+              "Autoraise": true,
+              "Sticky": true,
+              "Tooltip": true,
+              "GridProjection": false,
+              "HideWhenFaceDown": false,
+              "Hands": false,
+              "CustomMesh": {
+                "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Third_Gear_Dice_MeshURL.obj",
+                "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Third_Gear_Dice_DiffuseURL.jpg",
+                "NormalURL": "",
+                "ColliderURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Third_Gear_Dice_ColliderURL.obj",
+                "Convex": false,
+                "MaterialIndex": 0,
+                "TypeIndex": 2,
+                "CastShadows": true
+              },
+              "LuaScript": "",
+              "LuaScriptState": "",
+              "XmlUI": ""
+            },
+            {
+              "GUID": "6e3283",
+              "Name": "Die_20",
+              "Transform": {
+                "posX": 52.80428,
+                "posY": 2.859275,
+                "posZ": -11.2220564,
+                "rotX": 307.37738,
+                "rotY": 32.0091057,
+                "rotZ": 18.00008,
+                "scaleX": 1.5,
+                "scaleY": 1.5,
+                "scaleZ": 1.5
+              },
+              "Nickname": "Damage Dice",
+              "Description": "",
+              "GMNotes": "",
+              "AltLookAngle": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "ColorDiffuse": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.08245107
+              },
+              "LayoutGroupSortIndex": 0,
+              "Value": 0,
+              "Locked": false,
+              "Grid": false,
+              "Snap": true,
+              "IgnoreFoW": false,
+              "MeasureMovement": false,
+              "DragSelectable": true,
+              "Autoraise": true,
+              "Sticky": true,
+              "Tooltip": true,
+              "GridProjection": false,
+              "HideWhenFaceDown": false,
+              "Hands": false,
+              "MaterialIndex": 0,
+              "LuaScript": "",
+              "LuaScriptState": "",
+              "XmlUI": "",
+              "RotationValues": [
+                {
+                  "Value": "1",
+                  "Rotation": {
+                    "x": -11.0,
+                    "y": 60.0,
+                    "z": 17.0
+                  }
+                },
+                {
+                  "Value": "2",
+                  "Rotation": {
+                    "x": 52.0,
+                    "y": -60.0,
+                    "z": -17.0
+                  }
+                },
+                {
+                  "Value": "3",
+                  "Rotation": {
+                    "x": -11.0,
+                    "y": -180.0,
+                    "z": 90.0
+                  }
+                },
+                {
+                  "Value": "4",
+                  "Rotation": {
+                    "x": -11.0,
+                    "y": -180.0,
+                    "z": 162.0
+                  }
+                },
+                {
+                  "Value": "5",
+                  "Rotation": {
+                    "x": -11.0,
+                    "y": -60.0,
+                    "z": 234.0
+                  }
+                },
+                {
+                  "Value": "6",
+                  "Rotation": {
+                    "x": -11.0,
+                    "y": -180.0,
+                    "z": 306.0
+                  }
+                },
+                {
+                  "Value": "7",
+                  "Rotation": {
+                    "x": 52.0,
+                    "y": -60.0,
+                    "z": 55.0
+                  }
+                },
+                {
+                  "Value": "8",
+                  "Rotation": {
+                    "x": 52.0,
+                    "y": -60.0,
+                    "z": 198.0
+                  }
+                },
+                {
+                  "Value": "9",
+                  "Rotation": {
+                    "x": 52.0,
+                    "y": -60.0,
+                    "z": 127.0
+                  }
+                },
+                {
+                  "Value": "10",
+                  "Rotation": {
+                    "x": 52.0,
+                    "y": -180.0,
+                    "z": -90.0
+                  }
+                },
+                {
+                  "Value": "11",
+                  "Rotation": {
+                    "x": 308.0,
+                    "y": 0.0,
+                    "z": 90.0
+                  }
+                },
+                {
+                  "Value": "12",
+                  "Rotation": {
+                    "x": 306.0,
+                    "y": -240.0,
+                    "z": -52.0
+                  }
+                },
+                {
+                  "Value": "13",
+                  "Rotation": {
+                    "x": -52.0,
+                    "y": -240.0,
+                    "z": 18.0
+                  }
+                },
+                {
+                  "Value": "14",
+                  "Rotation": {
+                    "x": 307.0,
+                    "y": 120.0,
+                    "z": 233.0
+                  }
+                },
+                {
+                  "Value": "15",
+                  "Rotation": {
+                    "x": 11.0,
+                    "y": 120.0,
+                    "z": -234.0
+                  }
+                },
+                {
+                  "Value": "16",
+                  "Rotation": {
+                    "x": 11.0,
+                    "y": 0.0,
+                    "z": 54.0
+                  }
+                },
+                {
+                  "Value": "17",
+                  "Rotation": {
+                    "x": 11.0,
+                    "y": -120.0,
+                    "z": -17.0
+                  }
+                },
+                {
+                  "Value": "18",
+                  "Rotation": {
+                    "x": 11.0,
+                    "y": 0.0,
+                    "z": -90.0
+                  }
+                },
+                {
+                  "Value": "19",
+                  "Rotation": {
+                    "x": -52.0,
+                    "y": -240.0,
+                    "z": -198.0
+                  }
+                },
+                {
+                  "Value": "20",
+                  "Rotation": {
+                    "x": 11.0,
+                    "y": 0.0,
+                    "z": -162.0
+                  }
+                }
+              ]
+            },
+            {
+              "GUID": "39dfe8",
+              "Name": "Custom_Model",
+              "Transform": {
+                "posX": 54.1360054,
+                "posY": 2.78307676,
+                "posZ": -7.556429,
+                "rotX": 16.1763248,
+                "rotY": 222.190353,
+                "rotZ": 117.660545,
+                "scaleX": 0.75,
+                "scaleY": 0.75,
+                "scaleZ": 0.75
+              },
+              "Nickname": "Fourth Gear Dice",
+              "Description": "",
+              "GMNotes": "",
+              "AltLookAngle": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "ColorDiffuse": {
+                "r": 0.9999998,
+                "g": 0.9921649,
+                "b": 0.9999998
+              },
+              "LayoutGroupSortIndex": 0,
+              "Value": 0,
+              "Locked": false,
+              "Grid": false,
+              "Snap": false,
+              "IgnoreFoW": false,
+              "MeasureMovement": false,
+              "DragSelectable": true,
+              "Autoraise": true,
+              "Sticky": true,
+              "Tooltip": true,
+              "GridProjection": false,
+              "HideWhenFaceDown": false,
+              "Hands": false,
+              "CustomMesh": {
+                "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Fourth_Gear_Dice_MeshURL.obj",
+                "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Fourth_Gear_Dice_DiffuseURL.jpg",
+                "NormalURL": "",
+                "ColliderURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Fourth_Gear_Dice_ColliderURL.obj",
+                "Convex": false,
+                "MaterialIndex": 0,
+                "TypeIndex": 2,
+                "CastShadows": true
+              },
+              "LuaScript": "",
+              "LuaScriptState": "",
+              "XmlUI": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "GUID": "aec6e7",
+      "Name": "Custom_Model",
+      "Transform": {
+        "posX": 13.9327374,
+        "posY": 1.57000041,
+        "posZ": -15.937623,
+        "rotX": 340.703766,
+        "rotY": 192.271759,
+        "rotZ": 240.527084,
+        "scaleX": 0.625,
+        "scaleY": 0.625,
+        "scaleZ": 0.625
+      },
+      "Nickname": "Sixth Gear Dice",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.9999998,
+        "g": 0.992166,
+        "b": 0.9999998
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": false,
+      "Snap": false,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "CustomMesh": {
+        "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Sixth_Gear_Dice_MeshURL.obj",
+        "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Sixth_Gear_Dice_DiffuseURL.jpg",
+        "NormalURL": "",
+        "ColliderURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Sixth_Gear_Dice_ColliderURL.obj",
+        "Convex": true,
+        "MaterialIndex": 0,
+        "TypeIndex": 2,
+        "CastShadows": true
+      },
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": "",
+      "RotationValues": [
+        {
+          "Value": "25",
+          "Rotation": {
+            "x": 342.0,
+            "y": 0.0,
+            "z": 58.28
+          }
+        },
+        {
+          "Value": "26",
+          "Rotation": {
+            "x": 18.0,
+            "y": 0.0,
+            "z": 238.28
+          }
+        },
+        {
+          "Value": "27",
+          "Rotation": {
+            "x": 342.0,
+            "y": 0.0,
+            "z": 121.72
+          }
+        },
+        {
+          "Value": "22",
+          "Rotation": {
+            "x": 342.0,
+            "y": 0.0,
+            "z": 238.28
+          }
+        },
+        {
+          "Value": "21",
+          "Rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 180.0
+          }
+        },
+        {
+          "Value": "30",
+          "Rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        {
+          "Value": "24",
+          "Rotation": {
+            "x": 18.0,
+            "y": 0.0,
+            "z": 301.72
+          }
+        },
+        {
+          "Value": "23",
+          "Rotation": {
+            "x": 54.0,
+            "y": 0.0,
+            "z": 301.72
+          }
+        },
+        {
+          "Value": "28",
+          "Rotation": {
+            "x": 306.0,
+            "y": 0.0,
+            "z": 121.72
+          }
+        },
+        {
+          "Value": "29",
+          "Rotation": {
+            "x": 54.0,
+            "y": 0.0,
+            "z": 58.28
+          }
+        },
+        {
+          "Value": "30",
+          "Rotation": {
+            "x": 270.0,
+            "y": 0.0,
+            "z": 180.0
+          }
+        },
+        {
+          "Value": "27",
+          "Rotation": {
+            "x": 54.0,
+            "y": 0.0,
+            "z": 238.28
+          }
+        },
+        {
+          "Value": "21",
+          "Rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 90.0
+          }
+        },
+        {
+          "Value": "25",
+          "Rotation": {
+            "x": 54.0,
+            "y": 0.0,
+            "z": 121.72
+          }
+        },
+        {
+          "Value": "23",
+          "Rotation": {
+            "x": 330.0,
+            "y": 0.0,
+            "z": 200.91
+          }
+        },
+        {
+          "Value": "24",
+          "Rotation": {
+            "x": 330.0,
+            "y": 0.0,
+            "z": 20.91
+          }
+        },
+        {
+          "Value": "26",
+          "Rotation": {
+            "x": 30.0,
+            "y": 0.0,
+            "z": 20.91
+          }
+        },
+        {
+          "Value": "30",
+          "Rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 270.0
+          }
+        },
+        {
+          "Value": "26",
+          "Rotation": {
+            "x": 306.0,
+            "y": 0.0,
+            "z": 301.72
+          }
+        },
+        {
+          "Value": "28",
+          "Rotation": {
+            "x": 342.0,
+            "y": 0.0,
+            "z": 301.72
+          }
+        },
+        {
+          "Value": "25",
+          "Rotation": {
+            "x": 30.0,
+            "y": 0.0,
+            "z": 159.09
+          }
+        },
+        {
+          "Value": "29",
+          "Rotation": {
+            "x": 30.0,
+            "y": 0.0,
+            "z": 200.91
+          }
+        },
+        {
+          "Value": "24",
+          "Rotation": {
+            "x": 306.0,
+            "y": 0.0,
+            "z": 58.28
+          }
+        },
+        {
+          "Value": "23",
+          "Rotation": {
+            "x": 18.0,
+            "y": 0.0,
+            "z": 121.72
+          }
+        },
+        {
+          "Value": "29",
+          "Rotation": {
+            "x": 18.0,
+            "y": 0.0,
+            "z": 58.28
+          }
+        },
+        {
+          "Value": "28",
+          "Rotation": {
+            "x": 330.0,
+            "y": 0.0,
+            "z": 339.09
+          }
+        },
+        {
+          "Value": "22",
+          "Rotation": {
+            "x": 30.0,
+            "y": 0.0,
+            "z": 339.09
+          }
+        },
+        {
+          "Value": "21",
+          "Rotation": {
+            "x": 90.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        {
+          "Value": "27",
+          "Rotation": {
+            "x": 330.0,
+            "y": 0.0,
+            "z": 159.09
+          }
+        },
+        {
+          "Value": "22",
+          "Rotation": {
+            "x": 306.0,
+            "y": 0.0,
+            "z": 238.28
+          }
+        }
+      ]
+    },
+    {
+      "GUID": "b66c02",
+      "Name": "Infinite_Bag",
+      "Transform": {
+        "posX": 58.4181,
+        "posY": -0.0109999776,
+        "posZ": -29.7406,
+        "rotX": 0.0,
+        "rotY": 0.0,
+        "rotZ": 0.0,
+        "scaleX": 0.6500003,
+        "scaleY": 0.6500003,
+        "scaleZ": 0.6500003
+      },
+      "Nickname": "Rain Marker Bag",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.280926645,
+        "g": 0.3128339,
+        "b": 0.613143563
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": true,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "MaterialIndex": -1,
+      "MeshIndex": -1,
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": "",
+      "ContainedObjects": [
+        {
+          "GUID": "d9ab5f",
+          "Name": "Custom_Model",
+          "Transform": {
+            "posX": -50.57573,
+            "posY": 2.28496146,
+            "posZ": -23.9940853,
+            "rotX": 13.0130339,
+            "rotY": 359.9682,
+            "rotZ": 179.166367,
+            "scaleX": 1.0,
+            "scaleY": 1.0,
+            "scaleZ": 1.0
+          },
+          "Nickname": "Tire Type Marker - Rain",
+          "Description": "",
+          "GMNotes": "",
+          "AltLookAngle": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "ColorDiffuse": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0
+          },
+          "LayoutGroupSortIndex": 0,
+          "Value": 0,
+          "Locked": false,
+          "Grid": true,
+          "Snap": true,
+          "IgnoreFoW": false,
+          "MeasureMovement": false,
+          "DragSelectable": true,
+          "Autoraise": true,
+          "Sticky": true,
+          "Tooltip": true,
+          "GridProjection": false,
+          "HideWhenFaceDown": false,
+          "Hands": false,
+          "CustomMesh": {
+            "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Tire_Type_Marker_-_Rain_MeshURL.obj",
+            "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Tire_Type_Marker_-_Sun_DiffuseURL.jpg",
+            "NormalURL": "",
+            "ColliderURL": "",
+            "Convex": true,
+            "MaterialIndex": 1,
+            "TypeIndex": 0,
+            "CastShadows": true
+          },
+          "LuaScript": "",
+          "LuaScriptState": "",
+          "XmlUI": ""
+        }
+      ]
+    },
+    {
+      "GUID": "edfadc",
+      "Name": "Infinite_Bag",
+      "Transform": {
+        "posX": 57.3691,
+        "posY": -0.0127471685,
+        "posZ": 22.8053,
+        "rotX": -6.186666e-08,
+        "rotY": 2.37119082e-07,
+        "rotZ": -4.76675e-06,
+        "scaleX": 0.75,
+        "scaleY": 0.75,
+        "scaleZ": 0.75
+      },
+      "Nickname": "Beginner Dashboard Bag",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.3058885,
+        "g": 0.372555166,
+        "b": 1.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": true,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "MaterialIndex": -1,
+      "MeshIndex": -1,
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": "",
+      "ContainedObjects": [
+        {
+          "GUID": "e9c03d",
+          "Name": "Custom_Model",
+          "Transform": {
+            "posX": 57.8110352,
+            "posY": 2.22404575,
+            "posZ": 23.836338,
+            "rotX": 0.379805654,
+            "rotY": -0.000191082479,
+            "rotZ": 179.942291,
+            "scaleX": 1.0,
+            "scaleY": 1.0,
+            "scaleZ": 1.0
+          },
+          "Nickname": "Beginner Dashboard",
+          "Description": "",
+          "GMNotes": "",
+          "AltLookAngle": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "ColorDiffuse": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0
+          },
+          "LayoutGroupSortIndex": 0,
+          "Value": 0,
+          "Locked": false,
+          "Grid": true,
+          "Snap": true,
+          "IgnoreFoW": false,
+          "MeasureMovement": false,
+          "DragSelectable": true,
+          "Autoraise": true,
+          "Sticky": true,
+          "Tooltip": true,
+          "GridProjection": false,
+          "HideWhenFaceDown": false,
+          "Hands": false,
+          "CustomMesh": {
+            "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Advanced_Dashboard_MeshURL.obj",
+            "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Advanced_Dashboard_DiffuseURL.jpg",
+            "NormalURL": "",
+            "ColliderURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Advanced_Dashboard_ColliderURL.obj",
+            "Convex": false,
+            "MaterialIndex": 1,
+            "TypeIndex": 4,
+            "CastShadows": true
+          },
+          "LuaScript": "",
+          "LuaScriptState": "",
+          "XmlUI": "",
+          "AttachedSnapPoints": [
+            {
+              "Position": {
+                "x": 2.48337746,
+                "y": 0.3836751,
+                "z": -2.025683
+              }
+            },
+            {
+              "Position": {
+                "x": 4.22580338,
+                "y": 0.383675069,
+                "z": -1.21766269
+              }
+            },
+            {
+              "Position": {
+                "x": 2.468012,
+                "y": 0.383674979,
+                "z": -0.402479947
+              }
+            },
+            {
+              "Position": {
+                "x": 4.19789553,
+                "y": 0.383675069,
+                "z": 0.344779938
+              }
+            },
+            {
+              "Position": {
+                "x": 2.451436,
+                "y": 0.383674979,
+                "z": 1.1575954
+              }
+            },
+            {
+              "Position": {
+                "x": 4.2049427,
+                "y": 0.383675069,
+                "z": 1.93792832
+              }
+            },
+            {
+              "Position": {
+                "x": 0.9551008,
+                "y": 0.383674979,
+                "z": -2.32454419
+              }
+            },
+            {
+              "Position": {
+                "x": 0.107319191,
+                "y": 0.383674979,
+                "z": -2.31510544
+              }
+            },
+            {
+              "Position": {
+                "x": -0.759243965,
+                "y": 0.383674979,
+                "z": -2.306217
+              }
+            },
+            {
+              "Position": {
+                "x": -1.62505162,
+                "y": 0.383674979,
+                "z": -2.33942342
+              }
+            },
+            {
+              "Position": {
+                "x": -2.4879992,
+                "y": 0.383674979,
+                "z": -2.29898667
+              }
+            },
+            {
+              "Position": {
+                "x": -3.33286715,
+                "y": 0.383675128,
+                "z": -2.31061029
+              }
+            },
+            {
+              "Position": {
+                "x": -4.18536,
+                "y": 0.383675,
+                "z": -2.301531
+              }
+            },
+            {
+              "Position": {
+                "x": -4.194649,
+                "y": 0.383675,
+                "z": -1.57496977
+              }
+            },
+            {
+              "Position": {
+                "x": -3.33983684,
+                "y": 0.383674979,
+                "z": -1.53255045
+              }
+            },
+            {
+              "Position": {
+                "x": -2.48580241,
+                "y": 0.383674979,
+                "z": -1.52018154
+              }
+            },
+            {
+              "Position": {
+                "x": -1.620264,
+                "y": 0.383674979,
+                "z": -1.53758848
+              }
+            },
+            {
+              "Position": {
+                "x": -0.771915257,
+                "y": 0.383674979,
+                "z": -1.56561041
+              }
+            },
+            {
+              "Position": {
+                "x": 0.105430864,
+                "y": 0.383674979,
+                "z": -1.55269074
+              }
+            },
+            {
+              "Position": {
+                "x": 0.9680347,
+                "y": 0.383674979,
+                "z": -1.55025411
+              }
+            },
+            {
+              "Position": {
+                "x": -4.21499157,
+                "y": 0.383675,
+                "z": -0.7837072
+              }
+            },
+            {
+              "Position": {
+                "x": -3.342668,
+                "y": 0.383674979,
+                "z": -0.7799435
+              }
+            },
+            {
+              "Position": {
+                "x": -2.488786,
+                "y": 0.383674979,
+                "z": -0.7671245
+              }
+            },
+            {
+              "Position": {
+                "x": -1.6334542,
+                "y": 0.383674979,
+                "z": -0.782984138
+              }
+            },
+            {
+              "Position": {
+                "x": -0.7669277,
+                "y": 0.383674979,
+                "z": -0.789046049
+              }
+            },
+            {
+              "Position": {
+                "x": 0.09948547,
+                "y": 0.383674979,
+                "z": -0.7759448
+              }
+            },
+            {
+              "Position": {
+                "x": 0.957769036,
+                "y": 0.383674979,
+                "z": -0.772673368
+              }
+            },
+            {
+              "Position": {
+                "x": 0.946903169,
+                "y": 0.383674979,
+                "z": 0.0139080519
+              }
+            },
+            {
+              "Position": {
+                "x": 0.07219349,
+                "y": 0.3836751,
+                "z": -0.00240058918
+              }
+            },
+            {
+              "Position": {
+                "x": -0.7836024,
+                "y": 0.3836751,
+                "z": -0.009017201
+              }
+            },
+            {
+              "Position": {
+                "x": -1.62891746,
+                "y": 0.383674979,
+                "z": -0.0153519372
+              }
+            },
+            {
+              "Position": {
+                "x": -2.48300242,
+                "y": 0.383674979,
+                "z": 0.00537163159
+              }
+            },
+            {
+              "Position": {
+                "x": -3.360795,
+                "y": 0.3836751,
+                "z": -0.0201709233
+              }
+            },
+            {
+              "Position": {
+                "x": -4.209156,
+                "y": 0.383675,
+                "z": -0.0266758483
+              }
+            },
+            {
+              "Position": {
+                "x": -4.21041346,
+                "y": 0.383675,
+                "z": 0.7922155
+              }
+            },
+            {
+              "Position": {
+                "x": -4.205721,
+                "y": 0.383675,
+                "z": 1.5623349
+              }
+            },
+            {
+              "Position": {
+                "x": -4.22759151,
+                "y": 0.383674979,
+                "z": 2.318382
+              }
+            },
+            {
+              "Position": {
+                "x": -3.36376977,
+                "y": 0.383674979,
+                "z": 2.32713
+              }
+            },
+            {
+              "Position": {
+                "x": -3.36691856,
+                "y": 0.383674979,
+                "z": 1.523125
+              }
+            },
+            {
+              "Position": {
+                "x": -3.35832238,
+                "y": 0.383674979,
+                "z": 0.750131249
+              }
+            },
+            {
+              "Position": {
+                "x": -2.49301529,
+                "y": 0.383674979,
+                "z": 0.747901
+              }
+            },
+            {
+              "Position": {
+                "x": -2.50586963,
+                "y": 0.3836751,
+                "z": 1.56887162
+              }
+            },
+            {
+              "Position": {
+                "x": -2.50858068,
+                "y": 0.383674979,
+                "z": 2.30902553
+              }
+            },
+            {
+              "Position": {
+                "x": -1.65272462,
+                "y": 0.383674979,
+                "z": 2.33537364
+              }
+            },
+            {
+              "Position": {
+                "x": -1.64461052,
+                "y": 0.383674979,
+                "z": 1.55825233
+              }
+            },
+            {
+              "Position": {
+                "x": -1.63602257,
+                "y": 0.383674979,
+                "z": 0.7355149
+              }
+            },
+            {
+              "Position": {
+                "x": -0.7804104,
+                "y": 0.383674979,
+                "z": 0.772883654
+              }
+            },
+            {
+              "Position": {
+                "x": -0.7840682,
+                "y": 0.383674979,
+                "z": 1.58520389
+              }
+            },
+            {
+              "Position": {
+                "x": -0.8043708,
+                "y": 0.3836751,
+                "z": 2.325977
+              }
+            },
+            {
+              "Position": {
+                "x": 0.9343702,
+                "y": 0.383674979,
+                "z": 0.7610281
+              }
+            },
+            {
+              "Position": {
+                "x": 0.0889486,
+                "y": 0.383674979,
+                "z": 0.766305268
+              }
+            },
+            {
+              "Position": {
+                "x": 0.07042472,
+                "y": 0.383674979,
+                "z": 1.55312216
+              }
+            },
+            {
+              "Position": {
+                "x": 0.07130111,
+                "y": 0.383674979,
+                "z": 2.33550143
+              }
+            },
+            {
+              "Position": {
+                "x": 0.9332796,
+                "y": 0.383674979,
+                "z": 2.3492887
+              }
+            },
+            {
+              "Position": {
+                "x": 0.9424139,
+                "y": 0.383674979,
+                "z": 1.56034946
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "GUID": "f04a8d",
+      "Name": "Infinite_Bag",
+      "Transform": {
+        "posX": 72.6149,
+        "posY": -0.246599972,
+        "posZ": -29.7817,
+        "rotX": 0.457000017,
+        "rotY": 359.9403,
+        "rotZ": 359.167969,
+        "scaleX": 0.75,
+        "scaleY": 0.75,
+        "scaleZ": 0.75
+      },
+      "Nickname": "Advanced Rulebook Bag",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.3058885,
+        "g": 0.372555166,
+        "b": 1.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": true,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "MaterialIndex": -1,
+      "MeshIndex": -1,
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": "",
+      "ContainedObjects": [
+        {
+          "GUID": "e2a88f",
+          "Name": "Custom_PDF",
+          "Transform": {
+            "posX": 73.41634,
+            "posY": 1.56568253,
+            "posZ": -30.078764,
+            "rotX": 0.0290611479,
+            "rotY": 180.0,
+            "rotZ": 0.121208295,
+            "scaleX": 3.2506578,
+            "scaleY": 1.0,
+            "scaleZ": 3.2506578
+          },
+          "Nickname": "Rulebook Advanced",
+          "Description": "",
+          "GMNotes": "",
+          "AltLookAngle": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "ColorDiffuse": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0
+          },
+          "LayoutGroupSortIndex": 0,
+          "Value": 0,
+          "Locked": false,
+          "Grid": true,
+          "Snap": true,
+          "IgnoreFoW": false,
+          "MeasureMovement": false,
+          "DragSelectable": true,
+          "Autoraise": true,
+          "Sticky": true,
+          "Tooltip": true,
+          "GridProjection": false,
+          "HideWhenFaceDown": false,
+          "Hands": false,
+          "CustomPDF": {
+            "PDFUrl": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/c55a976c849fc2a4a0ef501b93ed5d3c12d96717/assets/raw/Rulebook_Advanced_PDFUrl.pdf",
+            "PDFPassword": "",
+            "PDFPage": 0,
+            "PDFPageOffset": 0
+          },
+          "LuaScript": "",
+          "LuaScriptState": "",
+          "XmlUI": ""
+        }
+      ]
+    },
+    {
+      "GUID": "38e023",
+      "Name": "Custom_Model",
+      "Transform": {
+        "posX": 11.7327375,
+        "posY": 1.57000041,
+        "posZ": -15.937623,
+        "rotX": 8.606291,
+        "rotY": 74.21148,
+        "rotZ": 316.853668,
+        "scaleX": 0.625,
+        "scaleY": 0.625,
+        "scaleZ": 0.625
+      },
+      "Nickname": "Fifth Gear Dice",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.9999998,
+        "g": 0.992165744,
+        "b": 0.9999998
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": false,
+      "Snap": false,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "CustomMesh": {
+        "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Fifth_Gear_Dice_MeshURL.obj",
+        "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Fifth_Gear_Dice_DiffuseURL.jpg",
+        "NormalURL": "",
+        "ColliderURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Fifth_Gear_Dice_ColliderURL.obj",
+        "Convex": true,
+        "MaterialIndex": 0,
+        "TypeIndex": 2,
+        "CustomShader": {
+          "SpecularColor": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0
+          },
+          "SpecularIntensity": 0.5,
+          "SpecularSharpness": 7.0,
+          "FresnelStrength": 0.4
+        },
+        "CastShadows": true
+      },
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": "",
+      "RotationValues": [
+        {
+          "Value": "19",
+          "Rotation": {
+            "x": 48.24,
+            "y": 0.0,
+            "z": 299.91
+          }
+        },
+        {
+          "Value": "13",
+          "Rotation": {
+            "x": 311.76,
+            "y": 0.0,
+            "z": 119.91
+          }
+        },
+        {
+          "Value": "15",
+          "Rotation": {
+            "x": 48.24,
+            "y": 0.0,
+            "z": 60.09
+          }
+        },
+        {
+          "Value": "18",
+          "Rotation": {
+            "x": 311.76,
+            "y": 0.0,
+            "z": 240.09
+          }
+        },
+        {
+          "Value": "19",
+          "Rotation": {
+            "x": 60.71,
+            "y": 0.0,
+            "z": 226.83
+          }
+        },
+        {
+          "Value": "16",
+          "Rotation": {
+            "x": 299.29,
+            "y": 0.0,
+            "z": 313.17
+          }
+        },
+        {
+          "Value": "13",
+          "Rotation": {
+            "x": 299.29,
+            "y": 0.0,
+            "z": 46.83
+          }
+        },
+        {
+          "Value": "12",
+          "Rotation": {
+            "x": 60.71,
+            "y": 0.0,
+            "z": 133.17
+          }
+        },
+        {
+          "Value": "15",
+          "Rotation": {
+            "x": 352.65,
+            "y": 0.0,
+            "z": 250.37
+          }
+        },
+        {
+          "Value": "12",
+          "Rotation": {
+            "x": 7.35,
+            "y": 0.0,
+            "z": 289.63
+          }
+        },
+        {
+          "Value": "16",
+          "Rotation": {
+            "x": 352.65,
+            "y": 0.0,
+            "z": 109.63
+          }
+        },
+        {
+          "Value": "18",
+          "Rotation": {
+            "x": 7.35,
+            "y": 0.0,
+            "z": 70.37
+          }
+        },
+        {
+          "Value": "17",
+          "Rotation": {
+            "x": 19.4,
+            "y": 0.0,
+            "z": 217.74
+          }
+        },
+        {
+          "Value": "14",
+          "Rotation": {
+            "x": 340.6,
+            "y": 0.0,
+            "z": 322.26
+          }
+        },
+        {
+          "Value": "11",
+          "Rotation": {
+            "x": 340.6,
+            "y": 0.0,
+            "z": 37.74
+          }
+        },
+        {
+          "Value": "14",
+          "Rotation": {
+            "x": 19.4,
+            "y": 0.0,
+            "z": 142.26
+          }
+        },
+        {
+          "Value": "11",
+          "Rotation": {
+            "x": 318.09,
+            "y": 0.0,
+            "z": 180.0
+          }
+        },
+        {
+          "Value": "17",
+          "Rotation": {
+            "x": 41.91,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        {
+          "Value": "20",
+          "Rotation": {
+            "x": 0.1,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        {
+          "Value": "20",
+          "Rotation": {
+            "x": 359.9,
+            "y": 0.0,
+            "z": 180.0
+          }
+        }
+      ]
+    },
+    {
+      "GUID": "39dfe8",
+      "Name": "Custom_Model",
+      "Transform": {
+        "posX": 9.532738,
+        "posY": 1.57000041,
+        "posZ": -15.937623,
+        "rotX": 351.8206,
+        "rotY": 312.310242,
+        "rotZ": 173.8913,
+        "scaleX": 0.75,
+        "scaleY": 0.75,
+        "scaleZ": 0.75
+      },
+      "Nickname": "Fourth Gear Dice",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.9999998,
+        "g": 0.9921649,
+        "b": 0.9999998
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": false,
+      "Snap": false,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "CustomMesh": {
+        "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Fourth_Gear_Dice_MeshURL.obj",
+        "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Fourth_Gear_Dice_DiffuseURL.jpg",
+        "NormalURL": "",
+        "ColliderURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Fourth_Gear_Dice_ColliderURL.obj",
+        "Convex": true,
+        "MaterialIndex": 0,
+        "TypeIndex": 2,
+        "CustomShader": {
+          "SpecularColor": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0
+          },
+          "SpecularIntensity": 0.5,
+          "SpecularSharpness": 7.0,
+          "FresnelStrength": 0.4
+        },
+        "CastShadows": true
+      },
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": "",
+      "RotationValues": [
+        {
+          "Value": "9",
+          "Rotation": {
+            "x": 296.28,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        {
+          "Value": "10",
+          "Rotation": {
+            "x": 63.72,
+            "y": 0.0,
+            "z": 180.0
+          }
+        },
+        {
+          "Value": "7",
+          "Rotation": {
+            "x": 313.83,
+            "y": 0.0,
+            "z": 130.61
+          }
+        },
+        {
+          "Value": "9",
+          "Rotation": {
+            "x": 313.83,
+            "y": 0.0,
+            "z": 229.39
+          }
+        },
+        {
+          "Value": "12",
+          "Rotation": {
+            "x": 0.28,
+            "y": 0.0,
+            "z": 180.0
+          }
+        },
+        {
+          "Value": "7",
+          "Rotation": {
+            "x": 359.72,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        {
+          "Value": "8",
+          "Rotation": {
+            "x": 343.82,
+            "y": 0.0,
+            "z": 62.34
+          }
+        },
+        {
+          "Value": "11",
+          "Rotation": {
+            "x": 343.82,
+            "y": 0.0,
+            "z": 297.66
+          }
+        },
+        {
+          "Value": "11",
+          "Rotation": {
+            "x": 16.18,
+            "y": 0.0,
+            "z": 242.34
+          }
+        },
+        {
+          "Value": "8",
+          "Rotation": {
+            "x": 16.18,
+            "y": 0.0,
+            "z": 117.66
+          }
+        },
+        {
+          "Value": "12",
+          "Rotation": {
+            "x": 46.17,
+            "y": 0.0,
+            "z": 310.61
+          }
+        },
+        {
+          "Value": "10",
+          "Rotation": {
+            "x": 46.17,
+            "y": 0.0,
+            "z": 49.39
+          }
+        }
+      ]
+    },
+    {
+      "GUID": "47c309",
+      "Name": "Custom_Model",
+      "Transform": {
+        "posX": 5.13273764,
+        "posY": 1.57000041,
+        "posZ": -15.937623,
+        "rotX": 89.91377,
+        "rotY": 89.56955,
+        "rotZ": 0.0,
+        "scaleX": 0.625,
+        "scaleY": 0.625,
+        "scaleZ": 0.625
+      },
+      "Nickname": "Second Gear Dice",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.9999998,
+        "g": 0.992166,
+        "b": 0.9999998
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": false,
+      "Snap": false,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "CustomMesh": {
+        "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Second_Gear_Dice_MeshURL.obj",
+        "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Second_Gear_Dice_DiffuseURL.jpg",
+        "NormalURL": "",
+        "ColliderURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Second_Gear_Dice_ColliderURL.obj",
+        "Convex": true,
+        "MaterialIndex": 0,
+        "TypeIndex": 2,
+        "CustomShader": {
+          "SpecularColor": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0
+          },
+          "SpecularIntensity": 0.5,
+          "SpecularSharpness": 7.0,
+          "FresnelStrength": 0.4
+        },
+        "CastShadows": true
+      },
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": "",
+      "RotationValues": [
+        {
+          "Value": "3",
+          "Rotation": {
+            "x": 270.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        {
+          "Value": "3",
+          "Rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 270.0
+          }
+        },
+        {
+          "Value": "4",
+          "Rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 90.0
+          }
+        },
+        {
+          "Value": "4",
+          "Rotation": {
+            "x": 90.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        {
+          "Value": "4",
+          "Rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        {
+          "Value": "2",
+          "Rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 180.0
+          }
+        }
+      ]
+    },
+    {
+      "GUID": "89b174",
+      "Name": "Custom_Model",
+      "Transform": {
+        "posX": 7.332738,
+        "posY": 1.57000041,
+        "posZ": -15.937623,
+        "rotX": 324.7356,
+        "rotY": 98.65554,
+        "rotZ": 224.999985,
+        "scaleX": 0.75,
+        "scaleY": 0.75,
+        "scaleZ": 0.75
+      },
+      "Nickname": "Third Gear Dice",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.9999998,
+        "g": 0.992166,
+        "b": 0.9999998
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": false,
+      "Snap": false,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "CustomMesh": {
+        "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Third_Gear_Dice_MeshURL.obj",
+        "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/Third_Gear_Dice_DiffuseURL.jpg",
+        "NormalURL": "",
+        "ColliderURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/Third_Gear_Dice_ColliderURL.obj",
+        "Convex": true,
+        "MaterialIndex": 0,
+        "TypeIndex": 2,
+        "CustomShader": {
+          "SpecularColor": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0
+          },
+          "SpecularIntensity": 0.5,
+          "SpecularSharpness": 7.0,
+          "FresnelStrength": 0.4
+        },
+        "CastShadows": true
+      },
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": "",
+      "RotationValues": [
+        {
+          "Value": "5",
+          "Rotation": {
+            "x": 35.26,
+            "y": 0.0,
+            "z": 315.0
+          }
+        },
+        {
+          "Value": "8",
+          "Rotation": {
+            "x": 35.26,
+            "y": 0.0,
+            "z": 45.0
+          }
+        },
+        {
+          "Value": "6",
+          "Rotation": {
+            "x": 324.74,
+            "y": 0.0,
+            "z": 45.0
+          }
+        },
+        {
+          "Value": "7",
+          "Rotation": {
+            "x": 324.74,
+            "y": 0.0,
+            "z": 315.0
+          }
+        },
+        {
+          "Value": "7",
+          "Rotation": {
+            "x": 35.26,
+            "y": 0.0,
+            "z": 225.0
+          }
+        },
+        {
+          "Value": "6",
+          "Rotation": {
+            "x": 35.26,
+            "y": 0.0,
+            "z": 135.0
+          }
+        },
+        {
+          "Value": "8",
+          "Rotation": {
+            "x": 324.74,
+            "y": 0.0,
+            "z": 135.0
+          }
+        },
+        {
+          "Value": "4",
+          "Rotation": {
+            "x": 324.74,
+            "y": 0.0,
+            "z": 225.0
+          }
+        }
+      ]
+    },
+    {
+      "GUID": "a8062d",
+      "Name": "Custom_Model",
+      "Transform": {
+        "posX": 2.93273783,
+        "posY": 1.57000041,
+        "posZ": -15.937623,
+        "rotX": 33.867115,
+        "rotY": 303.191864,
+        "rotZ": 227.839554,
+        "scaleX": 0.75,
+        "scaleY": 0.75,
+        "scaleZ": 0.75
+      },
+      "Nickname": "First Gear Dice",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.9999998,
+        "g": 0.992166,
+        "b": 0.9999998
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": false,
+      "Snap": false,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "CustomMesh": {
+        "MeshURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/First_Gear_Dice_MeshURL.obj",
+        "DiffuseURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/cac26c963d4c3d97a178507bfead949184a5bf04/assets/raw/First_Gear_Dice_DiffuseURL.jpg",
+        "NormalURL": "",
+        "ColliderURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/a7ed512a114107f3948cb5575ac8c33662bd2cad/assets/raw/First_Gear_Dice_ColliderURL.obj",
+        "Convex": true,
+        "MaterialIndex": 0,
+        "TypeIndex": 2,
+        "CustomShader": {
+          "SpecularColor": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0
+          },
+          "SpecularIntensity": 0.5,
+          "SpecularSharpness": 7.0,
+          "FresnelStrength": 0.4
+        },
+        "CastShadows": true
+      },
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": "",
+      "RotationValues": [
+        {
+          "Value": "1",
+          "Rotation": {
+            "x": 54.74,
+            "y": 0.0,
+            "z": 125.26
+          }
+        },
+        {
+          "Value": "2",
+          "Rotation": {
+            "x": 305.26,
+            "y": 0.0,
+            "z": 125.26
+          }
+        },
+        {
+          "Value": "1",
+          "Rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 250.53
+          }
+        },
+        {
+          "Value": "2",
+          "Rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "GUID": "ebde54",
+      "Name": "Custom_Tile",
+      "Transform": {
+        "posX": 3.02762437e-08,
+        "posY": 0.75,
+        "posZ": 6.123916e-12,
+        "rotX": 0.0,
+        "rotY": 180.0,
+        "rotZ": 0.0,
+        "scaleX": 44.0,
+        "scaleY": 1.0,
+        "scaleZ": 26.0
+      },
+      "Nickname": "Game Board Tile",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 1.0
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": true,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "CustomImage": {
+        "ImageURL": "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/bf67bab5c8213b2c3670c8c2b83147e25f6b4ff2/tracks/raw/FDMonaco.jpg",
+        "ImageSecondaryURL": "",
+        "ImageScalar": 1.0,
+        "WidthScale": 0.0,
+        "CustomTile": {
+          "Type": 0,
+          "Thickness": 0.2,
+          "Stackable": false,
+          "Stretch": false
+        }
+      },
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "AttachedVectorLines": [
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.843610644,
+              "y": 0.220000386,
+              "z": 0.476950318
+            },
+            {
+              "x": 0.8451796,
+              "y": 0.220000386,
+              "z": 0.4260168
+            }
+          ],
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0
+          },
+          "thickness": 0.005516033
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.838819444,
+              "y": 0.220000386,
+              "z": 0.4766044
+            },
+            {
+              "x": 0.840388358,
+              "y": 0.220000386,
+              "z": 0.4256709
+            }
+          ],
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0
+          },
+          "thickness": 0.005516033
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8340282,
+              "y": 0.220000386,
+              "z": 0.4762585
+            },
+            {
+              "x": 0.835597157,
+              "y": 0.220000386,
+              "z": 0.425324976
+            }
+          ],
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0
+          },
+          "thickness": 0.005516033
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.829237,
+              "y": 0.220000386,
+              "z": 0.475912571
+            },
+            {
+              "x": 0.8308059,
+              "y": 0.220000386,
+              "z": 0.4249791
+            }
+          ],
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0
+          },
+          "thickness": 0.005516033
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8244458,
+              "y": 0.220000386,
+              "z": 0.475566655
+            },
+            {
+              "x": 0.8260147,
+              "y": 0.220000386,
+              "z": 0.424633175
+            }
+          ],
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0
+          },
+          "thickness": 0.005516033
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8196545,
+              "y": 0.220000386,
+              "z": 0.47522074
+            },
+            {
+              "x": 0.8212235,
+              "y": 0.220000386,
+              "z": 0.42428726
+            }
+          ],
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0
+          },
+          "thickness": 0.005516033
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8452275,
+              "y": 0.220000386,
+              "z": 0.426083982
+            },
+            {
+              "x": 0.8467964,
+              "y": 0.220000386,
+              "z": 0.375150472
+            }
+          ],
+          "color": {
+            "r": 0.443,
+            "g": 0.231,
+            "b": 0.09
+          },
+          "thickness": 0.005516033
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8404362,
+              "y": 0.220000386,
+              "z": 0.425738066
+            },
+            {
+              "x": 0.8420052,
+              "y": 0.220000386,
+              "z": 0.3748046
+            }
+          ],
+          "color": {
+            "r": 0.443,
+            "g": 0.231,
+            "b": 0.09
+          },
+          "thickness": 0.005516033
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.835645,
+              "y": 0.220000386,
+              "z": 0.425392151
+            },
+            {
+              "x": 0.837214,
+              "y": 0.220000386,
+              "z": 0.374458671
+            }
+          ],
+          "color": {
+            "r": 0.443,
+            "g": 0.231,
+            "b": 0.09
+          },
+          "thickness": 0.005516033
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8308538,
+              "y": 0.220000386,
+              "z": 0.425046235
+            },
+            {
+              "x": 0.832422733,
+              "y": 0.220000386,
+              "z": 0.374112755
+            }
+          ],
+          "color": {
+            "r": 0.443,
+            "g": 0.231,
+            "b": 0.09
+          },
+          "thickness": 0.005516033
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.82606256,
+              "y": 0.220000386,
+              "z": 0.42470032
+            },
+            {
+              "x": 0.827631533,
+              "y": 0.220000386,
+              "z": 0.37376684
+            }
+          ],
+          "color": {
+            "r": 0.443,
+            "g": 0.231,
+            "b": 0.09
+          },
+          "thickness": 0.005516033
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.82127136,
+              "y": 0.220000386,
+              "z": 0.4243544
+            },
+            {
+              "x": 0.8228403,
+              "y": 0.220000386,
+              "z": 0.373420924
+            }
+          ],
+          "color": {
+            "r": 0.443,
+            "g": 0.231,
+            "b": 0.09
+          },
+          "thickness": 0.005516033
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8474982,
+              "y": 0.220000386,
+              "z": 0.373816162
+            },
+            {
+              "x": 0.8452971,
+              "y": 0.220000386,
+              "z": 0.3187211
+            }
+          ],
+          "color": {
+            "r": 0.905,
+            "g": 0.898,
+            "b": 0.172
+          },
+          "thickness": 0.00618229527
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.84213233,
+              "y": 0.220000386,
+              "z": 0.3743186
+            },
+            {
+              "x": 0.83993125,
+              "y": 0.220000386,
+              "z": 0.319223523
+            }
+          ],
+          "color": {
+            "r": 0.905,
+            "g": 0.898,
+            "b": 0.172
+          },
+          "thickness": 0.00618229527
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8367664,
+              "y": 0.220000386,
+              "z": 0.374821037
+            },
+            {
+              "x": 0.834565341,
+              "y": 0.220000386,
+              "z": 0.319726
+            }
+          ],
+          "color": {
+            "r": 0.905,
+            "g": 0.898,
+            "b": 0.172
+          },
+          "thickness": 0.00618229527
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8314006,
+              "y": 0.220000386,
+              "z": 0.375323474
+            },
+            {
+              "x": 0.829199433,
+              "y": 0.220000386,
+              "z": 0.320228428
+            }
+          ],
+          "color": {
+            "r": 0.905,
+            "g": 0.898,
+            "b": 0.172
+          },
+          "thickness": 0.00618229527
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.826034665,
+              "y": 0.220000386,
+              "z": 0.3758259
+            },
+            {
+              "x": 0.8238336,
+              "y": 0.220000386,
+              "z": 0.320730865
+            }
+          ],
+          "color": {
+            "r": 0.905,
+            "g": 0.898,
+            "b": 0.172
+          },
+          "thickness": 0.00618229527
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8206688,
+              "y": 0.220000386,
+              "z": 0.376328349
+            },
+            {
+              "x": 0.8184677,
+              "y": 0.220000386,
+              "z": 0.3212333
+            }
+          ],
+          "color": {
+            "r": 0.905,
+            "g": 0.898,
+            "b": 0.172
+          },
+          "thickness": 0.00618229527
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8453155,
+              "y": 0.220000386,
+              "z": 0.318618149
+            },
+            {
+              "x": 0.8431144,
+              "y": 0.220000386,
+              "z": 0.263523072
+            }
+          ],
+          "color": {
+            "r": 0.956,
+            "g": 0.392,
+            "b": 0.113
+          },
+          "thickness": 0.00618229527
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8399496,
+              "y": 0.220000386,
+              "z": 0.3191206
+            },
+            {
+              "x": 0.8377485,
+              "y": 0.220000386,
+              "z": 0.2640255
+            }
+          ],
+          "color": {
+            "r": 0.956,
+            "g": 0.392,
+            "b": 0.113
+          },
+          "thickness": 0.00618229527
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.834583759,
+              "y": 0.220000386,
+              "z": 0.319623023
+            },
+            {
+              "x": 0.8323826,
+              "y": 0.220000386,
+              "z": 0.264527947
+            }
+          ],
+          "color": {
+            "r": 0.956,
+            "g": 0.392,
+            "b": 0.113
+          },
+          "thickness": 0.00618229527
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.829217851,
+              "y": 0.220000386,
+              "z": 0.320125461
+            },
+            {
+              "x": 0.8270168,
+              "y": 0.220000386,
+              "z": 0.2650304
+            }
+          ],
+          "color": {
+            "r": 0.956,
+            "g": 0.392,
+            "b": 0.113
+          },
+          "thickness": 0.00618229527
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.823852,
+              "y": 0.220000386,
+              "z": 0.3206279
+            },
+            {
+              "x": 0.821650863,
+              "y": 0.220000386,
+              "z": 0.265532851
+            }
+          ],
+          "color": {
+            "r": 0.956,
+            "g": 0.392,
+            "b": 0.113
+          },
+          "thickness": 0.00618229527
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8184861,
+              "y": 0.220000386,
+              "z": 0.321130335
+            },
+            {
+              "x": 0.816285,
+              "y": 0.220000386,
+              "z": 0.2660353
+            }
+          ],
+          "color": {
+            "r": 0.956,
+            "g": 0.392,
+            "b": 0.113
+          },
+          "thickness": 0.00618229527
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.842379034,
+              "y": 0.220000386,
+              "z": 0.263042539
+            },
+            {
+              "x": 0.8373102,
+              "y": 0.220000386,
+              "z": 0.208517715
+            }
+          ],
+          "color": {
+            "r": 0.192,
+            "g": 0.701,
+            "b": 0.168
+          },
+          "thickness": 0.006042845
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8371768,
+              "y": 0.220000386,
+              "z": 0.264176
+            },
+            {
+              "x": 0.832108,
+              "y": 0.220000386,
+              "z": 0.2096512
+            }
+          ],
+          "color": {
+            "r": 0.192,
+            "g": 0.701,
+            "b": 0.168
+          },
+          "thickness": 0.006042845
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.831974566,
+              "y": 0.220000386,
+              "z": 0.2653095
+            },
+            {
+              "x": 0.8269058,
+              "y": 0.220000386,
+              "z": 0.210784689
+            }
+          ],
+          "color": {
+            "r": 0.192,
+            "g": 0.701,
+            "b": 0.168
+          },
+          "thickness": 0.006042845
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.826772332,
+              "y": 0.220000386,
+              "z": 0.266442984
+            },
+            {
+              "x": 0.821703553,
+              "y": 0.220000386,
+              "z": 0.211918175
+            }
+          ],
+          "color": {
+            "r": 0.192,
+            "g": 0.701,
+            "b": 0.168
+          },
+          "thickness": 0.006042845
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8215701,
+              "y": 0.220000386,
+              "z": 0.2675765
+            },
+            {
+              "x": 0.8165013,
+              "y": 0.220000386,
+              "z": 0.213051662
+            }
+          ],
+          "color": {
+            "r": 0.192,
+            "g": 0.701,
+            "b": 0.168
+          },
+          "thickness": 0.006042845
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.816367865,
+              "y": 0.220000386,
+              "z": 0.268709958
+            },
+            {
+              "x": 0.8112991,
+              "y": 0.220000386,
+              "z": 0.214185148
+            }
+          ],
+          "color": {
+            "r": 0.192,
+            "g": 0.701,
+            "b": 0.168
+          },
+          "thickness": 0.006042845
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.837286055,
+              "y": 0.220000386,
+              "z": 0.208463326
+            },
+            {
+              "x": 0.8322173,
+              "y": 0.220000386,
+              "z": 0.153938517
+            }
+          ],
+          "color": {
+            "r": 0.129,
+            "g": 0.694,
+            "b": 0.607
+          },
+          "thickness": 0.006042845
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8320838,
+              "y": 0.220000386,
+              "z": 0.209596813
+            },
+            {
+              "x": 0.827015042,
+              "y": 0.220000386,
+              "z": 0.155072
+            }
+          ],
+          "color": {
+            "r": 0.129,
+            "g": 0.694,
+            "b": 0.607
+          },
+          "thickness": 0.006042845
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8268816,
+              "y": 0.220000386,
+              "z": 0.2107303
+            },
+            {
+              "x": 0.8218128,
+              "y": 0.220000386,
+              "z": 0.15620549
+            }
+          ],
+          "color": {
+            "r": 0.129,
+            "g": 0.694,
+            "b": 0.607
+          },
+          "thickness": 0.006042845
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.821679354,
+              "y": 0.220000386,
+              "z": 0.211863786
+            },
+            {
+              "x": 0.8166106,
+              "y": 0.220000386,
+              "z": 0.157338977
+            }
+          ],
+          "color": {
+            "r": 0.129,
+            "g": 0.694,
+            "b": 0.607
+          },
+          "thickness": 0.006042845
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8164771,
+              "y": 0.220000386,
+              "z": 0.212997273
+            },
+            {
+              "x": 0.811408341,
+              "y": 0.220000386,
+              "z": 0.158472463
+            }
+          ],
+          "color": {
+            "r": 0.129,
+            "g": 0.694,
+            "b": 0.607
+          },
+          "thickness": 0.006042845
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.811274946,
+              "y": 0.220000386,
+              "z": 0.214130759
+            },
+            {
+              "x": 0.8062061,
+              "y": 0.220000386,
+              "z": 0.15960595
+            }
+          ],
+          "color": {
+            "r": 0.129,
+            "g": 0.694,
+            "b": 0.607
+          },
+          "thickness": 0.006042845
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8317261,
+              "y": 0.220000386,
+              "z": 0.152343333
+            },
+            {
+              "x": 0.822413564,
+              "y": 0.220000386,
+              "z": 0.09876209
+            }
+          ],
+          "color": {
+            "r": 0.856,
+            "g": 0.1,
+            "b": 0.094
+          },
+          "thickness": 0.00615130644
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.826557,
+              "y": 0.220000386,
+              "z": 0.154448971
+            },
+            {
+              "x": 0.81724447,
+              "y": 0.220000386,
+              "z": 0.100867733
+            }
+          ],
+          "color": {
+            "r": 0.856,
+            "g": 0.1,
+            "b": 0.094
+          },
+          "thickness": 0.00615130644
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8213879,
+              "y": 0.220000386,
+              "z": 0.156554624
+            },
+            {
+              "x": 0.8120754,
+              "y": 0.220000386,
+              "z": 0.102973379
+            }
+          ],
+          "color": {
+            "r": 0.856,
+            "g": 0.1,
+            "b": 0.094
+          },
+          "thickness": 0.00615130644
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.816218734,
+              "y": 0.220000386,
+              "z": 0.158660263
+            },
+            {
+              "x": 0.8069063,
+              "y": 0.220000386,
+              "z": 0.105079025
+            }
+          ],
+          "color": {
+            "r": 0.856,
+            "g": 0.1,
+            "b": 0.094
+          },
+          "thickness": 0.00615130644
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.81104964,
+              "y": 0.220000386,
+              "z": 0.160765916
+            },
+            {
+              "x": 0.8017371,
+              "y": 0.220000386,
+              "z": 0.107184671
+            }
+          ],
+          "color": {
+            "r": 0.856,
+            "g": 0.1,
+            "b": 0.094
+          },
+          "thickness": 0.00615130644
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.805880547,
+              "y": 0.220000386,
+              "z": 0.162871554
+            },
+            {
+              "x": 0.796568036,
+              "y": 0.220000386,
+              "z": 0.109290317
+            }
+          ],
+          "color": {
+            "r": 0.856,
+            "g": 0.1,
+            "b": 0.094
+          },
+          "thickness": 0.00615130644
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8224294,
+              "y": 0.220000386,
+              "z": 0.09875423
+            },
+            {
+              "x": 0.8131169,
+              "y": 0.220000386,
+              "z": 0.0451729819
+            }
+          ],
+          "color": {
+            "r": 0.96,
+            "g": 0.439,
+            "b": 0.807
+          },
+          "thickness": 0.00615130644
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.817260265,
+              "y": 0.220000386,
+              "z": 0.100859873
+            },
+            {
+              "x": 0.8079478,
+              "y": 0.220000386,
+              "z": 0.0472786278
+            }
+          ],
+          "color": {
+            "r": 0.96,
+            "g": 0.439,
+            "b": 0.807
+          },
+          "thickness": 0.00615130644
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8120912,
+              "y": 0.220000386,
+              "z": 0.102965519
+            },
+            {
+              "x": 0.802778661,
+              "y": 0.220000386,
+              "z": 0.0493842736
+            }
+          ],
+          "color": {
+            "r": 0.96,
+            "g": 0.439,
+            "b": 0.807
+          },
+          "thickness": 0.00615130644
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8069221,
+              "y": 0.220000386,
+              "z": 0.105071165
+            },
+            {
+              "x": 0.797609568,
+              "y": 0.220000386,
+              "z": 0.05148992
+            }
+          ],
+          "color": {
+            "r": 0.96,
+            "g": 0.439,
+            "b": 0.807
+          },
+          "thickness": 0.00615130644
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.801753,
+              "y": 0.220000386,
+              "z": 0.107176811
+            },
+            {
+              "x": 0.7924405,
+              "y": 0.220000386,
+              "z": 0.0535955653
+            }
+          ],
+          "color": {
+            "r": 0.96,
+            "g": 0.439,
+            "b": 0.807
+          },
+          "thickness": 0.00615130644
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.796583831,
+              "y": 0.220000386,
+              "z": 0.109282456
+            },
+            {
+              "x": 0.7872714,
+              "y": 0.220000386,
+              "z": 0.05570121
+            }
+          ],
+          "color": {
+            "r": 0.96,
+            "g": 0.439,
+            "b": 0.807
+          },
+          "thickness": 0.00615130644
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.812228441,
+              "y": 0.220000386,
+              "z": 0.0435764454
+            },
+            {
+              "x": 0.799814,
+              "y": 0.220000386,
+              "z": -0.008641618
+            }
+          ],
+          "color": {
+            "r": 0.118,
+            "g": 0.53,
+            "b": 1.0
+          },
+          "thickness": 0.006073834
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.807265341,
+              "y": 0.220000386,
+              "z": 0.0463419557
+            },
+            {
+              "x": 0.7948509,
+              "y": 0.220000386,
+              "z": -0.00587610947
+            }
+          ],
+          "color": {
+            "r": 0.118,
+            "g": 0.53,
+            "b": 1.0
+          },
+          "thickness": 0.006073834
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.8023023,
+              "y": 0.220000386,
+              "z": 0.0491074622
+            },
+            {
+              "x": 0.7898878,
+              "y": 0.220000386,
+              "z": -0.00311060017
+            }
+          ],
+          "color": {
+            "r": 0.118,
+            "g": 0.53,
+            "b": 1.0
+          },
+          "thickness": 0.006073834
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.7973392,
+              "y": 0.220000386,
+              "z": 0.0518729724
+            },
+            {
+              "x": 0.784924746,
+              "y": 0.220000386,
+              "z": -0.000345091
+            }
+          ],
+          "color": {
+            "r": 0.118,
+            "g": 0.53,
+            "b": 1.0
+          },
+          "thickness": 0.006073834
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.792376161,
+              "y": 0.220000386,
+              "z": 0.0546384826
+            },
+            {
+              "x": 0.779961646,
+              "y": 0.220000386,
+              "z": 0.0024204182
+            }
+          ],
+          "color": {
+            "r": 0.118,
+            "g": 0.53,
+            "b": 1.0
+          },
+          "thickness": 0.006073834
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.787413061,
+              "y": 0.220000386,
+              "z": 0.0574039929
+            },
+            {
+              "x": 0.7749986,
+              "y": 0.220000386,
+              "z": 0.00518592726
+            }
+          ],
+          "color": {
+            "r": 0.118,
+            "g": 0.53,
+            "b": 1.0
+          },
+          "thickness": 0.006073834
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.799778938,
+              "y": 0.220000386,
+              "z": -0.008527512
+            },
+            {
+              "x": 0.7873645,
+              "y": 0.220000386,
+              "z": -0.0607455745
+            }
+          ],
+          "color": {
+            "r": 0.627,
+            "g": 0.125,
+            "b": 0.941
+          },
+          "thickness": 0.006073834
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.7948159,
+              "y": 0.220000386,
+              "z": -0.005762002
+            },
+            {
+              "x": 0.782401443,
+              "y": 0.220000386,
+              "z": -0.0579800643
+            }
+          ],
+          "color": {
+            "r": 0.627,
+            "g": 0.125,
+            "b": 0.941
+          },
+          "thickness": 0.006073834
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.7898528,
+              "y": 0.220000386,
+              "z": -0.002996493
+            },
+            {
+              "x": 0.777438343,
+              "y": 0.220000386,
+              "z": -0.0552145578
+            }
+          ],
+          "color": {
+            "r": 0.627,
+            "g": 0.125,
+            "b": 0.941
+          },
+          "thickness": 0.006073834
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.784889758,
+              "y": 0.220000386,
+              "z": -0.000230983729
+            },
+            {
+              "x": 0.772475243,
+              "y": 0.220000386,
+              "z": -0.0524490476
+            }
+          ],
+          "color": {
+            "r": 0.627,
+            "g": 0.125,
+            "b": 0.941
+          },
+          "thickness": 0.006073834
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.779926658,
+              "y": 0.220000386,
+              "z": 0.00253452547
+            },
+            {
+              "x": 0.7675122,
+              "y": 0.220000386,
+              "z": -0.0496835373
+            }
+          ],
+          "color": {
+            "r": 0.627,
+            "g": 0.125,
+            "b": 0.941
+          },
+          "thickness": 0.006073834
+        },
+        {
+          "OwnerSteamID": 0,
+          "points3": [
+            {
+              "x": 0.774963558,
+              "y": 0.220000386,
+              "z": 0.005300035
+            },
+            {
+              "x": 0.7625491,
+              "y": 0.220000386,
+              "z": -0.04691803
+            }
+          ],
+          "color": {
+            "r": 0.627,
+            "g": 0.125,
+            "b": 0.941
+          },
+          "thickness": 0.006073834
+        }
+      ],
+      "XmlUI": ""
+    },
+    {
+      "GUID": "fa49e3",
+      "Name": "BlockRectangle",
+      "Transform": {
+        "posX": 9.532738,
+        "posY": 1.97000039,
+        "posZ": -24.8876228,
+        "rotX": 0.0,
+        "rotY": 0.0,
+        "rotZ": 0.0,
+        "scaleX": 11.6,
+        "scaleY": 2.0,
+        "scaleZ": 0.15
+      },
+      "Nickname": "Dice tray",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.119999953,
+        "g": 0.129999965,
+        "b": 0.149999976
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": true,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": ""
+    },
+    {
+      "GUID": "e65059",
+      "Name": "BlockRectangle",
+      "Transform": {
+        "posX": 9.532738,
+        "posY": 1.97000039,
+        "posZ": -17.5876236,
+        "rotX": 0.0,
+        "rotY": 0.0,
+        "rotZ": 0.0,
+        "scaleX": 11.6,
+        "scaleY": 2.0,
+        "scaleZ": 0.15
+      },
+      "Nickname": "Dice tray",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.119999953,
+        "g": 0.129999965,
+        "b": 0.149999976
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": true,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": ""
+    },
+    {
+      "GUID": "fe5c35",
+      "Name": "BlockRectangle",
+      "Transform": {
+        "posX": 3.88273764,
+        "posY": 1.97000039,
+        "posZ": -21.2376232,
+        "rotX": 0.0,
+        "rotY": 0.0,
+        "rotZ": 0.0,
+        "scaleX": 0.3,
+        "scaleY": 2.0,
+        "scaleZ": 3.5
+      },
+      "Nickname": "Dice tray",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.119999953,
+        "g": 0.129999965,
+        "b": 0.149999976
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": true,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": ""
+    },
+    {
+      "GUID": "044cc0",
+      "Name": "BlockRectangle",
+      "Transform": {
+        "posX": 15.1827374,
+        "posY": 1.97000039,
+        "posZ": -21.2376232,
+        "rotX": 0.0,
+        "rotY": 0.0,
+        "rotZ": 0.0,
+        "scaleX": 0.3,
+        "scaleY": 2.0,
+        "scaleZ": 3.5
+      },
+      "Nickname": "Dice tray",
+      "Description": "",
+      "GMNotes": "",
+      "AltLookAngle": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ColorDiffuse": {
+        "r": 0.119999953,
+        "g": 0.129999965,
+        "b": 0.149999976
+      },
+      "LayoutGroupSortIndex": 0,
+      "Value": 0,
+      "Locked": true,
+      "Grid": true,
+      "Snap": true,
+      "IgnoreFoW": false,
+      "MeasureMovement": false,
+      "DragSelectable": true,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "XmlUI": ""
+    }
+  ]
+}
