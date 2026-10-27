@@ -2174,25 +2174,17 @@ function T.the_setup_menu_shows_from_the_load()
     assert(S.ui.fds_drivers.value:find("none yet"), S.ui.fds_drivers.value)
 end
 
-function T.report_it_puts_the_issue_tracker_on_a_tablet()
+function T.report_shows_the_issue_link_to_copy()
     local S = world()
     eq(byId(S.xml).fds_issue.attributes.onClick, "fdReportIssue", "on the setup menu")
     fdReportIssue(Player.Red)
-    local tablet = S.find("Tablet")
-    assert(tablet, "a tablet")
-    eq(tablet.Browser.url, "https://github.com/c4tachan/tts-formula-d-2.0/issues")
-    eq(tablet.pos.z, -38 + 15, "in front of the seat, past the dashboard")
-    eq(tablet.rot.y, 0, "facing the seat")
+    eq(Player.Red.dialog[2], "https://github.com/c4tachan/tts-formula-d-2.0/issues", "in a box to copy")
 
-    local saved = onSave()
-    onLoad(saved)
-    fdReportIssue(Player.Red)
-    eq(S.count("Tablet"), 0, "again puts it away, after a load too")
-
-    S.player("Grey", S.vec(0, 1, 0)).seated = false
-    fdReportIssue(Player.Grey)
-    eq(S.count("Tablet"), 0, "a spectator has no seat to put one at")
-    assert(S.logged("Report a bug or an idea at https://github.com/"), "so gets the link")
+    -- A TTS without the box: asking for it throws, so the link goes to chat.
+    Player.Blue.showInputDialog = nil
+    setmetatable(Player.Blue, { __index = function(_, k) error("no member " .. k) end })
+    fdReportIssue(Player.Blue)
+    assert(S.logged("Report a bug or an idea at https://github.com/"), "or in chat")
 end
 
 function T.the_board_panels_buttons_reach_global()

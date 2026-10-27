@@ -137,7 +137,7 @@ function Setup.panel(maps, rulesets)
                 text(nil, "Found a bug, or have an idea?", { fontSize = "12", color = DIM, flexibleWidth = "1" }),
                 -- Shows the link to copy (fdReportIssue): TTS opens no browser.
                 button("fds_issue", "Report it", "fdReportIssue", {
-                    preferredWidth = "110", tooltip = "Get the link to the issue tracker on GitHub",
+                    preferredWidth = "110", tooltip = "The link to the issue tracker on GitHub, to copy",
                 }),
             }),
         }),

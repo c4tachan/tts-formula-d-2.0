@@ -79,7 +79,6 @@ local turnsSet = nil
 local undo = {}
 local joining = {} -- steam id -> true from connecting until moved to the spectators (see bench)
 local rulebooks = {} -- colour -> guid of the rulebook out for them (fdRules)
-local tablets = {} -- colour -> guid of the issue tracker tablet out for them (fdReportIssue)
 local UNDO_LIMIT = 30
 
 --- One roll of the black die, made by the script: only when the die itself
@@ -203,7 +202,6 @@ function onLoad(saved_data)
     race.autoRolls = true
     damagePieces = saved.damage or {}
     rulebooks = saved.books or {}
-    tablets = saved.tablets or {}
     turnsSet = nil
     Dice.prepareAll()
     Dashboard.scan()
@@ -301,8 +299,6 @@ function onSave()
         damage = damagePieces,
         -- The rulebooks players have out, by colour.
         books = rulebooks,
-        -- The issue tracker tablets out, by colour.
-        tablets = tablets,
         -- Editor markers out on the board; removed on load (see Editor.load).
         markers = (function()
             local out = Editor.markerGuids()
@@ -1538,14 +1534,11 @@ end
 
 --- The race distance field on the setup menu. Anything but a whole number
 -- of laps from 1 up is put back to the distance the race has.
--- How far in front of the hand zone the issue tracker's tablet goes: past
--- the dashboard, at the board's edge, for as long as it is out.
-local TABLET_AHEAD = 15
-
---- The issue tracker's link in a box `player` can copy it from. Should this
--- TTS have no such box -- asking for a missing method throws -- it goes to
--- their chat instead.
-local function showIssueLink(player)
+--- The Report buttons, on the setup menu and the race panel: TTS opens no
+-- browser, so the issue tracker's link goes in a box the player can copy it
+-- from. Should this TTS have no such box -- asking for a missing method
+-- throws -- it goes to their chat instead.
+function fdReportIssue(player)
     local shown = pcall(function()
         player.showInputDialog("Copy this link into your browser to report a bug or suggest an idea:",
             Setup.REPO, function() end)
@@ -1553,42 +1546,6 @@ local function showIssueLink(player)
     if not shown then
         broadcastToColor("Report a bug or an idea at " .. Setup.REPO, player.color, LEVEL_RGB.info)
     end
-end
-
---- The Report it buttons, on the setup menu and the race panel: a tablet --
--- TTS's web browser, the same page for everyone -- in front of the
--- clicker's seat showing the issue tracker, or put away the one they have
--- out. A spectator, or a TTS whose tablet will not take the page, gets the
--- link to copy instead.
-function fdReportIssue(player)
-    local color = player.color
-    local out = tablets[color] and getObjectFromGUID(tablets[color])
-    tablets[color] = nil
-    if out then
-        out.destruct()
-        return
-    end
-    local hand = SEATS[color] and player.getHandTransform()
-    if not hand then
-        showIssueLink(player)
-        return
-    end
-    local yaw = hand.rotation and hand.rotation.y or 0
-    local ix, iz = math.sin(math.rad(yaw)), math.cos(math.rad(yaw))
-    local p = hand.position
-    spawnObject({
-        type = "Tablet",
-        position = { x = p.x + ix * TABLET_AHEAD, y = DROP_Y, z = p.z + iz * TABLET_AHEAD },
-        rotation = { x = 0, y = yaw, z = 0 },
-        callback_function = function(tablet)
-            if pcall(function() tablet.Browser.url = Setup.REPO end) then
-                tablets[color] = tablet.getGUID()
-            else
-                tablet.destruct()
-                showIssueLink(player)
-            end
-        end,
-    })
 end
 
 function fdSetupLaps(player, value)

@@ -293,8 +293,6 @@ function spawnObject(params)
         rot = vec(r.x or r[1] or 0, r.y or r[2] or 0, r.z or r[3] or 0),
         scale = params.scale,
     })
-    -- A tablet is a web browser.
-    if params.type == "Tablet" then o.Browser = { url = "" } end
     if params.callback_function then params.callback_function(o) end
     return o
 end
@@ -348,6 +346,8 @@ function Stub.player(color, handPos, admin)
         broadcast = function(msg) Stub.log[#Stub.log + 1] = "broadcast to " .. p.color .. ": " .. msg end,
         getPointerPosition = function() return p.pointer or vec(0, 1, 0) end,
         getHandObjects = function() return p.hand or {} end,
+        -- The last input box shown to the player: { description, text }.
+        showInputDialog = function(description, text) p.dialog = { description, text } end,
         -- The hand zone faces into the table, square to its nearest edge.
         getHandTransform = function()
             local yaw = math.deg(math.atan2(-handPos.x, -handPos.z))

@@ -137,10 +137,10 @@ local function racePanel(rules, cols, place, owner)
                 button("fdr_rules_book", "Rules", owner .. "fdRules", {
                     preferredWidth = "64", tooltip = "The rulebook, in front of your seat. Again to put it away.",
                 }),
-                -- Also on the setup menu: the issue tracker (fdReportIssue).
+                -- Also on the setup menu: the issue tracker's link (fdReportIssue).
                 button("fdr_issue", "Report", owner .. "fdReportIssue", {
                     preferredWidth = "64",
-                    tooltip = "Report a bug or an idea: the issue tracker on a tablet. Again to put it away.",
+                    tooltip = "Report a bug or an idea: the link to the issue tracker",
                 }),
             }),
             text("fdr_rules", rules.name, { fontSize = "12", color = "#AAB0B8", preferredHeight = "16" }),
