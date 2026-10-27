@@ -376,6 +376,99 @@ function T.the_setup_menu_chooses_the_map()
     assert(S.ui.fds_map.value:find("Austin"), "and the menu says so")
 end
 
+--- Every element with an id in `nodes`, by id.
+local function byId(nodes, out)
+    out = out or {}
+    for _, node in ipairs(nodes or {}) do
+        if node.attributes and node.attributes.id then out[node.attributes.id] = node end
+        byId(node.children, out)
+    end
+    return out
+end
+
+local ADVANCED = "Formula D advanced rules"
+
+function T.the_host_picks_the_rules_on_the_setup_menu()
+    local S = world()
+    joinRace("Red", S.beginner)
+    local list = byId(S.xml).fds_rulesets
+    assert(list, "a rules list on the setup menu")
+    eq(list.children[1].attributes.selected, "true", "the basic rules to begin with")
+    eq(list.children[2].value, ADVANCED)
+
+    fdSetupRules(Player.Blue, ADVANCED)
+    eq(state().rules, "beginner", "only the host chooses")
+    fdSetupRules(Player.Red, ADVANCED)
+    eq(state().rules, "advanced")
+    assert(S.logged("picks the " .. ADVANCED))
+    eq(state().cars.Red.wear.tires, 6, "Red starts afresh in the six zones")
+    eq(state().cars.Red.wear.wp, nil)
+    -- Red's dashboard is turned to the advanced face, a marker in each zone.
+    eq(S.beginner.up.y > 0, true, "flipped over")
+    assert(not S.logged("Flip your dashboard"), "by the script: nobody is told to")
+    eq(S.count("Wear Tracker"), 6)
+    assert(S.beginner.buttons[1].label:find("T6 B3 G3 C3 E3 S2"), S.beginner.buttons[1].label)
+    -- The screen dashboard and the standings show the zones.
+    local ui = byId(S.xml)
+    assert(ui.fdm_Red_tiresMark and ui.fdm_Red_handlingMark, "a marker per zone on screen")
+    assert(ui.fdm_Red_tires14, "the advanced face's 14 tire slots")
+    eq(ui.fdm_Red_wpMark, nil)
+    assert(byId(S.board.xml).fdr_r1_w_tires, "a standings column per zone")
+    eq(S.ui.fds_rules.value:find(ADVANCED, 1, true) ~= nil, true, "the menu says which rules")
+
+    fdUndo(Player.Red)
+    eq(state().rules, "beginner", "Undo takes the choice back")
+    eq(state().cars.Red.wear.wp, 18)
+    eq(S.beginner.up.y < 0, true, "and turns the dashboard back")
+    assert(not S.logged("Flip your dashboard"))
+    eq(S.count("Wear Tracker"), 1)
+    assert(byId(S.xml).fdm_Red_wpMark)
+end
+
+function T.each_zone_is_set_on_its_own_under_the_advanced_rules()
+    local S = world()
+    joinRace("Red", S.beginner)
+    fdSetupRules(Player.Red, ADVANCED)
+    fdUiWear(Player.Red, "brakes:1")
+    eq(state().cars.Red.wear.brakes, 1, "clicked on the screen dashboard")
+    eq(state().cars.Red.wear.tires, 6, "the other zones as they were")
+    local tires = getObjectFromGUID(state().cars.Red.tts.markers.wear.tires)
+    dropOn(S, tires, "tires", 4)
+    eq(state().cars.Red.wear.tires, 4, "the tire marker moved on the dashboard")
+    eq(state().cars.Red.wear.brakes, 1)
+    -- Clicking the number a zone is on takes one off: down to 0, where it
+    -- says what that means, and its marker is put away.
+    fdUiWear(Player.Red, "gearbox:3")
+    eq(state().cars.Red.wear.gearbox, 2)
+    fdUiWear(Player.Red, "gearbox:1")
+    fdUiWear(Player.Red, "gearbox:1")
+    eq(state().cars.Red.wear.gearbox, 0)
+    assert(S.beginner.buttons[1].label:find("no gearbox WP: one gear down at a time"), S.beginner.buttons[1].label)
+    eq(state().cars.Red.tts.markers.wear.gearbox, nil)
+    eq(S.ui.fdm_Red_gearboxMark.active, "false")
+    -- No WP -1/+1 button: there is no one pool of WP.
+    for _, b in ipairs(S.beginner.buttons) do
+        assert(b.click_function ~= "fdDashWear", "no WP button on the advanced face")
+    end
+end
+
+function T.the_rules_are_not_changed_during_a_race()
+    local S = redRacing()
+    fdSetupRules(Player.Red, ADVANCED)
+    eq(state().rules, "beginner")
+end
+
+function T.a_game_saved_under_the_advanced_rules_loads_under_them()
+    local S = world()
+    joinRace("Red", S.beginner)
+    fdSetupRules(Player.Red, ADVANCED)
+    local saved = onSave()
+    onLoad(saved)
+    eq(state().rules, "advanced")
+    eq(byId(S.xml).fds_rulesets.children[2].attributes.selected, "true")
+    assert(byId(S.xml).fdm_Red_tiresMark)
+end
+
 function T.the_start_falls_back_on_the_spare_dice_set()
     local S = world()
     local names = packDice(S)
@@ -1041,18 +1134,21 @@ function T.an_icon_lies_face_up_on_its_space()
     assert(math.abs(d.position.x - mid.x) < 1e-9 and math.abs(d.position.z - mid.z) < 1e-9, "on the space")
     assert(d.position.y > mid.y, "over the lines")
     eq(d.rotation[1], 90, "face up")
-    -- A badge rides ahead of the icon it is on.
-    decals = Track.marks(S.board, FDMonaco, { { id = id, kind = "brake", badge = "collision" } })
-    eq(#decals, 2)
+    -- Badges ride ahead of the icon they are on, side by side.
+    decals = Track.marks(S.board, FDMonaco, { { id = id, kind = "brake", badges = { "collision", "damage" } } })
+    eq(#decals, 3)
     eq(decals[2].name, "collision")
+    eq(decals[3].name, "damage")
     assert(decals[2].scale[1] < decals[1].scale[1], "smaller")
+    local apart = (decals[2].position.x - decals[3].position.x) ^ 2 + (decals[2].position.z - decals[3].position.z) ^ 2
+    assert(apart > 0, "not on top of each other")
 end
 
 function T.every_icon_the_board_can_show_is_drawn()
     local Icons = require("fd.data.icons")
     local listed = {}
     for _, n in ipairs(Icons.names) do listed[n] = true end
-    local wanted = { "clean", "brake", "overshoot", "collision", "out", "blocked" }
+    local wanted = { "clean", "brake", "overshoot", "collision", "out", "blocked", "spin", "damage", "slipstream" }
     for _, seat in ipairs({ "White", "Brown", "Red", "Orange", "Yellow", "Green", "Teal", "Blue", "Purple", "Pink" }) do
         wanted[#wanted + 1] = "start-" .. seat
     end
@@ -2011,7 +2107,7 @@ function T.only_the_host_can_use_the_race_controls()
     for _, node in ipairs(S.xml) do walk(node, node.attributes.id) end
     for _, node in ipairs(S.board.xml) do walk(node, node.attributes.id) end
     eq(rows.fdr, 1, "Undo, on the race panel, is the host's")
-    eq(rows.fds, 4, "as are the setup menu's choices, Start race, the track tools and the editor line")
+    eq(rows.fds, 5, "as are the setup menu's choices, the rules, Start race, the track tools and the editor line")
 
     -- A click that gets through anyway does nothing.
     joinRace("Blue", S.advanced)
@@ -2514,6 +2610,69 @@ function T.the_map_cannot_change_during_the_grid_roll()
     onLoad(saved)
     fdSetupMap(Player.Red, "Formula D: Austin  (no track data)")
     eq(S.board.custom.image, Maps.byId.FDMonaco.url)
+end
+
+function T.a_race_runs_under_the_advanced_rules()
+    local S, red, blue = twoCars()
+    fdSetupRules(Player.Red, "Formula D advanced rules")
+    gridRoll(S, { Red = 4, Blue = 15 }) -- Blue on pole
+    fdStart(Player.Red)
+    eq(state().phase, "race")
+    assert(S.logged("BluePlayer rolls 10 on the black die %(start%): normal start"))
+    fdUiShift(Player.Blue, "1")
+    roll(S, 1, 2, "Blue")
+    moveOn(S, blue, "Blue")
+    eq(state().cars.Blue.wear.tires, 6, "a full roll costs nothing")
+    assert(S.logged("RedPlayer rolls 10 on the black die %(start%)"), "then Red's start")
+    fdUiShift(Player.Red, "1")
+    roll(S, 1, 1)
+    moveOn(S, red, "Red")
+    eq(state().round, 2)
+    eq(S.ui.fdr_r1_w_tires.value, "6", "the standings show each zone")
+    assert(S.advanced.buttons[1].label:find("T6 B3 G3 C3 E3 S2"), S.advanced.buttons[1].label)
+end
+
+function T.damage_markers_go_on_the_board_and_follow_the_hand()
+    local S = twoCars()
+    S.object("Damage Marker Bag", { guid = "bbc10d", spawns = "Damage Marker" })
+    fdSetupRules(Player.Red, "Formula D advanced rules")
+    gridRoll(S, { Red = 4, Blue = 15 })
+    fdStart(Player.Red)
+    -- Blue, on pole, calls a collision check and rolls a 1.
+    local random = math.random
+    math.random = function(m, n)
+        if m == 20 and n == nil then return 1 end
+        return random(m, n)
+    end
+    fdUiCollision(Player.Blue)
+    math.random = random
+    eq(state().cars.Blue.wear.body, 2)
+    local d = state().damage
+    eq(#d, 1)
+    eq(d[1].space, state().cars.Blue.space, "where Blue is")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local Track = require("fd.tts.track")
+    local piece = S.find("Damage Marker")
+    assert(piece, "a piece out of the bag")
+    eq(piece.locked, true, "locked flat, for the car to sit over")
+    local s = FDMonaco.byId[d[1].space]
+    local at = Track.worldOf(S.board, FDMonaco, s.pos[1], s.pos[2])
+    assert(math.abs(piece.pos.x - at.x) < 0.01 and math.abs(piece.pos.z - at.z) < 0.01, "on its space")
+
+    -- Moved by hand onto another space, it counts there.
+    local other = FDMonaco.byId[FDMonaco.start[5]]
+    piece.pos = Track.worldOf(S.board, FDMonaco, other.pos[1], other.pos[2])
+    onObjectDrop("Blue", piece)
+    eq(state().damage[1].space, other.id)
+    -- Deleted by hand, it is gone from the track; Undo brings it back.
+    piece.destruct()
+    eq(#state().damage, 0)
+    fdUndo(Player.Red)
+    eq(#state().damage, 1)
+    eq(S.count("Damage Marker"), 1, "a fresh piece for it")
+    -- A reset clears the track.
+    fdReset(Player.Red)
+    eq(S.count("Damage Marker"), 0)
 end
 
 return T

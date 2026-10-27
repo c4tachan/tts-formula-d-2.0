@@ -50,16 +50,25 @@ local MAX_ROWS = 10
 local ROW_HEIGHT = 18
 local PANEL_HEIGHT = 360
 
+-- Width of a wear column: one zone headed by its name, or one of several
+-- headed by its letter (the name in its tooltip).
+local ZONE_WIDTH = 36
+local ZONES_WIDTH = 18
+
 --- The standings columns: width 0 takes what the others leave. A column per
--- wear zone, headed with its name, so the cells need no unit.
+-- wear zone, so the cells need no unit.
 local function columns(rules)
     local cols = {
         { id = "pos", head = "#", width = 22, align = "MiddleRight" },
         { id = "driver", head = "Driver", width = 0 },
         { id = "gear", head = "Gear", width = 40 },
     }
+    local several = #rules.zones > 1
     for _, z in ipairs(rules.zones) do
-        cols[#cols + 1] = { id = "w_" .. z.id, head = z.name, width = 36, zone = z.id, align = "MiddleRight" }
+        cols[#cols + 1] = {
+            id = "w_" .. z.id, head = several and (z.short or z.name) or z.name, tip = z.name,
+            width = several and ZONES_WIDTH or ZONE_WIDTH, zone = z.id, align = "MiddleRight",
+        }
     end
     cols[#cols + 1] = { id = "lap", head = "Lap", width = 36 }
     cols[#cols + 1] = { id = "roll", head = "Roll", width = 34, align = "MiddleRight" }
@@ -76,7 +85,7 @@ local function standingsTable(cols)
     for i, c in ipairs(cols) do
         widths[i] = tostring(c.width)
         head[i] = el("Cell", nil, {
-            text(nil, c.head, { fontSize = "12", color = "#AAB0B8", alignment = c.align or "MiddleLeft" }),
+            text(nil, c.head, { fontSize = "12", color = "#AAB0B8", alignment = c.align or "MiddleLeft", tooltip = c.tip }),
         })
     end
     local rows = { el("Row", { preferredHeight = tostring(ROW_HEIGHT) }, head) }
@@ -96,7 +105,17 @@ local function standingsTable(cols)
     }, rows)
 end
 
+-- With one wear column; each more widens it.
 local PANEL_WIDTH = 380
+
+--- The panel's width for the columns `cols`.
+local function panelWidth(cols)
+    local w = PANEL_WIDTH - ZONE_WIDTH
+    for _, c in ipairs(cols) do
+        if c.zone then w = w + c.width end
+    end
+    return w
+end
 
 -- On the screen: where it was before it went on the board.
 local ON_SCREEN = {
@@ -106,7 +125,7 @@ local ON_SCREEN = {
 
 --- The panel, placed by `place` (ON_SCREEN or from placement).
 local function racePanel(rules, cols, place)
-    local attrs = { id = "fdr", width = tostring(PANEL_WIDTH), height = tostring(PANEL_HEIGHT), color = PANEL_BG }
+    local attrs = { id = "fdr", width = tostring(panelWidth(cols)), height = tostring(PANEL_HEIGHT), color = PANEL_BG }
     for k, v in pairs(place) do attrs[k] = v end
     return el("Panel", attrs, {
         el("VerticalLayout", { padding = "8 8 6 6", spacing = "4", childForceExpandHeight = "false" }, {
@@ -135,9 +154,9 @@ end
 -- panel reads the same way up as the picture.
 local UI_PER_LOCAL = 100
 
---- Where the panel goes on `tile` for `track`, or nil if the track names no
--- spot for it.
-local function placement(tile, track)
+--- Where the panel with the columns `cols` goes on `tile` for `track`, or
+-- nil if the track names no spot for it.
+local function placement(tile, track, cols)
     local spot = track and track.panel
     if not spot then
         return nil
@@ -145,7 +164,7 @@ local function placement(tile, track)
     local f = Track.frame(tile, track)
     local scale = tile.getScale()
     local l = Track.localIn(f, spot.pos[1], spot.pos[2])
-    local unit = spot.width * f.world / PANEL_WIDTH -- world units per UI unit
+    local unit = spot.width * f.world / panelWidth(cols) -- world units per UI unit
     return {
         position = string.format("%.1f %.1f %.1f", l.x * UI_PER_LOCAL, l.z * UI_PER_LOCAL, -l.y * UI_PER_LOCAL),
         scale = string.format("%.4f %.4f 1", unit * UI_PER_LOCAL / scale.x, unit * UI_PER_LOCAL / scale.z),
@@ -174,7 +193,7 @@ function Hud.build(rules, extras, tile, track, onReady)
     -- with the old elements yet remembered by fd.tts.ui, and the refresh in
     -- onReady would then skip them as repeats.
     ready = false
-    local place = tile and placement(tile, track)
+    local place = tile and placement(tile, track, cols)
     local function placePanel()
         if not place then
             -- Take a panel left on the board off it. Only if there is one:
@@ -227,10 +246,15 @@ function Hud.hold()
     Ui.route("fdr", nil)
 end
 
+--- "12 WP", or with several zones each by its letter: "T5 B3 G2 C3 E3 S2".
 local function wearSummary(race, car)
+    local zones = race.rules.zones
+    if #zones == 1 then
+        return math.max(0, car.wear[zones[1].id] or 0) .. " " .. zones[1].name
+    end
     local parts = {}
-    for _, z in ipairs(race.rules.zones) do
-        parts[#parts + 1] = math.max(0, car.wear[z.id]) .. " " .. z.name
+    for _, z in ipairs(zones) do
+        parts[#parts + 1] = (z.short or z.name) .. math.max(0, car.wear[z.id] or 0)
     end
     return table.concat(parts, " ")
 end
@@ -245,8 +269,10 @@ local function carCells(race, car, i, due, laps)
         cells.status = { "finished", "#FFD740" }
     else
         cells.gear = { car.gear > 0 and Race.gearName(car.gear) or "grid" }
+        -- A zone worn away that the car races on without stands out.
         for _, z in ipairs(race.rules.zones) do
-            cells["w_" .. z.id] = { tostring(math.max(0, car.wear[z.id])) }
+            local left = math.max(0, car.wear[z.id] or 0)
+            cells["w_" .. z.id] = { tostring(left), left == 0 and "#FFB74D" or nil }
         end
         if laps > 1 and car.lap > 0 then
             cells.lap = { math.min(car.lap, laps) .. "/" .. laps }

@@ -137,6 +137,11 @@ local function cellLength(track)
     return c
 end
 
+--- How long a space is on the board, in world units, by the frame `f`.
+function Track.cellWorld(f, track)
+    return cellLength(track) * f.world
+end
+
 --- The space nearest `world`, within `reach` cells of it, skipping any id
 -- listed in `taken`. Returns the space and the frame, or nil.
 function Track.spaceNear(tile, f, track, world, reach, taken)
@@ -266,12 +271,12 @@ end
 -- about 45 long, its lanes 34 apart). A braking move can end on most of the
 -- spaces a roll passes, so those are small.
 local ICON_SIZE = {
-    clean = 24, collision = 24, overshoot = 24, out = 24,
+    clean = 24, collision = 24, overshoot = 24, out = 24, spin = 24,
     brake = 16, blocked = 18, start = 26,
 }
--- A second icon on a space -- the collision check that comes with braking
--- or overshooting there -- is a badge this wide, this far ahead of the
--- space's middle along the way the track runs.
+-- More icons on a space -- the collision check that comes with braking or
+-- overshooting there, damage markers on the way, a slipstream -- are badges
+-- this wide, in a row across the track this far ahead of the space's middle.
 local BADGE_SIZE, BADGE_AHEAD = 14, 15
 
 --- The decal of icon `name` (see Icons.names), `size` image pixels across,
@@ -290,9 +295,9 @@ local function decal(f, name, px, py, size)
     }
 end
 
---- An icon on each space listed in `marks`: { id, kind, badge }, where
+--- An icon on each space listed in `marks`: { id, kind, badges }, where
 -- `kind` names the icon (a key of ICON_SIZE; "start" takes `color`, the
--- seat) and `badge`, if given, a second one ahead of it.
+-- seat) and `badges`, if given, lists more to put ahead of it.
 function Track.marks(tile, track, marks)
     local f = Track.frame(tile, track)
     local byId = {}
@@ -303,10 +308,13 @@ function Track.marks(tile, track, marks)
         if s and size then
             local name = m.kind == "start" and ("start-" .. m.color) or m.kind
             decals[#decals + 1] = decal(f, name, s.pos[1], s.pos[2], size)
-            if m.badge then
-                local a = math.rad(s.rot)
-                decals[#decals + 1] = decal(f, m.badge, s.pos[1] + BADGE_AHEAD * math.cos(a),
-                    s.pos[2] + BADGE_AHEAD * math.sin(a), BADGE_SIZE)
+            local badges = m.badges or {}
+            local a = math.rad(s.rot)
+            local ax, ay = math.cos(a), math.sin(a)
+            for i, b in ipairs(badges) do
+                local across = (i - (#badges + 1) / 2) * BADGE_SIZE
+                decals[#decals + 1] = decal(f, b, s.pos[1] + BADGE_AHEAD * ax - across * ay,
+                    s.pos[2] + BADGE_AHEAD * ay + across * ax, BADGE_SIZE)
             end
         end
     end

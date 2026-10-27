@@ -158,10 +158,21 @@ end
 function Dashboard.sync(dash, markers, car, rules, tint)
     markers.wear = markers.wear or {}
     markers.gear = place(dash, markers.gear, GEAR_STICK_BAG, "gear", math.max(car.gear, 1), tint)
+    local kept = {}
     for _, z in ipairs(rules.zones) do
-        local value = car.wear[z.id]
+        local value = car.wear[z.id] or 0
         if value >= 1 then
             markers.wear[z.id] = place(dash, markers.wear[z.id], WEAR_MARKER_BAG, z.id, value, tint)
+            kept[z.id] = true
+        end
+    end
+    -- A zone worn to nothing has no marker to show, and nor has one the
+    -- rules do not use: a fresh one comes out of the bag if it is needed.
+    for zone, guid in pairs(markers.wear) do
+        if not kept[zone] then
+            local obj = getObjectFromGUID(guid)
+            if obj then obj.destruct() end
+            markers.wear[zone] = nil
         end
     end
 end

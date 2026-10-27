@@ -179,6 +179,35 @@ def out():
     return pen
 
 
+def spin():
+    """Losing the last tires overshooting: the car spins, a turning arrow."""
+    pen = badge((150, 60, 210, 255))
+    cx, cy, r = 0.5, 0.5, 0.2
+    pen.arc(cx, cy, r, 200, 470, 0.06, WHITE)
+    # The head, at the arc's end (110 degrees on), pointing on round.
+    t = math.radians(110)
+    ex, ey = cx + (r - 0.03) * math.cos(t), cy + (r - 0.03) * math.sin(t)
+    pen.polygon([(ex - 0.11, ey - 0.02), (ex + 0.03, ey - 0.1), (ex + 0.03, ey + 0.07)], WHITE)
+    return pen
+
+
+def damage():
+    """A damage marker on the way, a black die check each: a road warning
+    sign with the road cracked on it."""
+    pen = badge(DARK)
+    pen.polygon([(0.5, 0.2), (0.8, 0.5), (0.5, 0.8), (0.2, 0.5)], (255, 215, 40, 255))
+    pen.line([(0.47, 0.32), (0.55, 0.44), (0.44, 0.53), (0.54, 0.67)], 0.045, DARK)
+    return pen
+
+
+def slipstream():
+    """Further by slipstreaming: fast forward."""
+    pen = badge((30, 135, 255, 255))
+    for x in (0.33, 0.5):
+        pen.line([(x, 0.33), (x + 0.15, 0.5), (x, 0.67)], 0.07, WHITE)
+    return pen
+
+
 def blocked():
     """Somewhere the roll gets to but the move may not end: no entry."""
     pen = badge((215, 30, 30, 255))
@@ -203,6 +232,9 @@ ICONS = {
     "collision": collision,
     "out": out,
     "blocked": blocked,
+    "spin": spin,
+    "damage": damage,
+    "slipstream": slipstream,
 }
 
 

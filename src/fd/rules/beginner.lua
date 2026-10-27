@@ -75,6 +75,23 @@ function Rules.overshootOut(missed)
     return missed >= 2
 end
 
+--- What ending a move as `o` (a Moves.reach option) does to a car that had
+-- `wear` before it: { wear = zone -> points, spin, out = why }. Here the
+-- wear is the same whatever the car has left, and nobody spins.
+function Rules.moveWear(o, wear)
+    local w = {}
+    for _, part in ipairs({ Rules.brakeWear(o.brake or 0), Rules.overshootWear(o.overshoot or 0) }) do
+        for z, pts in pairs(part) do
+            if pts ~= 0 then w[z] = (w[z] or 0) + pts end
+        end
+    end
+    local out = nil
+    if Rules.overshootOut(o.missed or 0) then
+        out = string.format("went through corner %s without its stops", tostring(o.corner))
+    end
+    return { wear = w, out = out }
+end
+
 --- Zones a pit stop restores to their starting value.
 Rules.pitRestores = { "wp" }
 

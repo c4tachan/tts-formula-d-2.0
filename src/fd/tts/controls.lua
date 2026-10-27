@@ -36,11 +36,14 @@ local FACES = {
     beginner = { down = -1, y = -0.55, rotation = { 0, 180, 180 }, xSign = 1 },
 }
 
+-- `face`: only on that face. The advanced face has six zones, each set by
+-- moving its marker.
 local ACTIONS = {
     { fn = "fdDashCar", label = "Car", tip = "Claim the nearest car, or take one from the bag.\nAlso: drop a car on this dashboard." },
     { fn = "fdDashCollision", label = "Collision?", tip = "Ended next to or behind a car: roll the black die" },
-    { fn = "fdDashWear", label = "WP -1 / +1", tip = "Left click: lose 1 WP. Right click: gain 1 WP.\nOr just move your WP marker." },
-    { fn = "fdDashPit", label = "Pit stop", tip = "Made for you when the car stops in its pit box. By hand: restore WP; leave in 4th gear or lower" },
+    { fn = "fdDashWear", label = "WP -1 / +1", tip = "Left click: lose 1 WP. Right click: gain 1 WP.\nOr just move your WP marker.",
+        face = "beginner" },
+    { fn = "fdDashPit", label = "Pit stop", tip = "Made for you when the car stops in its pit box. By hand: restore wear; leave in 4th gear or lower" },
     { fn = "fdDashLeave", label = "Leave", tip = "Take this car out of the race: its driver, or the host" },
 }
 
@@ -66,9 +69,13 @@ local function drawCar(dash, face, tint, orphaned)
         width = 2600, height = 180, font_size = 110,
         color = { 0.08, 0.09, 0.11, 0.85 }, font_color = tint,
     }, face)
-    local count = #ACTIONS
+    local actions = {}
+    for _, a in ipairs(ACTIONS) do
+        if not a.face or a.face == face then actions[#actions + 1] = a end
+    end
+    local count = #actions
     local spacing = 1.75
-    for i, a in ipairs(ACTIONS) do
+    for i, a in ipairs(actions) do
         button(dash, {
             click_function = a.fn, label = a.label, tooltip = a.tip,
             x = FACES[face].xSign * (i - (count + 1) / 2) * spacing, z = rowZ(face, BUTTON_GAP),
