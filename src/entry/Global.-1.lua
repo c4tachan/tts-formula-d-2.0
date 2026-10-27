@@ -1059,14 +1059,19 @@ local SEAT_RANGE = 12
 -- How far in front of the hand zone a fresh dashboard goes.
 local DASH_AHEAD = 3.5
 
--- The quick reference: four cards, one of the 2020 mod's bags.
+-- The quick reference: four cards, one of the 2020 mod's bags. They cover
+-- the advanced rules (gearbox, body, engine), so only those deal them.
 local QUICK_REFERENCE_BAG = "490aa3"
 
 local delivering = {}  -- colour -> true while their dashboard is on its way
 
---- Deal `color` the quick reference cards, unless their hand holds them --
--- or anything -- already: nothing else goes in a hand here.
+--- Deal `color` the quick reference cards under the advanced rules, unless
+-- their hand holds them -- or anything -- already: nothing else goes in a
+-- hand here.
 local function dealReference(color)
+    if race.rules.id ~= "advanced" then
+        return
+    end
     local p = Player[color]
     local hand = p and p.getHandTransform()
     local bag = getObjectFromGUID(QUICK_REFERENCE_BAG)

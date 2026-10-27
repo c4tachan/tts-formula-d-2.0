@@ -2667,10 +2667,20 @@ function T.the_rules_button_puts_the_rulebook_in_front_of_your_seat()
     assert(S.logged("Take a seat"))
 end
 
+function T.the_basic_rules_deal_no_quick_reference()
+    local S = world()
+    local cards = { { name = "Card" }, { name = "Card" }, { name = "Card" }, { name = "Card" } }
+    S.object("Quick Reference Bag", { guid = "490aa3", spawns = "Deck", spawnContents = cards })
+    fdSetupStart(Player.Red)
+    assert(state().cars.Red, "Red is dealt in")
+    eq(#Player.Red.getHandObjects(), 0, "the cards are for the advanced rules")
+end
+
 function T.being_dealt_in_hands_you_the_quick_reference()
     local S = world()
     local cards = { { name = "Card" }, { name = "Card" }, { name = "Card" }, { name = "Card" } }
     S.object("Quick Reference Bag", { guid = "490aa3", spawns = "Deck", spawnContents = cards })
+    fdSetupRules(Player.Red, require("fd.rules.advanced").name)
     -- Blue kept the cards from an earlier race.
     Player.Blue.hand = { { name = "Card" }, { name = "Card" }, { name = "Card" }, { name = "Card" } }
     fdSetupStart(Player.Red)
