@@ -36,6 +36,11 @@ plus Python tooling for data extraction.
   (SaveName "Formula D"): at setup, no cars, hand zones at the table's rim.
   Save & Play saves whatever is on the table into the loaded save, so load
   it fresh before Save & Play, never with a race on the table.
+  `save/Formula D.json` is its copy in the repo, scripts taken out
+  (`tools/build_save.py --take`); CI builds the published save from it and
+  `src/`, and a `v*` tag releases it. Retake it after changing the table, and
+  keep `build_save.py`'s bundling in step with TTSLua (`--compare` a fresh
+  Save & Play save).
 - **`fd.core` and `fd.rules` make no TTS calls.** They are tested under real
   Lua 5.2 (`tools/test_lua.py`). Anything touching objects, UI or `Wait` goes
   in `fd.tts` or the entry scripts. `tests/tts_stub.lua` fakes just enough of

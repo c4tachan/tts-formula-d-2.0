@@ -1,0 +1,110 @@
+# Tests every push and pull request, builds the save to publish, and on a
+# version tag (v1.0.0, ...) makes a GitHub release with it attached.
+name: Build
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: tools/requirements-dev.txt
+      - run: pip install -r tools/requirements-dev.txt
+
+      - name: Lua syntax
+        run: python tools/check_lua.py
+      - name: Lua tests
+        run: python tools/test_lua.py
+      - name: Track editor tests
+        run: python tools/editor/test_editor.py
+
+      - name: Generated files match their sources
+        run: |
+          python tools/extract/gen_registry.py
+          python tools/extract/gen_dice.py
+          python tools/extract/gen_tracks.py
+          if [ -n "$(git status --porcelain -- src)" ]; then
+            git status --short -- src
+            git diff -- src | head -100
+            echo "::error::Rerun the generators and commit what they write."
+            exit 1
+          fi
+
+  save:
+    runs-on: ubuntu-latest
+    steps:
+      # The asset pins name commits; telling whether GitHub has them needs
+      # every branch's history.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install pillow
+
+      - name: Asset pins are current and pushed
+        run: |
+          python tools/make_icons.py --pin
+          python tools/pin_assets.py
+          if [ -n "$(git status --porcelain -- src)" ]; then
+            git diff -- src
+            echo "::error::Rerun make_icons.py --pin and pin_assets.py and commit what they write."
+            exit 1
+          fi
+
+      - name: Build the save
+        run: python tools/build_save.py
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: formula-d-save
+          path: build/
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, save]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: formula-d-save
+          path: build
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # GitHub turns spaces in asset names into dots; the thumbnail keeps
+          # the save's name so TTS pairs them.
+          mv "build/Formula D.json" "build/Formula-D-$TAG.json"
+          mv "build/Formula D.png" "build/Formula-D-$TAG.png"
+          cat > notes.md <<'EOF'
+          To play this version without the Workshop, put both files in
+          `Documents/My Games/Tabletop Simulator/Saves/` and load
+          **Formula D** from Games → Save & Load.
+          EOF
+          # v1.0.0-rc1 and the like are prereleases.
+          pre=""
+          case "$TAG" in *-*) pre="--prerelease" ;; esac
+          gh release create "$TAG" build/* $pre \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Formula D $TAG" \
+            --notes-file notes.md \
+            --generate-notes

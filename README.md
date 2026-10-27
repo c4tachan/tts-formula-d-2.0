@@ -198,6 +198,7 @@ src/fd/         modules pulled in via require(); never edited in game
   data/dashboard.lua  slot positions on the dashboard model
   data/tracks/    generated from tracks/*.json by gen_tracks.py
 tests/          Lua tests, run under real Lua 5.2 with a fake TTS API
+save/           the save template releases are built from (scripts left out)
 tracks/         per-track space graphs (see docs/track-format.md)
 tools/          extraction, generation and sync scripts
 reference/      verbatim snapshot of the 2020 mod
@@ -241,6 +242,39 @@ Before pushing:
 pip install -r tools/requirements-dev.txt   # once
 python tools/check_lua.py      # syntax-check everything under src/
 python tools/test_lua.py       # rules and Global wiring tests
+```
+
+GitHub runs these too, on every push and pull request
+(`.github/workflows/build.yml`), and checks that the generated files and asset
+pins match their sources.
+
+### Builds and releases
+
+CI builds the save players load, `build/Formula D.json`, without the game:
+`tools/build_save.py` takes `save/Formula D.json`, puts in each `src/entry/`
+script bundled as TTSLua's Save & Play would, and points every asset at its
+pinned copy in the repo. Every run uploads it as the **formula-d-save**
+artifact (Actions → the run → Artifacts).
+
+To release, tag master and push the tag:
+
+```powershell
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The workflow then makes a GitHub release with the save and its thumbnail
+attached. A tag with a hyphen (`v1.0.0-rc1`) makes a prerelease. To update the
+Workshop item, load the release's save in TTS and upload that.
+
+The template is the clean save (at setup, no cars) with its scripts taken
+out. After changing anything on the table itself, save the clean save in TTS
+and take it again:
+
+```powershell
+python tools/build_save.py --take       # Saves/Formula D - clean.json -> save/
+python tools/build_save.py              # build locally into build/
+python tools/build_save.py --compare "<a save>"   # bundles match Save & Play's?
 ```
 
 ### Regenerating the map registry
