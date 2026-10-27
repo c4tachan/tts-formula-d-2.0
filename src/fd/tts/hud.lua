@@ -116,6 +116,22 @@ local function panelWidth(cols)
     return w
 end
 
+-- Tooltips on a solid background, so they read over the board: TTS's own
+-- is see-through (#19). Set once for the whole Global UI, every panel's,
+-- in a Defaults block of its own.
+local TOOLTIP = {
+    tooltipBackgroundColor = "#0E1013", tooltipTextColor = "#FFFFFF", tooltipBorderColor = "#AAB0B8",
+}
+local TOOLTIP_TAGS = { "Button", "Text", "InputField", "Dropdown", "Toggle", "Image" }
+
+local function defaults()
+    local tags = {}
+    for i, tag in ipairs(TOOLTIP_TAGS) do
+        tags[i] = el(tag, TOOLTIP)
+    end
+    return el("Defaults", nil, tags)
+end
+
 -- Where it sits on the screen; players can drag it.
 local ON_SCREEN = {
     rectAlignment = "UpperLeft", offsetXY = "20 -120",
@@ -177,10 +193,12 @@ function Hud.build(rules, extras, tile, onReady)
     ready = false
     whenLoaded(UI, function()
         local xml = UI.getXmlTable() or {}
-        local kept = {}
+        -- The tooltip defaults first. They are the only Defaults in the
+        -- Global UI (Global.-1.xml has none), so the old ones are dropped.
+        local kept = { defaults() }
         for _, node in ipairs(xml) do
             local id = node.attributes and node.attributes.id or ""
-            if id:sub(1, 2) ~= "fd" then
+            if id:sub(1, 2) ~= "fd" and node.tag ~= "Defaults" then
                 kept[#kept + 1] = node
             end
         end

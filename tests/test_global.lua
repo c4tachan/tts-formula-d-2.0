@@ -2212,6 +2212,30 @@ function T.report_shows_the_issue_link_to_copy()
     assert(S.logged("Report a bug or an idea at https://github.com/"), "or in chat")
 end
 
+function T.tooltips_have_a_solid_background()
+    local S = world()
+    local function defaults()
+        local found = {}
+        for _, node in ipairs(S.xml) do
+            if node.tag == "Defaults" then found[#found + 1] = node end
+        end
+        return found
+    end
+    eq(#defaults(), 1, "one Defaults block")
+    local tags = {}
+    for _, d in ipairs(defaults()[1].children) do
+        tags[d.tag] = d.attributes.tooltipBackgroundColor
+    end
+    -- Every kind of element that has a tooltip here, opaque (no alpha).
+    for _, tag in ipairs({ "Button", "Text", "InputField" }) do
+        assert(tags[tag] and #tags[tag] == 7, tag .. " tooltips on a solid background")
+    end
+    buildUi()
+    buildUi()
+    eq(#defaults(), 1, "not one more each time the UI is built")
+    eq(S.xml[1].tag, "Defaults", "ahead of the panels")
+end
+
 function T.the_race_panels_buttons_call_global_with_tooltips()
     local S = world()
     local panel = byId(S.xml)
