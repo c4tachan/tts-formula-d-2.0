@@ -12,7 +12,9 @@ local Ui = require("fd.tts.ui")
 
 local Setup = {}
 
-local REPO = "https://github.com/c4tachan/tts-formula-d-2.0/issues"
+-- The new issue page, which offers the bug and idea forms
+-- (.github/ISSUE_TEMPLATE/).
+local REPO = "https://github.com/c4tachan/tts-formula-d-2.0/issues/new/choose"
 
 local PANEL_BG = "#15181CF2"
 local DIM = "#AAB0B8"

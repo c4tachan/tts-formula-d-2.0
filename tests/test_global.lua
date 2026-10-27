@@ -2178,7 +2178,8 @@ function T.report_shows_the_issue_link_to_copy()
     local S = world()
     eq(byId(S.xml).fds_issue.attributes.onClick, "fdReportIssue", "on the setup menu")
     fdReportIssue(Player.Red)
-    eq(Player.Red.dialog[2], "https://github.com/c4tachan/tts-formula-d-2.0/issues", "in a box to copy")
+    eq(Player.Red.dialog[2], "https://github.com/c4tachan/tts-formula-d-2.0/issues/new/choose", "in a box to copy")
+    assert(Player.Red.dialog[1]:find("screenshot"), "asking for a screenshot")
 
     -- A TTS without the box: asking for it throws, so the link goes to chat.
     Player.Blue.showInputDialog = nil

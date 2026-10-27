@@ -1540,11 +1540,12 @@ end
 -- throws -- it goes to their chat instead.
 function fdReportIssue(player)
     local shown = pcall(function()
-        player.showInputDialog("Copy this link into your browser to report a bug or suggest an idea:",
-            Setup.REPO, function() end)
+        player.showInputDialog("Copy this link into your browser to report a bug or suggest an idea."
+            .. " A screenshot (F12) and what happened help most.", Setup.REPO, function() end)
     end)
     if not shown then
-        broadcastToColor("Report a bug or an idea at " .. Setup.REPO, player.color, LEVEL_RGB.info)
+        broadcastToColor("Report a bug or an idea at " .. Setup.REPO
+            .. " -- a screenshot (F12) and what happened help most.", player.color, LEVEL_RGB.info)
     end
 end
 

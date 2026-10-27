@@ -1,0 +1,50 @@
+name: Something went wrong
+description: A bug in the Formula D mod for Tabletop Simulator
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report it. A screenshot and a description of what happened help most.
+
+        **Taking a screenshot in Tabletop Simulator:** press **F12** (Steam's screenshot key), then find it in Steam under *View → Screenshots*. *Win+Shift+S* (Windows) or *Cmd+Shift+4* (Mac) work too. If you can, keep the chat in the picture: it shows the moves and any error.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: Drag it here, or paste it.
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen again
+      description: If you know. Which seat you were in and what you clicked helps.
+      placeholder: |
+        1. Took the Red seat
+        2. Started the race
+        3. ...
+  - type: dropdown
+    id: rules
+    attributes:
+      label: Rules
+      options:
+        - Basic rules
+        - Advanced rules
+        - Not sure
+  - type: input
+    id: map
+    attributes:
+      label: Map
+      placeholder: "Formula D: Monaco"
+  - type: textarea
+    id: error
+    attributes:
+      label: Error text
+      description: Any red error text from the chat, copied as it is.
+      render: text
