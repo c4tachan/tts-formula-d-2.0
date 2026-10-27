@@ -1,0 +1,5 @@
+# Assets the mod loads, kept byte for byte as they were uploaded: no line-ending
+# conversion, which would change the meshes GitHub serves (tools/pin_assets.py).
+assets/raw/** -text
+tracks/raw/** -text
+assets/raw/manifest.json text
