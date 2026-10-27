@@ -40,12 +40,13 @@ local ACTIONS = {
     { fn = "fdUiRoll", label = "Roll", tip = "Roll the gear die for the gear you are in" },
     { fn = "fdUiCar", label = "Car", tip = "Claim the nearest car, or take one from the bag" },
     { fn = "fdUiCollision", label = "Collision?", tip = "Ended next to or behind a car: roll the black die" },
-    { fn = "fdUiPit", label = "Pit stop", tip = "Made for you when the car stops in its pit box. By hand: restore WP; leave in 4th gear or lower" },
+    { fn = "fdUiPit", label = "Pit stop", tip = "Made for you when the car stops in its pit box. By hand: restore wear; leave in 4th gear or lower" },
     { fn = "fdUiLeave", label = "Leave", tip = "Take your car out of the race" },
 }
 
 local ready = false
 local face = "beginner"
+local zones = {} -- the ruleset's wear zones, as the panels were built for
 
 local function el(tag, attrs, children, value)
     return { tag = tag, attributes = attrs or {}, children = children or {}, value = value }
@@ -110,22 +111,25 @@ local function overlay(color)
             colors = "#FFFFFF00|#FFFFFF44|#FFFFFF66|#FFFFFF00", tooltip = Race.gearName(gear) .. " gear",
         })
     end
-    for _, zone in ipairs({ "wp" }) do
+    for _, z in ipairs(zones) do
         local n = 1
         while true do
-            local x, y = slotOffset(zone, n)
+            local x, y = slotOffset(z.id, n)
             if not x then break end
             kids[#kids + 1] = el("Button", {
-                id = p .. zone .. n, onClick = "fdUiWear(" .. zone .. ":" .. n .. ")",
+                id = p .. z.id .. n, onClick = "fdUiWear(" .. z.id .. ":" .. n .. ")",
                 width = tostring(HIT), height = tostring(HIT), offsetXY = xy(x, y),
-                colors = "#FFFFFF00|#FFFFFF44|#FFFFFF66|#FFFFFF00", tooltip = n .. " " .. zone:upper(),
+                colors = "#FFFFFF00|#FFFFFF44|#FFFFFF66|#FFFFFF00",
+                tooltip = n .. " " .. z.name .. (n == 1 and " (click again for 0)" or ""),
             })
             n = n + 1
         end
     end
     -- Markers last so they draw over the click targets.
     kids[#kids + 1] = marker(p .. "gearMark", color)
-    kids[#kids + 1] = marker(p .. "wpMark", color)
+    for _, z in ipairs(zones) do
+        kids[#kids + 1] = marker(p .. z.id .. "Mark", color)
+    end
     return kids
 end
 
@@ -169,6 +173,7 @@ end
 function Mini.panels(rules)
     -- Show whichever printed face carries this ruleset's wear zones.
     face = Dashboard.faceFor(rules)
+    zones = rules.zones
     local out = {}
     for _, c in ipairs(COLORS) do
         out[#out + 1] = panel(c)
@@ -226,11 +231,16 @@ function Mini.refresh(race)
         if car then
             local bits = { race:label(car) }
             bits[#bits + 1] = car.gear > 0 and (Race.gearName(car.gear) .. " gear") or "on the grid"
-            for _, z in ipairs(race.rules.zones) do
-                bits[#bits + 1] = math.max(0, car.wear[z.id]) .. " " .. z.name
+            if #zones == 1 then
+                bits[#bits + 1] = math.max(0, car.wear[zones[1].id] or 0) .. " " .. zones[1].name
             end
             if car.eliminated then
                 bits[#bits + 1] = "OUT"
+            elseif car.spun then
+                bits[#bits + 1] = "spun: drive off in 1st"
+            end
+            for _, w in ipairs(race:warnings(car)) do
+                bits[#bits + 1] = w
             end
             bits[#bits + 1] = race:progress(car)
             if car == due then
@@ -247,8 +257,8 @@ function Mini.refresh(race)
             Ui.value(p .. "here", here)
             Ui.value(p .. "corner", ahead)
             moveMarker(p .. "gearMark", "gear", math.max(car.gear, 1))
-            for _, z in ipairs(race.rules.zones) do
-                moveMarker(p .. "wpMark", z.id, math.max(0, car.wear[z.id]))
+            for _, z in ipairs(zones) do
+                moveMarker(p .. z.id .. "Mark", z.id, math.max(0, car.wear[z.id] or 0))
             end
         end
     end

@@ -439,4 +439,52 @@ function T.the_corner_ahead_matches_what_a_roll_can_reach_on_monaco()
     end
 end
 
+-- Slipstreaming -------------------------------------------------------------------
+
+--- Where a car on i0 in `gear` rolling `roll` can slipstream to, with cars
+-- on the spaces in `cars` (id -> gear).
+local function slip(track, gear, roll, cars)
+    local occupied = {}
+    for id in pairs(cars) do occupied[id] = true end
+    local reach = Moves.reach(track, "i0", roll, { occupied = occupied })
+    return Moves.slipstream(track, reach, {
+        occupied = occupied, gears = cars, gear = gear, minGear = 4, spaces = 3,
+    })
+end
+
+function T.a_full_roll_behind_a_car_slipstreams_three_further()
+    local s = slip(road(12), 4, 4, { i5 = 4 })
+    eq(fullRoll(s), "i6 o6", "round the car and back, or on in the other lane")
+    eq(table.concat(s.i6.path, " "), "i0 i1 i2 i3 i4 o4 o5 i6")
+    eq(s.i6.moved, 7)
+    eq(s.i6.slip, 1)
+    eq(s.i6.slipCorners, 0)
+    eq(s.o5.brake, 1, "short of the 3 is braking")
+end
+
+function T.slipstreaming_takes_both_cars_in_fourth_or_higher_the_one_behind_no_slower()
+    assert(next(slip(road(12), 5, 4, { i5 = 4 })), "faster than the car ahead")
+    eq(next(slip(road(12), 4, 4, { i5 = 5 })), nil, "slower than the car ahead")
+    eq(next(slip(road(12), 3, 4, { i5 = 3 })), nil, "below 4th")
+end
+
+function T.no_slipstream_after_braking_to_get_behind_a_car()
+    -- A roll of 5 ends a space past i4 or in the other lane; i4 is braking.
+    eq(next(slip(road(12), 4, 5, { i5 = 4 })), nil)
+end
+
+function T.a_slipstream_ending_behind_another_car_goes_on()
+    local s = slip(road(14), 4, 4, { i5 = 4, o7 = 4 })
+    eq(s.o6.slip, 1)
+    assert(s.i9, "on round the second car")
+    eq(s.i9.slip, 2)
+    eq(s.i9.brake, 0)
+end
+
+function T.a_slipstream_into_a_corner_is_noted()
+    local s = slip(road(14, { { 1, 6, 9, 1 } }), 4, 4, { i5 = 4 })
+    eq(s.i6.slipCorners, 1)
+    eq(s.o6.slipCorners, 1)
+end
+
 return T

@@ -11,7 +11,18 @@
 -- after its roll.
 
 local Race = require("fd.core.race")
-local Rules = require("fd.rules.beginner")
+-- The rulesets to choose from on the setup menu, in its order. The race
+-- state says which one it is raced under.
+local RULESETS = {
+    require("fd.rules.beginner"),
+    require("fd.rules.advanced"),
+}
+local function rulesFor(id)
+    for _, r in ipairs(RULESETS) do
+        if r.id == id then return r end
+    end
+    return RULESETS[1]
+end
 local Maps = require("fd.data.maps")
 local Assets = require("fd.data.assets")
 local Dice = require("fd.tts.dice")
@@ -51,6 +62,7 @@ local clearReach -- likewise
 local reachShown = nil -- whose move the marks on the board are for
 local useBoardTrack -- likewise
 local drawPits -- likewise
+local syncDamage, damageMarker, damagePieces -- likewise
 local joinAt -- with the dashboard buttons, below
 local deliver, dealInSeated, dropDashless, bench -- likewise
 local isAdmin -- with the race controls, below
@@ -120,6 +132,7 @@ local SOURCE_BAGS = {
     "4eb678", -- Advanced Dashboard Bag
     "71d89b", -- Gear Stick Bag (fd.tts.dashboard)
     "a845cd", -- Wear Tracker Bag (fd.tts.dashboard)
+    "bbc10d", -- Damage Marker Bag (DAMAGE_BAG, below)
     "ac4939", -- Dice Set Bag: spare dice (fd.tts.dice)
 }
 
@@ -198,8 +211,9 @@ function onLoad(saved_data)
         setup_packed = true
     end
 
-    race = Race.new(Rules, saved.race)
+    race = Race.new(rulesFor(saved.race and saved.race.rules), saved.race)
     race.autoRolls = true
+    damagePieces = saved.damage or {}
     turnsSet = nil
     Dice.prepareAll()
     Dashboard.scan()
@@ -218,6 +232,7 @@ function onLoad(saved_data)
         packModMenu()
         boardMenu(Editor.isOpen())
         hideSetup(function() layDice() end)
+        syncDamage()
     end, 1)
 end
 
@@ -228,15 +243,20 @@ function buildUi()
     -- out and then be skipped as repeats once it has (see fd.tts.ui).
     Mini.setReady(false)
     Setup.setReady(false)
-    local panels = Mini.panels(Rules)
+    local rules = race.rules
+    local panels = Mini.panels(rules)
     local map = mapOnBoard()
     local maps = {}
     for _, m in ipairs(Maps.list) do
         maps[#maps + 1] = { id = m.id, name = m.name, ready = TRACKS[m.id] ~= nil, current = map ~= nil and map.id == m.id }
     end
-    panels[#panels + 1] = Setup.panel(maps)
+    local rulesets = {}
+    for i, r in ipairs(RULESETS) do
+        rulesets[i] = { name = r.name, current = r == rules }
+    end
+    panels[#panels + 1] = Setup.panel(maps, rulesets)
     local track = map and TRACKS[map.id]
-    Hud.build(Rules, panels, Track.tile(), track and Editor.trackFor(track), function()
+    Hud.build(rules, panels, Track.tile(), track and Editor.trackFor(track), function()
         Mini.setReady()
         Setup.setReady()
         refresh()
@@ -288,6 +308,8 @@ function onSave()
         mp = mod_packed, sp = setup_packed, race = race and race:serialize(),
         -- Hand edits to track spaces; tools/extract/import_track.py reads them.
         edits = Editor.save(),
+        -- The damage marker pieces on the board, by marker id.
+        damage = damagePieces,
         -- Editor markers out on the board; removed on load (see Editor.load).
         markers = (function()
             local out = Editor.markerGuids()
@@ -323,10 +345,13 @@ end
 -- What each car's dashboard last showed, so an action that leaves a car alone
 -- does not move all of its markers again.
 local synced = {}
+-- Dashboards the script is turning over to another face, by guid: until
+-- they have and are drawn again (see dashboardMoved), nobody is told to.
+local flipping = {}
 
 local function dashState(car)
     local parts = { car.tts.dash or "", car.gear }
-    for _, z in ipairs(Rules.zones) do parts[#parts + 1] = car.wear[z.id] end
+    for _, z in ipairs(race.rules.zones) do parts[#parts + 1] = car.wear[z.id] end
     return table.concat(parts, "|")
 end
 
@@ -335,20 +360,23 @@ end
 -- somewhere it should not be, or moves the dashboard.
 local function syncDashboards(force)
     if force then synced = {} end
+    local rules = race.rules
     for _, car in ipairs(race:cars()) do
         car.tts = car.tts or {}
         local state = dashState(car)
         local dash = synced[car.color] ~= state and car.tts.dash and getObjectFromGUID(car.tts.dash)
         if dash then
             synced[car.color] = state
-            if Dashboard.fits(dash, Rules) then
+            if Dashboard.fits(dash, rules) then
                 car.tts.markers = car.tts.markers or {}
-                Dashboard.sync(dash, car.tts.markers, car, Rules, tintOf(car.color))
+                Dashboard.sync(dash, car.tts.markers, car, rules, tintOf(car.color))
                 car.tts.faceWarned = nil
+            elseif flipping[dash.getGUID()] then
+                synced[car.color] = nil -- drawn once it is over
             elseif not car.tts.faceWarned then
                 car.tts.faceWarned = true
-                broadcastToColor("Flip your dashboard to the beginner side to track wear on it.",
-                    car.color, LEVEL_RGB.warn)
+                broadcastToColor("Flip your dashboard to the " .. Dashboard.faceFor(rules)
+                    .. " side to track wear on it.", car.color, LEVEL_RGB.warn)
             end
         end
     end
@@ -373,6 +401,12 @@ local function dashLabel(car)
         if not car.place then
             parts[#parts + 1] = car.gear > 0 and (Race.gearName(car.gear) .. " gear") or "on the grid"
             parts[#parts + 1] = Hud.wearSummary(race, car)
+            if car.spun then
+                parts[#parts + 1] = "SPUN: 1st gear"
+            end
+            for _, w in ipairs(race:warnings(car)) do
+                parts[#parts + 1] = w
+            end
             if car.lastRoll then
                 parts[#parts + 1] = "rolled " .. car.lastRoll
             end
@@ -538,6 +572,7 @@ local function act(fn, followOn)
     race.opened = nil
     relay(race:drain())
     syncDashboards()
+    syncDamage()
     refresh(true)
     if opened then
         showReach(opened)
@@ -818,6 +853,19 @@ local function markerOwner(guid)
     return nil
 end
 
+--- The guids of every car's dashboard markers, as a set.
+local function markerGuids()
+    local out = {}
+    for _, car in ipairs(race:cars()) do
+        local m = car.tts and car.tts.markers
+        if m then
+            if m.gear then out[m.gear] = true end
+            for _, g in pairs(m.wear or {}) do out[g] = true end
+        end
+    end
+    return out
+end
+
 local function shiftTo(color, gear)
     -- A shift starts somebody's turn: the last move's options are done with.
     clearReach()
@@ -829,6 +877,7 @@ end
 local function dashboardMoved(dash)
     Wait.time(function()
         if dash == nil then return end
+        flipping[dash.getGUID()] = nil
         Controls.invalidate(dash)
         syncDashboards(true)
         renderDashboards()
@@ -845,6 +894,15 @@ function onObjectDrop(color, obj)
     end
     if Dashboard.is(obj) then
         dashboardMoved(obj)
+        return
+    end
+    -- A damage marker moved by hand counts on the space it is put down on,
+    -- or, off the track, no more.
+    local mark = damageMarker(obj.getGUID())
+    if mark then
+        local space = spaceUnder(obj)
+        act(function() race:markerMoved(mark, space) end)
+        syncDamage(true) -- back onto the middle of its space
         return
     end
     if CAR_NAMES[obj.getName()] then
@@ -864,7 +922,7 @@ function onObjectDrop(color, obj)
     end
     local owner = carOwning(obj.getGUID())
     if owner or CAR_NAMES[obj.getName()] then
-        local space, track = snapCar(obj)
+        local space, track, yaw = snapCar(obj)
         if owner then
             -- Put down during its move, the move is judged and charged:
             -- undoable, and the dashboards show the result. Put down after
@@ -873,6 +931,10 @@ function onObjectDrop(color, obj)
                 race:placed(owner.color, space and space.id, track)
                 race:putDown(owner.color)
             end)
+            -- A car that spins there is left pointing backwards.
+            if yaw and owner.spun then
+                obj.setRotationSmooth({ x = 0, y = yaw + 180, z = 0 }, false, true)
+            end
         end
         return
     end
@@ -1046,7 +1108,7 @@ deliver = function(color)
             return
         end
     end
-    local face = Dashboard.faceFor(Rules)
+    local face = Dashboard.faceFor(race.rules)
     local bag = getObjectFromGUID(DASHBOARD_BAGS[face])
     if not bag then
         return
@@ -1264,7 +1326,9 @@ function fdUiShift(player, value)
     end
 end
 
---- `value` arrives as "<zone>:<number>", e.g. "wp:12".
+--- `value` arrives as "<zone>:<number>", e.g. "wp:12". Clicking the number
+-- the zone is on already takes one off: the slots start at 1, so that is
+-- how a zone gets to 0.
 function fdUiWear(player, value)
     local car = mine(player)
     if not car then
@@ -1272,7 +1336,11 @@ function fdUiWear(player, value)
     end
     local zone, n = tostring(value):match("^(%a+):(%d+)$")
     if zone then
-        act(function() race:setWear(player.color, zone, tonumber(n), "set on screen") end)
+        n = tonumber(n)
+        if car.wear[zone] and math.max(0, car.wear[zone]) == n then
+            n = n - 1
+        end
+        act(function() race:setWear(player.color, zone, n, "set on screen") end)
     end
 end
 
@@ -1420,6 +1488,49 @@ function fdSetupLaps(player, value)
     end
 end
 
+--- Turn the dashboards on the table to the face `rules` uses: the rules
+-- are being picked, or have been undone. `change`, if given, puts the race
+-- under them, once the dashboards to turn are known and before they turn.
+local function turnDashboards(rules, change)
+    local face, turning = Dashboard.faceFor(rules), {}
+    for _, dash in ipairs(Dashboard.all()) do
+        if Dashboard.face(dash) ~= face then
+            flipping[dash.getGUID()] = true
+            turning[#turning + 1] = dash
+        end
+    end
+    if change then
+        change()
+    end
+    for _, dash in ipairs(turning) do
+        dash.flip()
+        dashboardMoved(dash)
+    end
+end
+
+--- The rules list on the setup menu: race under the rules picked, by their
+-- name. Not during a race; every car starts afresh in the new zones.
+function fdSetupRules(player, value)
+    local phase = race.state.phase
+    if not admin(player) or phase == "race" or phase == "grid" then
+        return
+    end
+    local rules = nil
+    for _, r in ipairs(RULESETS) do
+        if r.name == value then rules = r end
+    end
+    if not rules or rules == race.rules then
+        return
+    end
+    printToAll(player.steam_name .. " picks the " .. rules.name, LEVEL_RGB.info)
+    clearReach()
+    turnDashboards(rules, function()
+        act(function() race:setRules(rules) end)
+    end)
+    -- The screen dashboards, the standings and the menu, for the new rules.
+    buildUi()
+end
+
 --- A new map is on the board. Reloading the tile took the race panel with
 -- it, so it is drawn again; the setup menu says which map it is, turn order
 -- goes by its track, its pit boxes take their seats' colours, and the dice
@@ -1445,6 +1556,7 @@ function fdMapChanged()
         Track.drawIcons()
         buildUi()
         layDice()
+        syncDamage(true)
         -- A new map means a reloaded tile, and that has lost its menu.
         boardMenu(Editor.isOpen())
     end)
@@ -1465,9 +1577,22 @@ function fdUndo(player)
         broadcastToColor("Nothing to undo.", player.color, LEVEL_RGB.info)
         return
     end
-    race = Race.new(Rules, JSON.decode(last))
+    local state = JSON.decode(last)
+    local was, had = race.rules, markerGuids()
+    race = Race.new(rulesFor(state.rules), state)
     race.autoRolls = true
     pendingStart = nil
+    -- Markers put out since -- one per zone of other rules, say -- are not
+    -- the race's any more.
+    local kept = markerGuids()
+    for guid in pairs(had) do
+        local obj = not kept[guid] and getObjectFromGUID(guid)
+        if obj then obj.destruct() end
+    end
+    if race.rules ~= was then
+        turnDashboards(race.rules)
+        buildUi()
+    end
     useBoardTrack()
     clearReach()
     -- Undo puts the race back, not the pieces: the board still says where
@@ -1482,6 +1607,7 @@ function fdUndo(player)
     throwChecks()
     relay(race:drain())
     syncDashboards(true)
+    syncDamage(true)
     refresh()
 end
 
@@ -1568,6 +1694,84 @@ useBoardTrack = function()
     local tile, track = boardTrack()
     race:useTrack(track)
     return tile, track
+end
+
+-- Damage markers -------------------------------------------------------------
+-- A piece from the Damage Marker Bag on each space the race has a damage
+-- marker on (state.damage), locked flat on the board so the cars sit over
+-- it. Kept in step after every change; a piece moved or deleted by hand
+-- moves or takes away the race's marker (see onObjectDrop, onObjectDestroy).
+
+local DAMAGE_BAG = "bbc10d"
+-- The marker's model is 1.1 units long: scaled to this much of a space.
+local DAMAGE_SIZE = 0.55
+local DAMAGE_LENGTH = 1.1
+-- Height above the board face; each more on the same space a bit higher.
+local DAMAGE_LIFT = 0.02
+local DAMAGE_STACK = 0.05
+
+damagePieces = {} -- marker id -> guid of its piece
+local damageSynced = nil -- the markers as last put out, as ids and spaces
+
+--- The id of the race's marker that the piece `guid` stands for, if any.
+damageMarker = function(guid)
+    for id, g in pairs(damagePieces) do
+        if g == guid then return id end
+    end
+    return nil
+end
+
+syncDamage = function(force)
+    -- Unless the markers have changed, or `force` says a piece may be out of
+    -- place, nothing to do and no call into the game.
+    local parts = {}
+    for _, e in ipairs(race.state.damage or {}) do parts[#parts + 1] = e.id .. "@" .. tostring(e.space) end
+    local key = table.concat(parts, " ")
+    if (key == damageSynced and not force) or (key == "" and next(damagePieces) == nil) then
+        damageSynced = key
+        return
+    end
+    damageSynced = key
+    local wanted = {}
+    for _, e in ipairs(race.state.damage or {}) do wanted[e.id] = true end
+    for id, guid in pairs(damagePieces) do
+        if not wanted[id] then
+            -- Forgotten first, so its going is not taken for a hand's.
+            damagePieces[id] = nil
+            local obj = getObjectFromGUID(guid)
+            if obj then obj.destruct() end
+        end
+    end
+    local tile, track = boardTrack()
+    local bag = getObjectFromGUID(DAMAGE_BAG)
+    if not track then
+        return
+    end
+    local f = Track.frame(tile, track)
+    local k = Track.cellWorld(f, track) * DAMAGE_SIZE / DAMAGE_LENGTH
+    local stacked = {}
+    for _, e in ipairs(race.state.damage) do
+        local pos, yaw = Track.seat(tile, f, track, e.space)
+        if pos then
+            local n = stacked[e.space] or 0
+            stacked[e.space] = n + 1
+            local at = { x = pos.x, y = pos.y + DAMAGE_LIFT + n * DAMAGE_STACK, z = pos.z }
+            local rot = { x = 0, y = yaw + 90, z = 0 }
+            local obj = damagePieces[e.id] and getObjectFromGUID(damagePieces[e.id])
+            if obj then
+                local p = obj.getPosition()
+                if not obj.held_by_color and (p.x - at.x) ^ 2 + (p.z - at.z) ^ 2 > 0.01 then
+                    obj.setPositionSmooth(at, false, true)
+                    obj.setRotationSmooth(rot, false, true)
+                end
+            elseif bag then
+                obj = bag.takeObject({ position = at, rotation = rot, smooth = false })
+                obj.setScale({ k, k, k })
+                obj.setLock(true)
+                damagePieces[e.id] = obj.getGUID()
+            end
+        end
+    end
 end
 
 --- Paint each pit box's half of its garage in the colour of the seat it
@@ -1667,7 +1871,7 @@ snapCar = function(obj)
         return nil
     end
     setDown(obj, pos, yaw)
-    return space, track
+    return space, track, yaw
 end
 
 --- Once the grid roll has settled the order, set each claimed car down on
@@ -1714,12 +1918,13 @@ end
 
 --- Mark where the car of `color` can end the move it has just opened, with
 -- an icon on each space (see Track.marks): a skull where it would go out of
--- the race, else a speedometer for an overshoot or the brake light for
--- braking, each with a crash badge if it ends beside another car; else the
--- crash for a full roll beside one, or a tick for a full roll that costs
--- nothing. No entry on each space the move is blocked from -- by cars in the
--- way, or a pit lane shut to it. Advisory: nothing stops a car going
--- anywhere else.
+-- the race, else a turning arrow where it would spin, a speedometer for an
+-- overshoot or the brake light for braking, each with a crash badge if it
+-- ends beside another car; else the crash for a full roll beside one, or a
+-- tick for a full roll that costs nothing. Badges too for damage markers on
+-- the way and for a slipstream. No entry on each space the move is blocked
+-- from -- by cars in the way, or a pit lane shut to it. Advisory: nothing
+-- stops a car going anywhere else.
 showReach = function(color)
     local tile, track = boardTrack()
     local reach = track and race:reachable(color, track)
@@ -1734,16 +1939,22 @@ showReach = function(color)
         if id ~= from then
             local ahead = race:outcome(color, o)
             local crash = #ahead.touching > 0
-            local kind, badge = "clean", nil
+            local kind, badges = "clean", {}
             if ahead.out then
                 kind = "out"
-            elseif o.overshoot > 0 or o.brake > 0 then
-                kind = o.overshoot > 0 and "overshoot" or "brake"
-                badge = crash and "collision" or nil
-            elseif crash then
-                kind = "collision"
+            else
+                if ahead.spin then
+                    kind = "spin"
+                elseif o.overshoot > 0 or o.brake > 0 then
+                    kind = o.overshoot > 0 and "overshoot" or "brake"
+                elseif crash then
+                    kind = "collision"
+                end
+                if crash and kind ~= "collision" then badges[#badges + 1] = "collision" end
+                if ahead.hazards > 0 then badges[#badges + 1] = "damage" end
+                if o.slip then badges[#badges + 1] = "slipstream" end
             end
-            marks[#marks + 1] = { id = id, kind = kind, badge = badge }
+            marks[#marks + 1] = { id = id, kind = kind, badges = badges }
         end
     end
     for _, id in ipairs(race:blockedSpaces(color, track, reach)) do
@@ -2033,6 +2244,12 @@ end
 
 function onObjectDestroy(obj)
     Dashboard.forget(obj)
+    -- A damage marker deleted by hand is gone from the track.
+    local mark = damageMarker(obj.getGUID())
+    if mark then
+        damagePieces[mark] = nil
+        act(function() race:markerMoved(mark, nil) end)
+    end
     -- A driver's dashboard deleted before the start takes them out of the race.
     local driver = race and race.state.phase == "setup" and carOnDash(obj.getGUID())
     if driver then

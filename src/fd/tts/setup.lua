@@ -44,7 +44,7 @@ end
 
 local STEPS = table.concat({
     "<b>1.</b> Take a coloured seat. Everyone seated is dealt a dashboard and a car when the race starts.",
-    "<b>2.</b> The host picks a map and the rules, below.",
+    "<b>2.</b> The host picks a map, the race distance and the rules (basic or advanced), below.",
     "<b>3.</b> The host presses <b>Start race</b>: the grid is rolled, the cars put on it, and the race begins.",
     "<b>4.</b> On your turn: click a gear on your screen dashboard, press <b>Roll</b>, then move your car. "
         .. "The spaces it can reach are marked on the board.",
@@ -76,9 +76,21 @@ local function mapList(maps)
     }, options)
 end
 
+--- The rules list: the rulesets by name, as fdSetupRules is handed them.
+local function rulesList(rulesets)
+    local options = {}
+    for _, r in ipairs(rulesets) do
+        options[#options + 1] = el("Option", r.current and { selected = "true" } or {}, nil, r.name)
+    end
+    return el("Dropdown", {
+        id = "fds_rulesets", onValueChanged = "fdSetupRules", preferredWidth = "260", fontSize = "13",
+    }, options)
+end
+
 --- The panel, for Hud.build to add to the Global UI. `maps` lists the maps
--- to choose from: { id, name, ready (has track data), current }.
-function Setup.panel(maps)
+-- to choose from: { id, name, ready (has track data), current }, and
+-- `rulesets` the rules: { name, current }.
+function Setup.panel(maps, rulesets)
     -- The host's choices: the map, then the race distance.
     local choices = { mapList(maps or {}) }
     choices[#choices + 1] = text(nil, "Laps:", { preferredWidth = "40", alignment = "MiddleRight" })
@@ -99,7 +111,7 @@ function Setup.panel(maps)
         -- Hidden until the first refresh says the race has not started, so a
         -- rebuild during the race does not flash it up.
         id = "fds", active = "false",
-        rectAlignment = "MiddleCenter", width = "560", height = "580", color = PANEL_BG,
+        rectAlignment = "MiddleCenter", width = "560", height = "618", color = PANEL_BG,
         allowDragging = "true", returnToOriginalPositionWhenReleased = "false",
     }, {
         el("VerticalLayout", { padding = "16 16 12 12", spacing = "6", childForceExpandHeight = "false" }, {
@@ -111,6 +123,8 @@ function Setup.panel(maps)
             text("fds_drivers", "", { preferredHeight = "38" }),
             el("HorizontalLayout", { spacing = "6", preferredHeight = "32", visibility = ADMIN, childForceExpandWidth = "false" },
                 choices),
+            el("HorizontalLayout", { spacing = "6", preferredHeight = "32", visibility = ADMIN, childForceExpandWidth = "false" },
+                { rulesList(rulesets or {}) }),
             button("fds_start", "Start race", "fdSetupStart", {
                 preferredHeight = "40", fontSize = "18", fontStyle = "Bold", visibility = ADMIN, colors = PICKED,
                 tooltip = "Roll the grid, put the cars on it and start the race",

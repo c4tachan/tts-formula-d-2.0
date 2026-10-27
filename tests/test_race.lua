@@ -845,8 +845,8 @@ function T.reachable_is_what_the_move_will_be_judged_by()
     eq(r.opened, "Red", "the Global script is told a move opened")
     local reach = r:reachable("Red", track)
     eq(reach.c8.missed, 2)
-    assert(r:moveOut(reach.c8), "through a 2-stop corner without stopping is out")
-    assert(not r:moveOut(reach.c6))
+    assert(r:outcome("Red", reach.c8).out, "through a 2-stop corner without stopping is out")
+    assert(not r:outcome("Red", reach.c6).out)
     eq(reach.c6.brake, 2)
 end
 

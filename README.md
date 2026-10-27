@@ -13,10 +13,10 @@ That original is preserved verbatim in [`reference/original-2020/`](reference/or
 |---|---|
 | Project scaffold, build pipeline | done |
 | Auto gear dice selection | done (shared dice set, results read automatically) |
-| Rules automation | Formula D basic rules, except those needing track positions |
+| Rules automation | Formula D basic rules, and the advanced rules but the optional rules |
 | Track data | Monaco done: 497 spaces (detected, then hand-edited in game) and its 10 corners with their stop counts |
 | Space snapping + facings | done for Monaco |
-| Damage tracking | done for the basic rules' single 18 WP pool |
+| Damage tracking | done: the basic rules' single 18 WP pool, the advanced rules' six zones |
 | Movement limits + highlighting | done for Monaco |
 
 ### What the basic rules cover today
@@ -80,6 +80,53 @@ button in the meantime, and on a board without track data, braking and
 overshoots are the WP -1 button, collisions the Collision button, and turn
 order stays as the grid set it.
 
+### The advanced rules
+
+The host picks **Formula D advanced rules** on the setup menu before the
+start (Undo takes the choice back). The dashboards are turned to their
+advanced face, with a marker in each of the six zones -- tires 6, brakes 3,
+gearbox 3, body 3, engine 3, suspension 2 -- and the race panel has a column
+for each (T B G C E S).
+
+- **Braking** costs a brake WP a space; from the 4th space on, 3 brake and a
+  tire WP a space; 7 or more is out. Brake WP the car does not have come out
+  of its tires.
+- **Overshooting** costs a tire WP a space. Losing the last tire WP that way
+  spins the car: it is left turned round, and drives off in 1st next turn.
+  On no tires, overshooting by one spins it again, and by more is out.
+- **Skipping gears down** costs gearbox, then brake, then engine WP (1 skipped:
+  gearbox; 2: and brakes; 3: and engine). With no gearbox WP left, a car is
+  warned to shift down one gear at a time.
+- **Black die:** only a 20 is a great start, only a 1 a collision (a body WP),
+  and engine strain costs an engine WP.
+- **Pit stops** give back the tires only, and the black die times them: 1-10
+  is a quick stop, and the car moves half the roll (rounded up) out of the
+  pits at once, in 4th; 11-20 is slow, and it waits for the next round.
+- **Slipstreaming:** a full roll that ends right behind a car, both in 4th or
+  higher and the one behind in no lower a gear, may go 3 spaces further round
+  it -- and on again if that ends behind another car. Those spaces are marked
+  with the rest of the move, so put the car down where the slipstream takes
+  it; the collision check is made there. Short of the 3 is braking, and a
+  slipstream into a corner costs a brake WP. Not in the basic rules, which
+  have no such rule.
+- A car is out when it loses its last body, engine or suspension WP, or more
+  tire WP than it has. No brakes or gearbox left, it races on, and its
+  dashboards say what that means (one gear down at a time, say); the race
+  panel shows the empty zone in orange.
+- **Damage markers:** each body or engine WP lost (a collision, engine strain,
+  three gears skipped) and each car going out leaves a marker on the space
+  where the car's move ends, out of the Damage Marker bag. A move over or
+  onto a marked space rolls the black die for each: 1-4 costs a suspension
+  WP. A marker moved by hand (unlock it first) counts where it is put down,
+  and one deleted is gone from the track.
+- **Setting wear by hand:** click a zone's number on the screen dashboard, or
+  move its marker on the table. Clicking the number it is on takes one off,
+  which is how a zone gets to 0.
+- Each car keeps its own starting wear, which a pit stop restores and no
+  gain goes past -- ready for building your own car (#124).
+
+Not yet automated: the optional rules.
+
 ### Playing
 
 1. Sit down in a coloured seat before the start: you are dealt a dashboard
@@ -127,9 +174,10 @@ editor".
 ## Design decisions
 
 - **Rulesets:** Formula D (modern) and Formula Dé (classic), switchable at setup,
-  with individual toggles for the optional rules each supports. Only the modern
-  basic rules exist so far (`src/fd/rules/beginner.lua`). A ruleset states all
-  wear as zone → points, so the advanced rules' six zones fit the same engine.
+  with individual toggles for the optional rules each supports. The modern
+  basic and advanced rules exist so far (`src/fd/rules/`). A ruleset states all
+  wear as zone → points, and prices a move from what the car has left
+  (`moveWear`), so one engine serves one pool and six zones alike.
 - **Enforcement:** advisory. The mod highlights legal spaces, warns on illegal
   moves and applies damage automatically, but never blocks a player. Bad track
   data or a rules bug must not be able to wedge a game.
@@ -143,7 +191,7 @@ src/entry/      one file per TTS object, named <Object>.<guid>.lua — these are
                 what the TTS extension exchanges with the game
 src/fd/         modules pulled in via require(); never edited in game
   core/           rules bookkeeping and the track graph -- no TTS calls, unit tested
-  rules/          one module per ruleset (beginner so far)
+  rules/          one module per ruleset (beginner, advanced)
   tts/            dice, dashboards, on-screen panels -- the TTS-facing side
   data/maps.lua   generated map registry (339 tracks)
   data/dice.lua   generated gear dice rotation values
