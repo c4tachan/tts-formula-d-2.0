@@ -54,12 +54,8 @@ end
 -- `crop` is the printed card in pixels; `pixel` converts a local X/Z to a pixel
 -- on it (px runs against X on both faces; py runs with Z on the advanced face
 -- and against it on the beginner face, which is printed the other way up).
--- Note the host: the save still carries the old cloud-3.steamusercontent.com
--- URL for this texture, which now answers 403. The board itself keeps working
--- from the local TTS cache, but a UI asset is fetched fresh and comes back
--- blank, so this uses the same host the map registry does.
+-- The UI loads it as "fdDashboard" (see fd.data.assets).
 Layout.texture = {
-    url = "https://steamusercontent-a.akamaihd.net/ugc/1014943869376223859/3149670324DC1FF3D734BC3145C0C47C1D0EE65D/",
     width = 1024,
     height = 1024,
 }

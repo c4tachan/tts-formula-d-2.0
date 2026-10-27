@@ -5,6 +5,7 @@
 -- snapped to it follows the board when a player drags or turns it.
 
 local Maps = require("fd.data.maps")
+local Assets = require("fd.data.assets")
 local Icons = require("fd.data.icons")
 local Graph = require("fd.core.trackgraph")
 
@@ -38,7 +39,7 @@ end
 function Track.onBoard(track, tile)
     local map = Maps.byId[track.id]
     local custom = tile and tile.getCustomObject()
-    return not map or not custom or custom.image == map.url
+    return not map or not custom or Assets.same(custom.image, map.url)
 end
 
 --- How the track's image lies on the tile, measured once.

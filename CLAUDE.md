@@ -20,6 +20,15 @@ plus Python tooling for data extraction.
   changing an icon: run it, commit and push the PNGs, then
   `python tools/make_icons.py --pin` rewrites `src/fd/data/icons.lua` with
   that commit. A pin to a commit that isn't pushed yet won't load.
+- **Every other asset loads from the repo too.** Meshes, textures and UI
+  images are in `assets/raw/` (`manifest.json` records the Steam URL each came
+  from and what uses it), board images in `tracks/raw/`. Lua names an asset by
+  its Steam URL and passes it through `Assets.url()` (`fd.data.assets`, made by
+  `tools/pin_assets.py`); compare board images with `Assets.same()`, since older
+  saves hold the Steam form. After adding or changing an asset: run
+  `tools/extract/download_assets.py` (or `download_maps.py`), commit and push,
+  then `python tools/pin_assets.py`; `--save` also writes a copy of the latest
+  save with its objects pointing at the repo.
 - **`fd.core` and `fd.rules` make no TTS calls.** They are tested under real
   Lua 5.2 (`tools/test_lua.py`). Anything touching objects, UI or `Wait` goes
   in `fd.tts` or the entry scripts. `tests/tts_stub.lua` fakes just enough of

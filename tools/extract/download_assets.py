@@ -55,6 +55,7 @@ EXT = {"image/jpeg": ".jpg", "image/png": ".png", "image/gif": ".gif", "image/we
 SNIFF = [(b"\xff\xd8\xff", ".jpg"), (b"\x89PNG", ".png"), (b"GIF8", ".gif"),
          (b"RIFF", ".webp"), (b"%PDF", ".pdf")]
 CACHE_DIRS = ["Images", "Models", "PDF", "Assetbundles", "Audio"]
+REPO_COPY = "https://raw.githubusercontent.com/"
 RETRIES = 3
 
 
@@ -128,7 +129,8 @@ def collect(data):
 
     def add(url, label, use):
         url = akamai(url)
-        if url in track_urls or not url.startswith("http"):
+        # The repo's own copies (tools/pin_assets.py) are stored already.
+        if url in track_urls or not url.startswith("http") or url.startswith(REPO_COPY):
             return
         if url in seen:
             if use not in seen[url]:
@@ -276,10 +278,14 @@ def main():
             if status != "skip":
                 print(f"[{n}/{len(jobs)}] {status:5} {base}: {detail}", flush=True)
 
-    manifest = [{"file": files[base].name if files[base] else None, "url": url, "use": uses}
-                for uses, url, base in jobs]
-    MANIFEST.write_text(json.dumps(sorted(manifest, key=lambda m: m["use"][0]), indent=1) + "\n",
-                        encoding="utf-8")
+    # Merged into what is there: once a save points at the repo's copies, the
+    # Steam URLs are only on record here, and tools/pin_assets.py needs them.
+    manifest = {m["url"]: m for m in json.loads(MANIFEST.read_text(encoding="utf-8"))} \
+        if MANIFEST.exists() else {}
+    for uses, url, base in jobs:
+        manifest[url] = {"file": files[base].name if files[base] else None, "url": url, "use": uses}
+    MANIFEST.write_text(json.dumps(sorted(manifest.values(), key=lambda m: m["use"][0]), indent=1) + "\n",
+                        encoding="utf-8", newline="\n")
 
     print(f"\n{counts['ok']} downloaded, {counts['cache']} copied from the TTS cache, "
           f"{counts['skip']} already present, {counts['fail']} failed -> {OUT.relative_to(ROOT)}")

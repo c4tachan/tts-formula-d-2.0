@@ -176,25 +176,6 @@ function Mini.panels(rules)
     return out
 end
 
---- Make sure the dashboard texture is available to the UI, keeping any assets
--- the mod already defined.
-function Mini.registerAsset()
-    local assets = UI.getCustomAssets() or {}
-    for _, a in ipairs(assets) do
-        if a.name == ASSET then
-            if a.url == Layout.texture.url then
-                return
-            end
-            -- An older URL is saved with the game; replace it.
-            a.url = Layout.texture.url
-            UI.setCustomAssets(assets)
-            return
-        end
-    end
-    assets[#assets + 1] = { name = ASSET, url = Layout.texture.url }
-    UI.setCustomAssets(assets)
-end
-
 --- Mark the screen dashboards ready for updates, or (false) not yet.
 function Mini.setReady(on)
     ready = on ~= false

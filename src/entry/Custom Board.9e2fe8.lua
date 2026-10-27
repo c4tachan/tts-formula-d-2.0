@@ -6,6 +6,7 @@
 -- track means adding one record there.
 
 local Maps = require("fd.data.maps")
+local Assets = require("fd.data.assets")
 
 local MAP_TILE_GUID = "ebde54"
 local SETUP_BAG_GUID = "0fde3b"
@@ -17,6 +18,8 @@ local memoryBagModMenu
 function onLoad()
     memoryBagSetup = getObjectFromGUID(SETUP_BAG_GUID)
     memoryBagModMenu = getObjectFromGUID(MOD_MENU_BAG_GUID)
+    -- The map thumbnails and buttons in this board's XML.
+    Assets.register(self.UI, self.getGUID())
 end
 
 -- TTS calls UI handlers as (player, value, elementId), where `value` is the
@@ -29,7 +32,7 @@ function selectMap(player, mapId)
         broadcastToAll("Unknown track id: " .. tostring(mapId), { 1, 0.4, 0.4 })
         return
     end
-    setMapImage(map.url)
+    setMapImage(Assets.url(map.url))
     broadcastToAll(player.steam_name .. " selected " .. map.name, { 0.6, 0.9, 0.6 })
 end
 
