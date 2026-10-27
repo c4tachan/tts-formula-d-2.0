@@ -260,7 +260,7 @@ def build(out):
     thumb = TEMPLATE.with_suffix(".png")
     if thumb.exists():
         dest.with_suffix(".png").write_bytes(thumb.read_bytes())
-    print(f"built {dest} ({count} asset URLs pointed at the repo)")
+    print(f"built {dest} ({count} asset URLs moved to the current pins)")
 
 
 def arg_after(flag, default):
