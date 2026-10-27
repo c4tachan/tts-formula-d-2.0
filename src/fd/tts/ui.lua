@@ -6,23 +6,10 @@
 --
 -- Setting the whole XML (UI.setXmlTable) puts every element back to what the
 -- XML says, so call reset() whenever that happens.
---
--- Elements drawn on an object rather than the screen are reached through
--- route(): ids with the given prefix go to that object's UI.
 
 local Ui = {}
 
 local attrs, values = {}, {}
-local routes = {} -- id prefix -> an object's UI, for elements drawn on it
-
-local function target(id)
-    for prefix, handle in pairs(routes) do
-        if id:sub(1, #prefix) == prefix then
-            return handle
-        end
-    end
-    return UI
-end
 
 function Ui.set(id, attr, value)
     value = tostring(value)
@@ -31,7 +18,7 @@ function Ui.set(id, attr, value)
         return
     end
     attrs[key] = value
-    target(id).setAttribute(id, attr, value)
+    UI.setAttribute(id, attr, value)
 end
 
 function Ui.value(id, value)
@@ -40,13 +27,7 @@ function Ui.value(id, value)
         return
     end
     values[id] = value
-    target(id).setValue(id, value)
-end
-
---- Send ids starting with `prefix` to `handle` (an object's UI), or back to
--- the screen with nil.
-function Ui.route(prefix, handle)
-    routes[prefix] = handle
+    UI.setValue(id, value)
 end
 
 --- Forget what was sent: the UI has been rebuilt from its XML. With

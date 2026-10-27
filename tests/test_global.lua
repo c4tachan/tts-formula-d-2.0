@@ -451,7 +451,7 @@ function T.the_host_picks_the_rules_on_the_setup_menu()
     assert(ui.fdm_Red_tiresMark and ui.fdm_Red_handlingMark, "a marker per zone on screen")
     assert(ui.fdm_Red_tires14, "the advanced face's 14 tire slots")
     eq(ui.fdm_Red_wpMark, nil)
-    assert(byId(S.board.xml).fdr_r1_w_tires, "a standings column per zone")
+    assert(byId(S.xml).fdr_r1_w_tires, "a standings column per zone")
     eq(S.ui.fds_rules.value:find(ADVANCED, 1, true) ~= nil, true, "the menu says which rules")
 
     fdUndo(Player.Red)
@@ -2143,7 +2143,6 @@ function T.only_the_host_can_use_the_race_controls()
         for _, c in ipairs(node.children or {}) do walk(c, panel) end
     end
     for _, node in ipairs(S.xml) do walk(node, node.attributes.id) end
-    for _, node in ipairs(S.board.xml) do walk(node, node.attributes.id) end
     eq(rows.fdr, 1, "Undo, on the race panel, is the host's")
     eq(rows.fds, 5, "as are the setup menu's choices, the rules, Start race, the track tools and the editor line")
 
@@ -2213,30 +2212,13 @@ function T.report_shows_the_issue_link_to_copy()
     assert(S.logged("Report a bug or an idea at https://github.com/"), "or in chat")
 end
 
-function T.the_board_panels_buttons_reach_global()
-    -- On the board the panel is the tile's UI, whose clicks would go to the
-    -- tile's own script.
+function T.the_race_panels_buttons_call_global_with_tooltips()
     local S = world()
-    local panel = byId(S.board.xml)
-    eq(panel.fdr_rules_book.attributes.onClick, "Global/fdRules")
-    eq(panel.fdr_issue.attributes.onClick, "Global/fdReportIssue")
-    eq(panel.fdr_undo.attributes.onClick, "Global/fdUndo")
-    -- Nor tooltips: TTS draws them upside down and under the table there.
-    local function tips(nodes, out)
-        for _, n in ipairs(nodes or {}) do
-            if n.attributes and n.attributes.tooltip then out[#out + 1] = n.attributes.tooltip end
-            tips(n.children, out)
-        end
-        return out
-    end
-    eq(#tips(S.board.xml, {}), 0, "no tooltips on the board")
-
-    -- A map with no spot for it: the panel goes on the screen, tooltips and all.
-    S.board.custom = { image = "http://example.invalid/other-map.png" }
-    buildUi()
-    local screen = byId(S.xml)
-    eq(screen.fdr_undo.attributes.onClick, "fdUndo")
-    assert(screen.fdr_undo.attributes.tooltip, "tooltips on the screen")
+    local panel = byId(S.xml)
+    eq(panel.fdr_rules_book.attributes.onClick, "fdRules")
+    eq(panel.fdr_issue.attributes.onClick, "fdReportIssue")
+    eq(panel.fdr_undo.attributes.onClick, "fdUndo")
+    assert(panel.fdr_undo.attributes.tooltip, "with tooltips")
 end
 
 function T.the_setup_menu_sets_the_distance()
@@ -2296,25 +2278,17 @@ function T.start_race_needs_drivers_and_the_host()
     assert(S.logged("Nobody is seated yet"))
 end
 
-function T.the_race_panel_lies_on_the_board_where_the_track_says()
+function T.the_race_panel_is_on_the_screen_even_where_the_board_has_a_spot()
     local S = world()
-    local panel = S.board.xml[1].attributes
-    eq(panel.id, "fdr", "drawn on the board tile")
-    for _, node in ipairs(S.xml) do
-        assert(node.attributes.id ~= "fdr", "not on the screen")
-    end
-    -- Monaco's spot, on the Formula D logo: centred on (2172, 1410) of the
-    -- 2474 x 1616 image, which is local (-935 / 2474, 602 / 1616) on a
-    -- 1-unit tile; 400 pixels wide.
-    local x, y = panel.position:match("^(%S+) (%S+)")
-    eq(x, "-37.8")
-    eq(y, "37.3")
-    eq(panel.scale, "0.0425 0.0425 1", "380 UI units across 400 pixels")
-    eq(panel.rotation, "0 0 180", "the same way up as the picture")
-    -- A new map reloads the tile, which loses its UI: it is drawn again.
-    S.board.xml = {}
-    fdMapChanged()
-    eq(S.board.xml[1].attributes.id, "fdr")
+    -- Monaco's track names a spot on the board, from when the panel lay there.
+    assert(require("fd.data.tracks.FDMonaco").panel)
+    assert(byId(S.xml).fdr, "on the screen")
+    eq(#(S.board.xml or {}), 0, "not on the board")
+    -- A game saved while it lay on the board has it there still: taken off.
+    S.board.xml = { { tag = "Panel", attributes = { id = "fdr" }, children = {} } }
+    buildUi()
+    eq(#S.board.xml, 0, "the old one taken off the board")
+    assert(byId(S.xml).fdr, "and on the screen")
 end
 
 function T.the_dice_tray_moves_where_the_board_menu_says_and_is_saved()
@@ -2404,35 +2378,25 @@ function T.turning_the_dice_moves_their_row_a_quarter_round_the_tray()
     eq(table.concat(sides, " "), "right down left up")
 end
 
-function T.the_race_panel_moves_and_resizes_from_the_board_menu()
+function T.the_board_menu_holds_the_layout_and_while_open_the_editor()
     local S = world()
-    local Track = require("fd.tts.track")
-    local FDMonaco = require("fd.data.tracks.FDMonaco")
-    -- Monaco's own spot is 2474 / 2 - 935 = 302 pixels from its middle's x.
-    S.board.rightClick("Put the race panel here", "Red", Track.worldOf(S.board, FDMonaco, 1237, 808))
-    local panel = S.board.xml[1].attributes
-    local x, y = panel.position:match("^(%S+) (%S+)")
-    assert(math.abs(tonumber(x)) < 0.05 and math.abs(tonumber(y)) < 0.05, "centred on the board: " .. x .. " " .. y)
-    eq(panel.scale, "0.0425 0.0425 1", "as wide as before")
-    S.board.menu["Race panel larger"]("Red")
-    eq(S.board.xml[1].attributes.scale, "0.0489 0.0489 1", "15% wider")
-    assert(math.abs(onSave().json.edits.FDMonaco.panel.width - 460) < 1e-6, "saved")
-    S.board.menu["Race panel smaller"]("Red")
-    eq(S.board.xml[1].attributes.scale, "0.0425 0.0425 1")
+    fdLayout({ color = "Red" })
+    assert(S.board.menu["Put the dice here"], "layout items")
+    eq(S.board.menu["Put the race panel here"], nil, "none for the race panel, on the screen now")
     -- The editor's own items join the layout ones while it is open, and go
     -- again when it closes.
     fdEdit({ color = "Red", steam_name = "RedPlayer" })
     assert(S.board.menu["Pick up spaces here"], "editor items while it is open")
     fdEdit({ color = "Red", steam_name = "RedPlayer" })
     eq(S.board.menu["Pick up spaces here"], nil)
-    assert(S.board.menu["Put the race panel here"], "layout items stay")
+    assert(S.board.menu["Put the dice here"], "layout items stay")
 end
 
 function T.the_race_panel_goes_on_the_screen_for_a_map_without_a_spot()
     local S = world()
     S.board.custom = { image = "http://example.invalid/other-map.png" }
     fdMapChanged()
-    eq(#S.board.xml, 0, "off the board")
+    eq(#(S.board.xml or {}), 0, "off the board")
     local found = nil
     for _, node in ipairs(S.xml) do
         if node.attributes.id == "fdr" then found = node end

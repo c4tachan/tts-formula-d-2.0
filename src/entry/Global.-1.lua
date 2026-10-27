@@ -226,8 +226,8 @@ function onLoad(saved_data)
     end, 1)
 end
 
---- (Re)build the race panel on the board, the screen dashboards and the
--- setup menu, then fill them in.
+--- (Re)build the race panel, the screen dashboards and the setup menu,
+-- then fill them in.
 function buildUi()
     -- Until the new XML has loaded, updates would go to elements on their way
     -- out and then be skipped as repeats once it has (see fd.tts.ui).
@@ -245,8 +245,7 @@ function buildUi()
         rulesets[i] = { name = r.name, current = r == rules }
     end
     panels[#panels + 1] = Setup.panel(maps, rulesets)
-    local track = map and TRACKS[map.id]
-    Hud.build(rules, panels, Track.tile(), track and Editor.trackFor(track), function()
+    Hud.build(rules, panels, Track.tile(), function()
         Mini.setReady()
         Setup.setReady()
         refresh()
@@ -1542,12 +1541,9 @@ function fdSetupMap(player, value)
     custom.image = Assets.url(map.url)
     custom.secondary_image = custom.image
     tile.setCustomObject(custom)
-    -- Reloading takes the race panel with the tile: hold its updates until
-    -- it is drawn again (fdMapChanged).
-    Hud.hold()
     tile.reload()
     printToAll(player.steam_name .. " puts " .. map.name .. " on the board", LEVEL_RGB.info)
-    -- Once the tile is back: the race panel, the menu and the dice follow it.
+    -- Once the tile is back: the menu and the dice follow it.
     Wait.time(function() fdMapChanged() end, 1)
 end
 
@@ -1639,8 +1635,8 @@ function fdSetupRules(player, value)
     buildUi()
 end
 
---- A new map is on the board. Reloading the tile took the race panel with
--- it, so it is drawn again; the setup menu says which map it is, turn order
+--- A new map is on the board. The panels are drawn again: the setup menu
+-- says which map it is; turn order
 -- goes by its track, its pit boxes take their seats' colours, and the dice
 -- move to its name panel.
 -- Longest to wait for a reloaded board tile to be ready, in seconds. Past
@@ -2092,7 +2088,7 @@ local function addAt(color, pos)
     editorStatus()
 end
 
---- The board layout: where the dice tray and the race panel go on the map
+--- The board layout: where the dice tray goes on the map
 -- on the board. Kept with the track's edits (fd.tts.track_editor), and
 -- brought into the repo by import_track.py like the rest of them.
 local function layoutTrack(color)
@@ -2113,16 +2109,6 @@ local function diceAt(color, pos)
         color, LEVEL_RGB.info)
 end
 
-local function panelAt(color, pos)
-    local tile, track = layoutTrack(color)
-    if not (tile and track) then return end
-    local px, py = Track.pixelOf(tile, track, pos)
-    Editor.setPanel(track, px, py)
-    buildUi()
-    broadcastToColor(string.format("Race panel moved to (%d, %d). Save the game to keep it.", px, py),
-        color, LEVEL_RGB.info)
-end
-
 local function turnDice(color)
     local tile, track = layoutTrack(color)
     if not (tile and track) then return end
@@ -2134,21 +2120,6 @@ local function turnDice(color)
     layDice()
     broadcastToColor("The dice now line up along the tray's " .. side
         .. " side (as the board image runs). Save the game to keep it.", color, LEVEL_RGB.info)
-end
-
--- How much each step makes the race panel larger or smaller.
-local PANEL_STEP = 1.15
-
-local function scalePanel(color, factor)
-    local tile, track = layoutTrack(color)
-    if not (tile and track) then return end
-    local width = Editor.scalePanel(track, factor)
-    if not width then
-        broadcastToColor("Put the race panel on the board first (Put the race panel here).", color, LEVEL_RGB.warn)
-        return
-    end
-    buildUi()
-    broadcastToColor(string.format("Race panel %d px wide. Save the game to keep it.", width), color, LEVEL_RGB.info)
 end
 
 -- Whether the board is open for its layout to be set (fdLayout).
@@ -2212,9 +2183,6 @@ boardMenu = function(on)
     end
     item("Put the dice here", diceAt)
     item("Turn the dice", turnDice)
-    item("Put the race panel here", panelAt)
-    item("Race panel larger", function(color) scalePanel(color, PANEL_STEP) end)
-    item("Race panel smaller", function(color) scalePanel(color, 1 / PANEL_STEP) end)
     item("Use the track file", useTrackFile)
     if not on then return end
     item("Pick up spaces here", pickUpAt)
@@ -2232,8 +2200,8 @@ function fdLayout(player)
     layoutOn = not layoutOn
     boardMenu(Editor.isOpen())
     if layoutOn then
-        broadcastToColor("Right-click the board: Put the dice here, Turn the dice, Put the race panel here, "
-            .. "Race panel larger / smaller, Use the track file (drop this game's edits to it). "
+        broadcastToColor("Right-click the board: Put the dice here, Turn the dice, "
+            .. "Use the track file (drop this game's edits to it). "
             .. "Press Layout again when done, and save the game to keep it.",
             player.color, LEVEL_RGB.info)
     else
@@ -2304,7 +2272,7 @@ local function editorKey(fn)
     return function(color, hovered, pointer, up)
         if up or not admin({ color = color }) then return end
         if not Editor.isOpen() then
-            broadcastToColor("Open the track editor first (Edit on the race panel).", color, LEVEL_RGB.warn)
+            broadcastToColor("Open the track editor first (Edit track on the setup menu).", color, LEVEL_RGB.warn)
             return
         end
         fn(color, hovered, pointer)
@@ -2321,9 +2289,6 @@ local function registerEditorKeys()
     end
     addHotkey("Board layout: put the dice here", layoutKey(diceAt))
     addHotkey("Board layout: turn the dice", layoutKey(turnDice))
-    addHotkey("Board layout: put the race panel here", layoutKey(panelAt))
-    addHotkey("Board layout: race panel larger", layoutKey(function(color) scalePanel(color, PANEL_STEP) end))
-    addHotkey("Board layout: race panel smaller", layoutKey(function(color) scalePanel(color, 1 / PANEL_STEP) end))
     addHotkey("Track editor: pick up spaces here", editorKey(function(color, _, pointer)
         pickUpAt(color, pointer)
     end))
