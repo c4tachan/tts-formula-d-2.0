@@ -214,7 +214,10 @@ function T.a_seat_with_no_dashboard_gets_one_from_the_bag()
     assert(dash ~= S.beginner and dash ~= S.advanced, "a fresh dashboard")
     eq(dash.up.y, -1, "beginner side up")
     eq(dash.rot.y, 0, "turned to face the seat")
-    assert(dash.pos.z > -38 and dash.pos.z < -30, "in front of the seat")
+    assert(dash.pos.z > -38 and dash.pos.z < -28, "in front of the seat")
+    -- Its near edge (3.26 from its middle) clear of the far side of the
+    -- hand zone (about 3.2 from the hand's middle), where the cards stand.
+    assert(dash.pos.z - 3.26 > -38 + 3.2, "clear of the hand")
     assert(dash.pos.y > 1, "on the table")
     eq(dash.buttons[1].click_function, "fdNoop", "its status label is drawn")
     assert(getObjectFromGUID(green.tts.car), "and a car")
@@ -2645,7 +2648,7 @@ function T.the_rules_button_puts_the_rulebook_in_front_of_your_seat()
     -- Red sits at z = -38 facing +z: ahead as a dashboard goes, then to
     -- their left (-x), the other side from the car.
     eq(book.pos.x, -9)
-    eq(book.pos.z, -38 + 3.5)
+    eq(book.pos.z, -38 + 7.5)
     eq(book.rot.y, 0, "facing the seat")
 
     fdRules(Player.Red)
