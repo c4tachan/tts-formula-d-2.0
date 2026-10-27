@@ -1,0 +1,686 @@
+[
+ {
+  "file": "Advanced_Dashboard_ColliderURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376249016/05FEC46559CC477C10071FDDC372854D19CAD239/",
+  "use": [
+   "Advanced Dashboard.ColliderURL",
+   "Beginner Dashboard.ColliderURL"
+  ]
+ },
+ {
+  "file": "Advanced_Dashboard_DiffuseURL.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376223859/3149670324DC1FF3D734BC3145C0C47C1D0EE65D/",
+  "use": [
+   "Advanced Dashboard.DiffuseURL",
+   "Gear Stick.DiffuseURL",
+   "Wear Tracker.DiffuseURL",
+   "Beginner Dashboard.DiffuseURL",
+   "ui:fdDashboard"
+  ]
+ },
+ {
+  "file": "Advanced_Dashboard_MeshURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376256359/3AA57EDF77C43D67617058ED0A9B8172A5E7C068/",
+  "use": [
+   "Advanced Dashboard.MeshURL",
+   "Beginner Dashboard.MeshURL"
+  ]
+ },
+ {
+  "file": "Damage_Marker_DiffuseURL.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376400720/EECBF282979E3B0BA26A0DEC6D431AF30EBB554D/",
+  "use": [
+   "Damage Marker.DiffuseURL"
+  ]
+ },
+ {
+  "file": "Damage_Marker_MeshURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376400123/F0DEE085540106AA7278341FDB647C0234C3E489/",
+  "use": [
+   "Damage Marker.MeshURL"
+  ]
+ },
+ {
+  "file": "Deck_FaceURL.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376360342/E66960A50427A2F03C089F166D9128361B9D8B2E/",
+  "use": [
+   "Deck.FaceURL",
+   "Deck.BackURL",
+   "Card.FaceURL",
+   "Card.BackURL"
+  ]
+ },
+ {
+  "file": "Derek_Green_Team_DiffuseURL.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376478824/86529B7292D9C2B1A3DDF24CFE5F955E7E905F51/",
+  "use": [
+   "Derek Green Team.DiffuseURL"
+  ]
+ },
+ {
+  "file": "Diane_White_Team_DiffuseURL.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376464925/38C154AE5FE7E19E192ABE235609CEF9F28FAF7D/",
+  "use": [
+   "Diane White Team.DiffuseURL"
+  ]
+ },
+ {
+  "file": "Dimitri_Red_Team_DiffuseURL.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376475552/6E178716295FB80A6124833C25B1E9965A590562/",
+  "use": [
+   "Dimitri Red Team.DiffuseURL"
+  ]
+ },
+ {
+  "file": "Fifth_Gear_Dice_ColliderURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376334378/4BA6223F2DB6C2408AC980218B2F8D9C96AC84EC/",
+  "use": [
+   "Fifth Gear Dice.ColliderURL"
+  ]
+ },
+ {
+  "file": "Fifth_Gear_Dice_DiffuseURL.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376333593/E36B7E080292641810AF6CDDDE48ECA80FBC45BF/",
+  "use": [
+   "Fifth Gear Dice.DiffuseURL"
+  ]
+ },
+ {
+  "file": "Fifth_Gear_Dice_MeshURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376332147/4BA6223F2DB6C2408AC980218B2F8D9C96AC84EC/",
+  "use": [
+   "Fifth Gear Dice.MeshURL"
+  ]
+ },
+ {
+  "file": "First_Gear_Dice_ColliderURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376314652/2E4F434CB4FA1D5FBE795F758E40F27F9276AC57/",
+  "use": [
+   "First Gear Dice.ColliderURL"
+  ]
+ },
+ {
+  "file": "First_Gear_Dice_DiffuseURL.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376313466/DFD81BCBFC5F94B0E36E8ED3D2670D224239A246/",
+  "use": [
+   "First Gear Dice.DiffuseURL"
+  ]
+ },
+ {
+  "file": "First_Gear_Dice_MeshURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376312899/2E4F434CB4FA1D5FBE795F758E40F27F9276AC57/",
+  "use": [
+   "First Gear Dice.MeshURL"
+  ]
+ },
+ {
+  "file": "Formula_1_Black_DiffuseURL.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376499344/2EC1C42A84B24EF94AAF2C03CA884DAC89D9A326/",
+  "use": [
+   "Formula 1 Black.DiffuseURL"
+  ]
+ },
+ {
+  "file": "Formula_1_Black_MeshURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376497767/CE18C3F74DA725FD41EAC3D46E26CC284C566EB1/",
+  "use": [
+   "Formula 1 Black.MeshURL"
+  ]
+ },
+ {
+  "file": "Formula_1_Solid_DiffuseURL.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376507421/8A5B06F5BD75053F2140E2401DB81A55918D61FC/",
+  "use": [
+   "Formula 1 Solid.DiffuseURL"
+  ]
+ },
+ {
+  "file": "Formula_1_Solid_MeshURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376509471/CE18C3F74DA725FD41EAC3D46E26CC284C566EB1/",
+  "use": [
+   "Formula 1 Solid.MeshURL"
+  ]
+ },
+ {
+  "file": "Fourth_Gear_Dice_ColliderURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376349274/2E0F35B6C1EDA0802A5905525BCD33463AD59F37/",
+  "use": [
+   "Fourth Gear Dice.ColliderURL"
+  ]
+ },
+ {
+  "file": "Fourth_Gear_Dice_DiffuseURL.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376350649/928E92C7D36029E14CD181FA55D984EB082308AE/",
+  "use": [
+   "Fourth Gear Dice.DiffuseURL"
+  ]
+ },
+ {
+  "file": "Fourth_Gear_Dice_MeshURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376345636/2E0F35B6C1EDA0802A5905525BCD33463AD59F37/",
+  "use": [
+   "Fourth Gear Dice.MeshURL"
+  ]
+ },
+ {
+  "file": "Gear_Stick_MeshURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376224437/A34C5EA6B4BDCA2FD8B176D692EEEABB2C6A35E2/",
+  "use": [
+   "Gear Stick.MeshURL"
+  ]
+ },
+ {
+  "file": "Jack_Blue_Team_DiffuseURL.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376453630/9CAB3AD138013693BFE988A82FFB5C3867F9BB98/",
+  "use": [
+   "Jack Blue Team.DiffuseURL"
+  ]
+ },
+ {
+  "file": "Jenny_Red_Team_DiffuseURL.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376461249/87E0001999A73D4060E7C277F52FC49CD7EC06B5/",
+  "use": [
+   "Jenny Red Team.DiffuseURL"
+  ]
+ },
+ {
+  "file": "Julien_Green_Team_DiffuseURL.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376468687/3FE1210CDAA1035602D41936E99D623B08B14CBD/",
+  "use": [
+   "Julien Green Team.DiffuseURL"
+  ]
+ },
+ {
+  "file": "Li_Tsu_White_Team_DiffuseURL.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376433770/B28E6609294B441A78F83C7067032983EA2AC949/",
+  "use": [
+   "Li Tsu White Team.DiffuseURL"
+  ]
+ },
+ {
+  "file": "Li_Tsu_White_Team_MeshURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376422144/70F77805BB8E930DFB58EDD2E992010BBA00B75E/",
+  "use": [
+   "Li Tsu White Team.MeshURL",
+   "Montoya Blue Team.MeshURL",
+   "Jack Blue Team.MeshURL",
+   "Stanley Yellow Team.MeshURL",
+   "Jenny Red Team.MeshURL",
+   "Diane White Team.MeshURL",
+   "Julien Green Team.MeshURL",
+   "Temana Yellow Team.MeshURL",
+   "Dimitri Red Team.MeshURL",
+   "Derek Green Team.MeshURL"
+  ]
+ },
+ {
+  "file": "Montoya_Blue_Team_DiffuseURL.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376444645/ED86CD3530855D05F79982F3425D989F7EF4F9C0/",
+  "use": [
+   "Montoya Blue Team.DiffuseURL"
+  ]
+ },
+ {
+  "file": "Rulebook_Advanced_PDFUrl.pdf",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376794566/5DDDC872990A5B862391EA4C40314B8FC8C620FF/",
+  "use": [
+   "Rulebook Advanced.PDFUrl"
+  ]
+ },
+ {
+  "file": "Rulebook_Beginner_PDFUrl.pdf",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376795302/2D6CF3A3EC2DF2285C6E14B4CE8190192A92DE5A/",
+  "use": [
+   "Rulebook Beginner.PDFUrl"
+  ]
+ },
+ {
+  "file": "Second_Gear_Dice_ColliderURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376323279/357BAAD4DEE9E12DC59DE59F0CD710CCC73E5569/",
+  "use": [
+   "Second Gear Dice.ColliderURL"
+  ]
+ },
+ {
+  "file": "Second_Gear_Dice_DiffuseURL.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376324805/37DC40CE587CBC3C1F7495C72706665CD21E19DC/",
+  "use": [
+   "Second Gear Dice.DiffuseURL"
+  ]
+ },
+ {
+  "file": "Second_Gear_Dice_MeshURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376323974/357BAAD4DEE9E12DC59DE59F0CD710CCC73E5569/",
+  "use": [
+   "Second Gear Dice.MeshURL"
+  ]
+ },
+ {
+  "file": "Setup_Board_ImageURL.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014944186280113044/B539CB88586093B7B1485B1B07841EA29C7EB043/",
+  "use": [
+   "Setup Board.ImageURL"
+  ]
+ },
+ {
+  "file": "Sixth_Gear_Dice_ColliderURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376340165/46620A9939FE40EC50A09D55F6783A0CB2A96D18/",
+  "use": [
+   "Sixth Gear Dice.ColliderURL"
+  ]
+ },
+ {
+  "file": "Sixth_Gear_Dice_DiffuseURL.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376341948/2713E732F0557BEF362749184C9D95F4DF188859/",
+  "use": [
+   "Sixth Gear Dice.DiffuseURL"
+  ]
+ },
+ {
+  "file": "Sixth_Gear_Dice_MeshURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376340802/46620A9939FE40EC50A09D55F6783A0CB2A96D18/",
+  "use": [
+   "Sixth Gear Dice.MeshURL"
+  ]
+ },
+ {
+  "file": "Sky.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943920258633832/621B73D374E2079F36F75DEBE995313A8F412769/",
+  "use": [
+   "SkyURL"
+  ]
+ },
+ {
+  "file": "Sports_Car_DiffuseURL.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376515219/AE0BBE154AAE3CC2FD3C1F9D246CCA1AEE20804A/",
+  "use": [
+   "Sports Car.DiffuseURL"
+  ]
+ },
+ {
+  "file": "Sports_Car_MeshURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376513598/6242ED42C06A069E9C1A4E9DE75556CE8FAE83A3/",
+  "use": [
+   "Sports Car.MeshURL"
+  ]
+ },
+ {
+  "file": "Stanley_Yellow_Team_DiffuseURL.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376457901/5FE8C0280E1CBB7BAA1EE8DEAF80AB0B5EECC9DC/",
+  "use": [
+   "Stanley Yellow Team.DiffuseURL"
+  ]
+ },
+ {
+  "file": "Table.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376524460/0FB4B0615F849D0927EACDE49445585E5D914C22/",
+  "use": [
+   "TableURL"
+  ]
+ },
+ {
+  "file": "Temana_Yellow_Team_DiffuseURL.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376472385/DBCCF696FACD4C95A6E2C6F3C7F16D341346A108/",
+  "use": [
+   "Temana Yellow Team.DiffuseURL"
+  ]
+ },
+ {
+  "file": "Third_Gear_Dice_ColliderURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376300982/4DC081EDACCD8D1E4AAE62E8470BDA86C33F5891/",
+  "use": [
+   "Third Gear Dice.ColliderURL"
+  ]
+ },
+ {
+  "file": "Third_Gear_Dice_DiffuseURL.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376302575/8F8E816DC6EDE713D6642C523F6469A4CC0EB2B1/",
+  "use": [
+   "Third Gear Dice.DiffuseURL"
+  ]
+ },
+ {
+  "file": "Third_Gear_Dice_MeshURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376300176/4DC081EDACCD8D1E4AAE62E8470BDA86C33F5891/",
+  "use": [
+   "Third Gear Dice.MeshURL"
+  ]
+ },
+ {
+  "file": "Tire_Type_Marker_-_Rain_MeshURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376396326/F0DEE085540106AA7278341FDB647C0234C3E489/",
+  "use": [
+   "Tire Type Marker - Rain.MeshURL"
+  ]
+ },
+ {
+  "file": "Tire_Type_Marker_-_Sun_DiffuseURL.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376390292/9A0C9C40212B36CF1AB7B1AC02C72F40F9FD03ED/",
+  "use": [
+   "Tire Type Marker - Sun.DiffuseURL",
+   "Tire Type Marker - Rain.DiffuseURL"
+  ]
+ },
+ {
+  "file": "Tire_Type_Marker_-_Sun_MeshURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376391101/F0DEE085540106AA7278341FDB647C0234C3E489/",
+  "use": [
+   "Tire Type Marker - Sun.MeshURL"
+  ]
+ },
+ {
+  "file": "Wear_Tracker_MeshURL.obj",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869376224936/C67D1C6E0D3796E9BFDFA82F3D0211A58B102258/",
+  "use": [
+   "Wear Tracker.MeshURL"
+  ]
+ },
+ {
+  "file": "ui_BigBoxModMenu.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014944122125180336/7ED03448E3E98633F8A43CD48019D188DF205E63/",
+  "use": [
+   "ui:BigBoxModMenu"
+  ]
+ },
+ {
+  "file": "ui_ThumbD.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014944186280770694/2FA56E833CDFF56489F02D49A0115AACD579E214/",
+  "use": [
+   "ui:ThumbD"
+  ]
+ },
+ {
+  "file": "ui_ThumbDe.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014944186280768856/C3E9E741E3B744E2BDD7EE24D5C990924AEFDF71/",
+  "use": [
+   "ui:ThumbDe"
+  ]
+ },
+ {
+  "file": "ui_fD5Sotchi.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943920262854222/F5A55E4A548CBAB9FB3746B868E012AC529195CD/",
+  "use": [
+   "ui:fD5Sotchi"
+  ]
+ },
+ {
+  "file": "ui_fD6Austin.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943920262855344/4BD44961873B5D4DFF0D43C9EDF63CA32C89BC2C/",
+  "use": [
+   "ui:fD6Austin"
+  ]
+ },
+ {
+  "file": "ui_fd4Buddh.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943920262852084/80662A0C1EDCFDBF79728162BA8814E4458BA60D/",
+  "use": [
+   "ui:fd4Buddh"
+  ]
+ },
+ {
+  "file": "ui_formula10brasil.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374155439/4F0CFEA07FC7AECFA96A94F9981650F490F076E1/",
+  "use": [
+   "ui:formula10brasil"
+  ]
+ },
+ {
+  "file": "ui_formula11watkinsglen.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374157420/8835C356D56EBB7B42BC18731680BE97DBBF83D4/",
+  "use": [
+   "ui:formula11watkinsglen"
+  ]
+ },
+ {
+  "file": "ui_formula12silverstone.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374159936/2E5FD8F5B714D6C7ADA7B7862789BC2A9656296C/",
+  "use": [
+   "ui:formula12silverstone"
+  ]
+ },
+ {
+  "file": "ui_formula13montreal.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374161143/D4939FA77D10DB951424F5420F861F2389EA421D/",
+  "use": [
+   "ui:formula13montreal"
+  ]
+ },
+ {
+  "file": "ui_formula14longbeach.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374162331/91BF1713DA3751276B85D65098453ADC8134342F/",
+  "use": [
+   "ui:formula14longbeach"
+  ]
+ },
+ {
+  "file": "ui_formula15hokenheim.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374163506/A8125BE5DE6B944020D5EC32A89D6C3F00DEFBF1/",
+  "use": [
+   "ui:formula15hokenheim"
+  ]
+ },
+ {
+  "file": "ui_formula16zeltweg.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374164932/84E8BB22B8845741AC218F6A83D8CEABC15F8A5F/",
+  "use": [
+   "ui:formula16zeltweg"
+  ]
+ },
+ {
+  "file": "ui_formula17buenosaires.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374166063/404E68D2F56EE6F4986E238C332C078C26AC6D90/",
+  "use": [
+   "ui:formula17buenosaires"
+  ]
+ },
+ {
+  "file": "ui_formula18barcelona.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374167096/6497B830CB98012964B58D96E9324C7CDDC71062/",
+  "use": [
+   "ui:formula18barcelona"
+  ]
+ },
+ {
+  "file": "ui_formula19suzuka.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374167936/5DF6D8368293081E028EE4DB4AB367EA6D9B05EF/",
+  "use": [
+   "ui:formula19suzuka"
+  ]
+ },
+ {
+  "file": "ui_formula1monaco.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374168898/43775C6FB726A61793732517758D38C5AC6EB46F/",
+  "use": [
+   "ui:formula1monaco"
+  ]
+ },
+ {
+  "file": "ui_formula20melbourneorg.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374169875/7C00E0174B34AF3EA5CD754654C9D8CF2472A681/",
+  "use": [
+   "ui:formula20melbourneorg"
+  ]
+ },
+ {
+  "file": "ui_formula20melbournerev.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374170622/F7FB089401F8A81519FD7FC6C98B122EA7383A24/",
+  "use": [
+   "ui:formula20melbournerev"
+  ]
+ },
+ {
+  "file": "ui_formula21budapestorg.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374171572/74107B94762B3D02BA37283BC0F26178DFE840F9/",
+  "use": [
+   "ui:formula21budapestorg"
+  ]
+ },
+ {
+  "file": "ui_formula21budapestrev.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374172486/FD6A22A3825430E620D35CB0EAAA5A65CE576D9D/",
+  "use": [
+   "ui:formula21budapestrev"
+  ]
+ },
+ {
+  "file": "ui_formula22nurburgringorg.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374173562/235FEDD5D21C4D5958F9850C60DF6F48FE96D61D/",
+  "use": [
+   "ui:formula22nurburgringorg"
+  ]
+ },
+ {
+  "file": "ui_formula22nurburgringrev.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374174787/E0F62C079BEF095C4F9BC931BA12C1DB1786A225/",
+  "use": [
+   "ui:formula22nurburgringrev"
+  ]
+ },
+ {
+  "file": "ui_formula26indianapolisorg.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374181343/378A294F64E52EFE337521776A10DA1129229861/",
+  "use": [
+   "ui:formula26indianapolisorg"
+  ]
+ },
+ {
+  "file": "ui_formula26indianapolisrev.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374182157/DE4EA1CC8F6EEC0A74DFDAF29243AF5E538888D7/",
+  "use": [
+   "ui:formula26indianapolisrev"
+  ]
+ },
+ {
+  "file": "ui_formula27detroitorg.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374183632/95F22BF1FD938809D4BB0C96F188D76751D09AB9/",
+  "use": [
+   "ui:formula27detroitorg"
+  ]
+ },
+ {
+  "file": "ui_formula27detroitrev.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374184855/1B9DEA1689DED161D3238C0FD40DC01B59B91F0E/",
+  "use": [
+   "ui:formula27detroitrev"
+  ]
+ },
+ {
+  "file": "ui_formula2nederland.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374189807/D82BD79053DBD811211282ADB9ADA5C7DCE0EA85/",
+  "use": [
+   "ui:formula2nederland"
+  ]
+ },
+ {
+  "file": "ui_formula32sepang.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374193178/CA04A5CDD20ACC9279B632C010AC7F6CF4BABBC9/",
+  "use": [
+   "ui:formula32sepang"
+  ]
+ },
+ {
+  "file": "ui_formula34nedex.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1624066328576641417/93B9885DF6BCBEC536BA97EA9FFE1A9CC0F00948/",
+  "use": [
+   "ui:formula34nedex"
+  ]
+ },
+ {
+  "file": "ui_formula3nederland2.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374196045/9A60E4395CE4CC3BDBA6F9E3346757A79708A2DA/",
+  "use": [
+   "ui:formula3nederland2"
+  ]
+ },
+ {
+  "file": "ui_formula4belgique.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374196701/EFAB4888A09725030FAEB157637E3BED1A7D3443/",
+  "use": [
+   "ui:formula4belgique"
+  ]
+ },
+ {
+  "file": "ui_formula5southafrica.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374197859/E68DFAB26EB4196BA9227F17496042B19B4E8116/",
+  "use": [
+   "ui:formula5southafrica"
+  ]
+ },
+ {
+  "file": "ui_formula6sanmarino.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374198760/0C2758EE4534FB565528E07CD94F1FF99AE6C618/",
+  "use": [
+   "ui:formula6sanmarino"
+  ]
+ },
+ {
+  "file": "ui_formula7france.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374199922/F17129A567CE3BB710BA58A5E7F050E7F4743C75/",
+  "use": [
+   "ui:formula7france"
+  ]
+ },
+ {
+  "file": "ui_formula8italiaorg.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374200934/CD39BC3AF938030E302557A13DA8630BF9755E75/",
+  "use": [
+   "ui:formula8italiaorg"
+  ]
+ },
+ {
+  "file": "ui_formula8italiarev.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374201964/03BB8BB1B93DDA832E72C621BFCF493F58CC9D4F/",
+  "use": [
+   "ui:formula8italiarev"
+  ]
+ },
+ {
+  "file": "ui_formula9portugalorg.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374202801/CEBDA5295871B1C32D686B3EBF0A05E7F5DFC778/",
+  "use": [
+   "ui:formula9portugalorg"
+  ]
+ },
+ {
+  "file": "ui_formula9portugalrev.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943869374203566/8B9A72E17483126A1497155D0EFF3F74F78F9BA0/",
+  "use": [
+   "ui:formula9portugalrev"
+  ]
+ },
+ {
+  "file": "ui_formulaD0Amonaco.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781016154215/F07993E64590795C5822584EE1AD0264C8402626/",
+  "use": [
+   "ui:formulaD0Amonaco"
+  ]
+ },
+ {
+  "file": "ui_formulaD1Asebring.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781016158515/6AAF2642D4AEA32A02F05174F935E6347E01E396/",
+  "use": [
+   "ui:formulaD1Asebring"
+  ]
+ },
+ {
+  "file": "ui_formulaD2Ahockenheimring.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781016160372/3837688FC9FA7185F6C6B314B6D70A472EC372BB/",
+  "use": [
+   "ui:formulaD2Ahockenheimring"
+  ]
+ },
+ {
+  "file": "ui_formulaD2Bvalencia.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781016161662/55246815607AB6AE618B9857C51E49C69A9B6A83/",
+  "use": [
+   "ui:formulaD2Bvalencia"
+  ]
+ },
+ {
+  "file": "ui_formulaD3Bsingapore.jpg",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/1014943781016165483/77A581A64908CA941A25FB0F1DB726BF31EF8300/",
+  "use": [
+   "ui:formulaD3Bsingapore"
+  ]
+ }
+]

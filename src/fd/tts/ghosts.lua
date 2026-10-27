@@ -11,12 +11,13 @@
 -- Editor.onHover). The ones only there to be looked at have no collision at all.
 
 local Track = require("fd.tts.track")
+local Assets = require("fd.data.assets")
 
 local Ghosts = {}
 
 -- The Formula 1 Solid car from the mod's own bag (see CAR_BAG in Global).
-local MESH = "https://steamusercontent-a.akamaihd.net/ugc/1014943869376509471/CE18C3F74DA725FD41EAC3D46E26CC284C566EB1/"
-local DIFFUSE = "https://steamusercontent-a.akamaihd.net/ugc/1014943869376507421/8A5B06F5BD75053F2140E2401DB81A55918D61FC/"
+local MESH = Assets.url("https://steamusercontent-a.akamaihd.net/ugc/1014943869376509471/CE18C3F74DA725FD41EAC3D46E26CC284C566EB1/")
+local DIFFUSE = Assets.url("https://steamusercontent-a.akamaihd.net/ugc/1014943869376507421/8A5B06F5BD75053F2140E2401DB81A55918D61FC/")
 -- Smaller than the cars players race with (1.5), so neighbouring ghosts
 -- stand clear of each other and the print shows round them.
 local SCALE = 1.0

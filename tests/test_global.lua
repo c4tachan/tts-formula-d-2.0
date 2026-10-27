@@ -370,7 +370,10 @@ function T.the_setup_menu_chooses_the_map()
     fdSetupMap(Player.Blue, "Formula D: Austin")
     eq(S.board.custom.image, Maps.byId.FDMonaco.url, "only the host chooses")
     fdSetupMap(Player.Red, "Formula D: Austin")
-    eq(S.board.custom.image, Maps.byId.FDAustin.url, "the host's choice goes on the board")
+    local Assets = require("fd.data.assets")
+    eq(S.board.custom.image, Assets.url(Maps.byId.FDAustin.url), "the host's choice goes on the board")
+    assert(S.board.custom.image:find("^https://raw.githubusercontent.com/.+/tracks/raw/FDAustin"),
+        "loaded from the repo's copy")
     eq(S.board.reloads, 1, "reloaded to show it")
     assert(S.logged("puts Formula D: Austin on the board"))
     assert(S.ui.fds_map.value:find("Austin"), "and the menu says so")
@@ -645,7 +648,7 @@ end
 function T.the_screen_copy_follows_the_car()
     local S = redRacing()
     eq(S.assets[1].name, "fdDashboard", "dashboard texture registered once")
-    assert(S.assets[1].url:find("akamaihd"), "a URL that still serves the image")
+    assert(S.assets[1].url:find("^https://raw.githubusercontent.com/"), "from the repo's copy")
     eq(S.ui.fdm_Red.active, "true")
     eq(S.ui.fdm_Blue.active, "false", "only shown to players in the race")
     assert(S.ui["fdm_Red_label"].value:find("18 WP"))
@@ -1371,7 +1374,7 @@ function T.opening_the_editor_puts_a_ghost_car_on_every_space()
     local sp = FDMonaco.spaces[100]
     local m = S.find("Space " .. sp.id .. " (lane " .. sp.lane .. ")")
     eq(m.data.Name, "Custom_Model")
-    assert(m.data.CustomMesh.MeshURL:find("steamusercontent"), "the car's own model")
+    assert(m.data.CustomMesh.MeshURL:find("/assets/raw/Formula_1_Solid_MeshURL.obj", 1, true), "the car's own model")
     eq(m.locked, true, "locked: no physics")
     eq(m.collider.enabled, true, "keeps its collision, so it can be picked up")
     assert(m.tint.a < 1, "see-through")
@@ -2600,6 +2603,40 @@ function T.a_load_clears_the_marks_the_save_kept()
     onLoad(saved)
     eq(marksOn(S2).clean, nil, "the move's marks are gone")
     eq(marksOn(S2).brake, nil)
+end
+
+function T.a_map_is_known_by_its_steam_url_or_the_repo_copy()
+    local Maps = require("fd.data.maps")
+    local Assets = require("fd.data.assets")
+    local S = world()
+    local monaco = Maps.byId.FDMonaco.url
+    for _, image in ipairs({
+        monaco,
+        Assets.url(monaco),
+        (monaco:gsub("^https://steamusercontent%-a%.akamaihd%.net/", "http://cloud-3.steamusercontent.com/")),
+    }) do
+        S.board.custom = { image = image }
+        buildUi()
+        assert(S.ui.fds_map.value:find("Monaco"), image .. " shows Monaco")
+    end
+    eq(Assets.same(nil, monaco), false)
+end
+
+function T.global_ui_holds_only_the_images_it_uses()
+    local S = world()
+    local Assets = require("fd.data.assets")
+    -- A save from before, with thumbnails for boards long gone.
+    S.assets = { { name = "formula1monaco", url = "http://example.invalid/a" }, { name = "fdDashboard", url = "x" } }
+    onLoad("")
+    eq(#S.assets, #Assets.ui["-1"], "the save's leftover thumbnails are gone")
+    eq(S.assets[1].url, Assets.ui["-1"][1].url)
+
+    local set = 0
+    local real = UI.setCustomAssets
+    UI.setCustomAssets = function(a) set = set + 1 real(a) end
+    Assets.register(UI, "-1")
+    UI.setCustomAssets = real
+    eq(set, 0, "not set again when nothing changed: that would reload the UI")
 end
 
 function T.the_map_cannot_change_during_the_grid_roll()

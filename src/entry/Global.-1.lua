@@ -24,6 +24,7 @@ local function rulesFor(id)
     return RULESETS[1]
 end
 local Maps = require("fd.data.maps")
+local Assets = require("fd.data.assets")
 local Dice = require("fd.tts.dice")
 local Dashboard = require("fd.tts.dashboard")
 local Hud = require("fd.tts.hud")
@@ -192,7 +193,7 @@ local function mapOnBoard()
         return nil
     end
     for _, map in ipairs(Maps.list) do
-        if custom.image == map.url then
+        if Assets.same(custom.image, map.url) then
             return map
         end
     end
@@ -216,7 +217,7 @@ function onLoad(saved_data)
     turnsSet = nil
     Dice.prepareAll()
     Dashboard.scan()
-    Mini.registerAsset()
+    Assets.register(UI, "-1")
     setupTrackEditor(saved.edits, saved.markers)
     drawPits(useBoardTrack())
     -- The save keeps the icons that were on the board; none are wanted yet.
@@ -1453,8 +1454,8 @@ function fdSetupMap(player, value)
         return
     end
     local custom = tile.getCustomObject()
-    custom.image = map.url
-    custom.secondary_image = map.url
+    custom.image = Assets.url(map.url)
+    custom.secondary_image = custom.image
     tile.setCustomObject(custom)
     -- Reloading takes the race panel with the tile: hold its updates until
     -- it is drawn again (fdMapChanged).

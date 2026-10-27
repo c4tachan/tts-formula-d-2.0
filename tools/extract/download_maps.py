@@ -1,7 +1,7 @@
 """Download every board image listed in maps.json into tracks/raw/.
 
 Files are named <id>.<ext> (extension taken from the response's content type).
-tracks/raw/ is gitignored, so the ~340 MB of images stay out of the repo. Files
+They are committed, so the boards survive their uploads being deleted. Files
 that already exist are skipped, so the script can be rerun to fill in gaps.
 
 Run:  python tools/extract/download_maps.py            # everything
