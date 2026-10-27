@@ -123,8 +123,10 @@ local ON_SCREEN = {
     allowDragging = "true", returnToOriginalPositionWhenReleased = "false",
 }
 
---- The panel, placed by `place` (ON_SCREEN or from placement).
-local function racePanel(rules, cols, place)
+--- The panel, placed by `place` (ON_SCREEN or from placement). On the
+-- board it is the tile's UI, whose clicks go to the tile's own script
+-- unless named for Global: `owner` is "Global/" there, "" on the screen.
+local function racePanel(rules, cols, place, owner)
     local attrs = { id = "fdr", width = tostring(panelWidth(cols)), height = tostring(PANEL_HEIGHT), color = PANEL_BG }
     for k, v in pairs(place) do attrs[k] = v end
     return el("Panel", attrs, {
@@ -132,8 +134,13 @@ local function racePanel(rules, cols, place)
             el("HorizontalLayout", { spacing = "4", preferredHeight = "26", childForceExpandWidth = "false" }, {
                 text("fdr_title", "Formula D", { fontSize = "18", fontStyle = "Bold", flexibleWidth = "1" }),
                 -- For everyone: hands the clicker the rulebook (fdRules).
-                button("fdr_rules_book", "Rules", "fdRules", {
+                button("fdr_rules_book", "Rules", owner .. "fdRules", {
                     preferredWidth = "64", tooltip = "The rulebook, in front of your seat. Again to put it away.",
+                }),
+                -- Also on the setup menu: the issue tracker (fdReportIssue).
+                button("fdr_issue", "Report", owner .. "fdReportIssue", {
+                    preferredWidth = "64",
+                    tooltip = "Report a bug or an idea: the issue tracker on a tablet. Again to put it away.",
                 }),
             }),
             text("fdr_rules", rules.name, { fontSize = "12", color = "#AAB0B8", preferredHeight = "16" }),
@@ -144,7 +151,7 @@ local function racePanel(rules, cols, place)
             -- when it is pressed. The rest of the race controls are on the
             -- setup menu.
             el("HorizontalLayout", { spacing = "4", preferredHeight = "34", visibility = ADMIN }, {
-                button("fdr_undo", "Undo", "fdUndo", { tooltip = "Undo the last change" }),
+                button("fdr_undo", "Undo", owner .. "fdUndo", { tooltip = "Undo the last change" }),
             }),
         }),
     })
@@ -212,7 +219,7 @@ function Hud.build(rules, extras, tile, track, onReady)
             ready = true
             return onReady()
         end
-        tile.UI.setXmlTable({ racePanel(rules, cols, place) })
+        tile.UI.setXmlTable({ racePanel(rules, cols, place, "Global/") })
         Ui.route("fdr", tile.UI)
         Ui.reset("fdr")
         Wait.frames(function()
@@ -232,7 +239,7 @@ function Hud.build(rules, extras, tile, track, onReady)
             end
         end
         if not place then
-            kept[#kept + 1] = racePanel(rules, cols, ON_SCREEN)
+            kept[#kept + 1] = racePanel(rules, cols, ON_SCREEN, "")
         end
         for _, node in ipairs(extras or {}) do
             kept[#kept + 1] = node

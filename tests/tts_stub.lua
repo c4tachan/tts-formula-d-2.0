@@ -293,6 +293,8 @@ function spawnObject(params)
         rot = vec(r.x or r[1] or 0, r.y or r[2] or 0, r.z or r[3] or 0),
         scale = params.scale,
     })
+    -- A tablet is a web browser.
+    if params.type == "Tablet" then o.Browser = { url = "" } end
     if params.callback_function then params.callback_function(o) end
     return o
 end

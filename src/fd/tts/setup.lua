@@ -133,9 +133,13 @@ function Setup.panel(maps, rulesets)
                 { preferredHeight = "20", color = DIM }),
             el("HorizontalLayout", { spacing = "4", preferredHeight = "28", visibility = ADMIN }, tools),
             text("fds_editor", "", { preferredHeight = "34", fontSize = "12", color = "#9FD3FF", visibility = ADMIN }),
-            text(nil, "Found a bug, or have an idea? Report it here (select the link to copy it):",
-                { preferredHeight = "20", fontSize = "12", color = DIM }),
-            el("InputField", { id = "fds_link", readOnly = "true", preferredHeight = "26", fontSize = "13" }, nil, REPO),
+            el("HorizontalLayout", { spacing = "6", preferredHeight = "28", childForceExpandWidth = "false" }, {
+                text(nil, "Found a bug, or have an idea?", { fontSize = "12", color = DIM, flexibleWidth = "1" }),
+                -- Shows the link to copy (fdReportIssue): TTS opens no browser.
+                button("fds_issue", "Report it", "fdReportIssue", {
+                    preferredWidth = "110", tooltip = "Get the link to the issue tracker on GitHub",
+                }),
+            }),
         }),
     })
 end
@@ -203,9 +207,6 @@ function Setup.refresh(race, map, seated)
     Ui.value("fds_rules", "Rules: " .. race.rules.name .. ", " .. (s.laps == 1 and "1 lap" or (s.laps .. " laps")))
     Ui.value("fds_drivers", driverList(race, seated))
     Ui.value("fds_laps", s.laps)
-    -- An InputField built by setXmlTable comes up empty, whatever its value
-    -- there, until it is set like this.
-    Ui.value("fds_link", REPO)
 end
 
 --- The most laps the field takes.

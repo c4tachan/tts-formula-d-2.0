@@ -2174,10 +2174,35 @@ function T.the_setup_menu_shows_from_the_load()
     assert(S.ui.fds_drivers.value:find("none yet"), S.ui.fds_drivers.value)
 end
 
-function T.the_setup_menu_shows_where_to_report_a_bug()
+function T.report_it_puts_the_issue_tracker_on_a_tablet()
     local S = world()
-    eq(S.ui.fds_link.value, "https://github.com/c4tachan/tts-formula-d-2.0/issues",
-        "set once the menu is up, as the XML's own value shows nothing")
+    eq(byId(S.xml).fds_issue.attributes.onClick, "fdReportIssue", "on the setup menu")
+    fdReportIssue(Player.Red)
+    local tablet = S.find("Tablet")
+    assert(tablet, "a tablet")
+    eq(tablet.Browser.url, "https://github.com/c4tachan/tts-formula-d-2.0/issues")
+    eq(tablet.pos.z, -38 + 15, "in front of the seat, past the dashboard")
+    eq(tablet.rot.y, 0, "facing the seat")
+
+    local saved = onSave()
+    onLoad(saved)
+    fdReportIssue(Player.Red)
+    eq(S.count("Tablet"), 0, "again puts it away, after a load too")
+
+    S.player("Grey", S.vec(0, 1, 0)).seated = false
+    fdReportIssue(Player.Grey)
+    eq(S.count("Tablet"), 0, "a spectator has no seat to put one at")
+    assert(S.logged("Report a bug or an idea at https://github.com/"), "so gets the link")
+end
+
+function T.the_board_panels_buttons_reach_global()
+    -- On the board the panel is the tile's UI, whose clicks would go to the
+    -- tile's own script.
+    local S = world()
+    local panel = byId(S.board.xml)
+    eq(panel.fdr_rules_book.attributes.onClick, "Global/fdRules")
+    eq(panel.fdr_issue.attributes.onClick, "Global/fdReportIssue")
+    eq(panel.fdr_undo.attributes.onClick, "Global/fdUndo")
 end
 
 function T.the_setup_menu_sets_the_distance()
