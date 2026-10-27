@@ -59,10 +59,13 @@ REPO_COPY = "https://raw.githubusercontent.com/"
 RETRIES = 3
 
 
-def find_save():
-    """Most recently modified Saves/*.json for this mod."""
+def find_save(skip=None):
+    """Most recently modified Saves/*.json for this mod, but those whose name
+    ends with `skip`."""
     hits = []
     for f in (TTS_DIR / "Saves").glob("*.json"):
+        if skip and f.stem.endswith(skip):
+            continue
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
