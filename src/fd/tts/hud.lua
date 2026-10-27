@@ -80,12 +80,14 @@ local function cellId(row, col)
     return "fdr_r" .. row .. "_" .. col.id
 end
 
-local function standingsTable(cols)
+--- The standings, with the zone names as tooltips on their letters if
+-- `tips` (see racePanel).
+local function standingsTable(cols, tips)
     local widths, head = {}, {}
     for i, c in ipairs(cols) do
         widths[i] = tostring(c.width)
         head[i] = el("Cell", nil, {
-            text(nil, c.head, { fontSize = "12", color = "#AAB0B8", alignment = c.align or "MiddleLeft", tooltip = c.tip }),
+            text(nil, c.head, { fontSize = "12", color = "#AAB0B8", alignment = c.align or "MiddleLeft", tooltip = tips and c.tip or nil }),
         })
     end
     local rows = { el("Row", { preferredHeight = tostring(ROW_HEIGHT) }, head) }
@@ -126,7 +128,11 @@ local ON_SCREEN = {
 --- The panel, placed by `place` (ON_SCREEN or from placement). On the
 -- board it is the tile's UI, whose clicks go to the tile's own script
 -- unless named for Global: `owner` is "Global/" there, "" on the screen.
+-- Nor does it have tooltips there: TTS places them in the tile's turned,
+-- stretched space, upside down and under the table.
 local function racePanel(rules, cols, place, owner)
+    local tips = owner == ""
+    local function tip(s) return tips and s or nil end
     local attrs = { id = "fdr", width = tostring(panelWidth(cols)), height = tostring(PANEL_HEIGHT), color = PANEL_BG }
     for k, v in pairs(place) do attrs[k] = v end
     return el("Panel", attrs, {
@@ -135,23 +141,23 @@ local function racePanel(rules, cols, place, owner)
                 text("fdr_title", "Formula D", { fontSize = "18", fontStyle = "Bold", flexibleWidth = "1" }),
                 -- For everyone: hands the clicker the rulebook (fdRules).
                 button("fdr_rules_book", "Rules", owner .. "fdRules", {
-                    preferredWidth = "64", tooltip = "The rulebook, in front of your seat. Again to put it away.",
+                    preferredWidth = "64", tooltip = tip("The rulebook, in front of your seat. Again to put it away."),
                 }),
                 -- Also on the setup menu: the issue tracker's link (fdReportIssue).
                 button("fdr_issue", "Report", owner .. "fdReportIssue", {
                     preferredWidth = "64",
-                    tooltip = "Report a bug or an idea: the link to the issue tracker",
+                    tooltip = tip("Report a bug or an idea: the link to the issue tracker"),
                 }),
             }),
             text("fdr_rules", rules.name, { fontSize = "12", color = "#AAB0B8", preferredHeight = "16" }),
-            standingsTable(cols),
+            standingsTable(cols, tips),
             text("fdr_empty", "No cars yet -- take a coloured seat to join.", { preferredHeight = "18" }),
             text("fdr_checks", "", { preferredHeight = "40", color = "#FFB74D" }),
             -- For the host and promoted players only; Global checks again
             -- when it is pressed. The rest of the race controls are on the
             -- setup menu.
             el("HorizontalLayout", { spacing = "4", preferredHeight = "34", visibility = ADMIN }, {
-                button("fdr_undo", "Undo", owner .. "fdUndo", { tooltip = "Undo the last change" }),
+                button("fdr_undo", "Undo", owner .. "fdUndo", { tooltip = tip("Undo the last change") }),
             }),
         }),
     })

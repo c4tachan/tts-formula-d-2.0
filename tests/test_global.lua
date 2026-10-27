@@ -2221,6 +2221,22 @@ function T.the_board_panels_buttons_reach_global()
     eq(panel.fdr_rules_book.attributes.onClick, "Global/fdRules")
     eq(panel.fdr_issue.attributes.onClick, "Global/fdReportIssue")
     eq(panel.fdr_undo.attributes.onClick, "Global/fdUndo")
+    -- Nor tooltips: TTS draws them upside down and under the table there.
+    local function tips(nodes, out)
+        for _, n in ipairs(nodes or {}) do
+            if n.attributes and n.attributes.tooltip then out[#out + 1] = n.attributes.tooltip end
+            tips(n.children, out)
+        end
+        return out
+    end
+    eq(#tips(S.board.xml, {}), 0, "no tooltips on the board")
+
+    -- A map with no spot for it: the panel goes on the screen, tooltips and all.
+    S.board.custom = { image = "http://example.invalid/other-map.png" }
+    buildUi()
+    local screen = byId(S.xml)
+    eq(screen.fdr_undo.attributes.onClick, "fdUndo")
+    assert(screen.fdr_undo.attributes.tooltip, "tooltips on the screen")
 end
 
 function T.the_setup_menu_sets_the_distance()
