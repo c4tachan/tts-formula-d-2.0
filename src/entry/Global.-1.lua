@@ -1056,10 +1056,11 @@ end
 local DASHBOARD_BAGS = { beginner = "edfadc", advanced = "4eb678" }
 -- A free dashboard this close to a seat's hand zone is that seat's.
 local SEAT_RANGE = 12
--- How far in front of the hand zone's middle a fresh dashboard goes: clear
--- of the zone (about 6.4 deep) and of the cards standing in it, with the
--- dashboard 6.5 deep itself.
-local DASH_AHEAD = 7.5
+-- How far in front of the hand zone's middle a fresh dashboard goes. The
+-- zones sit at the table's rim (z +-38.4, x +-55.7), the board reaches
+-- z +-26 and x +-44, and a dashboard is 6.5 deep: 7.8 leaves it clear of
+-- both the zone (about 6.4 deep) and the board.
+local DASH_AHEAD = 7.8
 
 -- The quick reference: four cards, one of the 2020 mod's bags. They cover
 -- the advanced rules (gearbox, body, engine), so only those deal them.
