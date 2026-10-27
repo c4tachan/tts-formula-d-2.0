@@ -431,6 +431,48 @@ function T.the_basic_rules_have_no_slipstream()
     assert(not hasEvent(r, "info", "can slipstream"))
 end
 
+-- A car's own starting wear -----------------------------------------------------
+
+function T.a_car_built_otherwise_keeps_its_own_starting_wear()
+    local r = newRace("Red")
+    local car = r:car("Red")
+    car.start = { tires = 9, brakes = 2, gearbox = 2, body = 2, engine = 3, handling = 2 }
+    r:startRace()
+    eq(wear(r, "Red"), "T9 B2 G2 C2 E3 S2", "the race starts it on its own")
+    r:blackDie(10, "Red")
+    r:setWear("Red", "tires", 1)
+    r:pitStop("Red")
+    eq(car.wear.tires, 9, "a pit stop gives back its own")
+    r:adjust("Red", "brakes", 5)
+    eq(car.wear.brakes, 2, "and nothing gives back more")
+    r:reset()
+    eq(wear(r, "Red"), "T9 B2 G2 C2 E3 S2", "kept through a reset")
+    r:setRules(Beginner)
+    eq(car.wear.wp, 18, "other rules, the cars are built afresh")
+    eq(car.start.wp, 18)
+end
+
+function T.a_game_saved_before_cars_had_their_own_start_loads()
+    local r = newRace("Red")
+    local saved = r:serialize()
+    saved.cars.Red.start = nil
+    local copy = Race.new(Rules, saved)
+    eq(copy:startOf(copy:car("Red"), "tires"), 6)
+end
+
+function T.an_empty_zone_raced_on_is_spelled_out()
+    local r = started("Red")
+    eq(#r:warnings(r:car("Red")), 0)
+    r:setWear("Red", "tires", 0)
+    r:setWear("Red", "gearbox", 0)
+    local w = r:warnings(r:car("Red"))
+    eq(#w, 2)
+    eq(w[1], "no tire WP: overshoot 1 spins, more is out")
+    eq(w[2], "no gearbox WP: one gear down at a time")
+    r:setWear("Red", "body", 0)
+    eq(#r:warnings(r:car("Red")), 0, "nothing for a car out of the race")
+end
+
 -- Setup -----------------------------------------------------------------------------
 
 function T.switching_rules_starts_the_cars_afresh_in_the_new_zones()

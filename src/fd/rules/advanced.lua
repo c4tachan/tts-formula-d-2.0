@@ -24,11 +24,11 @@ Rules.gears = {
 -- A car on no tires is still racing (it spins, see moveWear); losing more
 -- than it has is out. Brakes and gearbox never put a car out by themselves.
 -- The ids are the dashboard's (fd.data.dashboard). `short` heads the
--- standings column.
+-- standings column; `empty` says what racing on with none left means.
 Rules.zones = {
-    { id = "tires", name = "tire WP", short = "T", start = 6, eliminateAt = -1 },
-    { id = "brakes", name = "brake WP", short = "B", start = 3 },
-    { id = "gearbox", name = "gearbox WP", short = "G", start = 3 },
+    { id = "tires", name = "tire WP", short = "T", start = 6, eliminateAt = -1, empty = "overshoot 1 spins, more is out" },
+    { id = "brakes", name = "brake WP", short = "B", start = 3, empty = "braking takes tires" },
+    { id = "gearbox", name = "gearbox WP", short = "G", start = 3, empty = "one gear down at a time" },
     { id = "body", name = "body WP", short = "C", start = 3, eliminateAt = 0 },
     { id = "engine", name = "engine WP", short = "E", start = 3, eliminateAt = 0 },
     { id = "handling", name = "suspension WP", short = "S", start = 2, eliminateAt = 0 },

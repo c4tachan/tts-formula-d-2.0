@@ -119,7 +119,8 @@ local function overlay(color)
             kids[#kids + 1] = el("Button", {
                 id = p .. z.id .. n, onClick = "fdUiWear(" .. z.id .. ":" .. n .. ")",
                 width = tostring(HIT), height = tostring(HIT), offsetXY = xy(x, y),
-                colors = "#FFFFFF00|#FFFFFF44|#FFFFFF66|#FFFFFF00", tooltip = n .. " " .. z.name,
+                colors = "#FFFFFF00|#FFFFFF44|#FFFFFF66|#FFFFFF00",
+                tooltip = n .. " " .. z.name .. (n == 1 and " (click again for 0)" or ""),
             })
             n = n + 1
         end
@@ -256,6 +257,9 @@ function Mini.refresh(race)
                 bits[#bits + 1] = "OUT"
             elseif car.spun then
                 bits[#bits + 1] = "spun: drive off in 1st"
+            end
+            for _, w in ipairs(race:warnings(car)) do
+                bits[#bits + 1] = w
             end
             bits[#bits + 1] = race:progress(car)
             if car == due then

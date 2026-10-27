@@ -392,6 +392,9 @@ local function dashLabel(car)
             if car.spun then
                 parts[#parts + 1] = "SPUN: 1st gear"
             end
+            for _, w in ipairs(race:warnings(car)) do
+                parts[#parts + 1] = w
+            end
             if car.lastRoll then
                 parts[#parts + 1] = "rolled " .. car.lastRoll
             end
@@ -1300,7 +1303,9 @@ function fdUiShift(player, value)
     end
 end
 
---- `value` arrives as "<zone>:<number>", e.g. "wp:12".
+--- `value` arrives as "<zone>:<number>", e.g. "wp:12". Clicking the number
+-- the zone is on already takes one off: the slots start at 1, so that is
+-- how a zone gets to 0.
 function fdUiWear(player, value)
     local car = mine(player)
     if not car then
@@ -1308,7 +1313,11 @@ function fdUiWear(player, value)
     end
     local zone, n = tostring(value):match("^(%a+):(%d+)$")
     if zone then
-        act(function() race:setWear(player.color, zone, tonumber(n), "set on screen") end)
+        n = tonumber(n)
+        if car.wear[zone] and math.max(0, car.wear[zone]) == n then
+            n = n - 1
+        end
+        act(function() race:setWear(player.color, zone, n, "set on screen") end)
     end
 end
 

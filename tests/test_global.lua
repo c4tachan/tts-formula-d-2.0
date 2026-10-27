@@ -434,6 +434,16 @@ function T.each_zone_is_set_on_its_own_under_the_advanced_rules()
     dropOn(S, tires, "tires", 4)
     eq(state().cars.Red.wear.tires, 4, "the tire marker moved on the dashboard")
     eq(state().cars.Red.wear.brakes, 1)
+    -- Clicking the number a zone is on takes one off: down to 0, where it
+    -- says what that means, and its marker is put away.
+    fdUiWear(Player.Red, "gearbox:3")
+    eq(state().cars.Red.wear.gearbox, 2)
+    fdUiWear(Player.Red, "gearbox:1")
+    fdUiWear(Player.Red, "gearbox:1")
+    eq(state().cars.Red.wear.gearbox, 0)
+    assert(S.beginner.buttons[1].label:find("no gearbox WP: one gear down at a time"), S.beginner.buttons[1].label)
+    eq(state().cars.Red.tts.markers.wear.gearbox, nil)
+    eq(S.ui.fdm_Red_gearboxMark.active, "false")
     -- No WP -1/+1 button: there is no one pool of WP.
     for _, b in ipairs(S.beginner.buttons) do
         assert(b.click_function ~= "fdDashWear", "no WP button on the advanced face")

@@ -269,8 +269,10 @@ local function carCells(race, car, i, due, laps)
         cells.status = { "finished", "#FFD740" }
     else
         cells.gear = { car.gear > 0 and Race.gearName(car.gear) or "grid" }
+        -- A zone worn away that the car races on without stands out.
         for _, z in ipairs(race.rules.zones) do
-            cells["w_" .. z.id] = { tostring(math.max(0, car.wear[z.id])) }
+            local left = math.max(0, car.wear[z.id] or 0)
+            cells["w_" .. z.id] = { tostring(left), left == 0 and "#FFB74D" or nil }
         end
         if laps > 1 and car.lap > 0 then
             cells.lap = { math.min(car.lap, laps) .. "/" .. laps }

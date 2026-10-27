@@ -47,6 +47,21 @@ function Race.forget()
     reaches = setmetatable({}, { __mode = "k" })
 end
 
+--- Each zone's starting wear under `rules`, zone -> points.
+local function freshWear(rules)
+    local w = {}
+    for _, z in ipairs(rules.zones) do
+        w[z.id] = z.start
+    end
+    return w
+end
+
+local function copy(t)
+    local out = {}
+    for k, v in pairs(t) do out[k] = v end
+    return out
+end
+
 function Race.new(rules, saved)
     local self = setmetatable({ rules = rules, events = {} }, Race)
     self.state = saved or {}
@@ -63,6 +78,7 @@ function Race.new(rules, saved)
     s.rules = rules.id
     for _, car in pairs(s.cars) do
         car.lap = car.lap or 0
+        car.start = car.start or freshWear(rules)
         -- Saved before moves were charged as wear: spaces braked and
         -- overshot, the same wear whatever the car had.
         local m = car.move
@@ -103,21 +119,13 @@ function Race:label(car)
     return car.name or car.color
 end
 
-local function freshWear(rules)
-    local w = {}
-    for _, z in ipairs(rules.zones) do
-        w[z.id] = z.start
-    end
-    return w
-end
-
 -- `space` is not reset: a reset or a fresh start does not move the cars on
 -- the board. The move and corner stops are, as they belong to the race
 -- being thrown away.
 local function resetCar(rules, car)
     car.gear = 0         -- selected on the dashboard
     car.rolledGear = 0   -- gear of the last die actually rolled; 0 = on the grid
-    car.wear = freshWear(rules)
+    car.wear = copy(car.start or freshWear(rules))
     car.eliminated = false
     car.lastRoll = nil
     car.maxGear = nil
@@ -138,7 +146,10 @@ function Race:join(color, name)
         self:emit("info", self:label(s.cars[color]) .. " is already racing", color)
         return s.cars[color]
     end
-    local car = { color = color, name = name, tts = {} }
+    -- `start`: the wear the car starts with, its own so that a car can be
+    -- built otherwise than the ruleset's; a pit stop restores it, and
+    -- nothing gives back more.
+    local car = { color = color, name = name, tts = {}, start = freshWear(self.rules) }
     resetCar(self.rules, car)
     s.cars[color] = car
     s.order[#s.order + 1] = color
@@ -152,6 +163,7 @@ function Race:setRules(rules)
     self.rules = rules
     self.state.rules = rules.id
     for _, car in ipairs(self:cars()) do
+        car.start = freshWear(rules)
         resetCar(rules, car)
     end
 end
@@ -371,7 +383,7 @@ function Race:outcome(color, o)
     end
     local out = e.out ~= nil
     for _, z in ipairs(rules.zones) do
-        local left = restored[z.id] and z.start or (before[z.id] or 0) - (e.wear[z.id] or 0)
+        local left = restored[z.id] and self:startOf(car, z.id) or (before[z.id] or 0) - (e.wear[z.id] or 0)
         if z.eliminateAt and left <= z.eliminateAt then out = true end
     end
     -- No collision for a car out of the race, over the line for the last
@@ -810,6 +822,33 @@ function Race:zone(id)
     return nil
 end
 
+--- The wear `car` starts with in zone `id`: what a pit stop restores, and
+-- the most it can have.
+function Race:startOf(car, id)
+    local own = car.start and car.start[id]
+    if own then
+        return own
+    end
+    local z = self:zone(id)
+    return z and z.start or 0
+end
+
+--- What the zones `car` has worn away change for it, as the ruleset says
+-- (a zone's `empty`): "no tire WP: an overshoot spins the car". Nothing
+-- for a car out of the race or finished.
+function Race:warnings(car)
+    local out = {}
+    if car.eliminated or car.place then
+        return out
+    end
+    for _, z in ipairs(self.rules.zones) do
+        if z.empty and (car.wear[z.id] or 0) <= 0 then
+            out[#out + 1] = "no " .. z.name .. ": " .. z.empty
+        end
+    end
+    return out
+end
+
 -- Wear ----------------------------------------------------------------------
 
 function Race:checkElimination(car)
@@ -853,7 +892,7 @@ function Race:refund(car, wear, reason)
         local pts = wear[z.id]
         if pts and pts ~= 0 then
             local before = car.wear[z.id]
-            car.wear[z.id] = math.min(z.start, before + pts)
+            car.wear[z.id] = math.min(self:startOf(car, z.id), before + pts)
             self:emit("info", string.format("%s gets back %d %s (%s) -- %d left",
                 self:label(car), car.wear[z.id] - before, z.name, reason, car.wear[z.id]), car.color)
         end
@@ -872,7 +911,7 @@ function Race:adjust(color, zoneId, delta, reason)
         return
     end
     local before = car.wear[z.id]
-    car.wear[z.id] = math.min(z.start, before + delta)
+    car.wear[z.id] = math.min(self:startOf(car, z.id), before + delta)
     self:emit("info", string.format("%s gains %d %s (%s) -- %d left",
         self:label(car), car.wear[z.id] - before, z.name, reason or "adjusted", car.wear[z.id]), color)
     self:checkElimination(car)
@@ -896,7 +935,7 @@ function Race:pitStop(color)
     local car = self:car(color)
     if not car then return end
     for _, id in ipairs(self.rules.pitRestores) do
-        car.wear[id] = self:zone(id).start
+        car.wear[id] = self:startOf(car, id)
     end
     car.maxGear = self.rules.pitMaxGear
     self:emit("info", string.format("%s pits: wear restored, leave in %s gear or lower",

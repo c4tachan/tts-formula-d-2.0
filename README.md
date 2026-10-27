@@ -110,7 +110,14 @@ for each (T B G C E S).
   slipstream into a corner costs a brake WP. Not in the basic rules, which
   have no such rule.
 - A car is out when it loses its last body, engine or suspension WP, or more
-  tire WP than it has. No brakes or gearbox left, it races on.
+  tire WP than it has. No brakes or gearbox left, it races on, and its
+  dashboards say what that means (one gear down at a time, say); the race
+  panel shows the empty zone in orange.
+- **Setting wear by hand:** click a zone's number on the screen dashboard, or
+  move its marker on the table. Clicking the number it is on takes one off,
+  which is how a zone gets to 0.
+- Each car keeps its own starting wear, which a pit stop restores and no
+  gain goes past -- ready for building your own car (#124).
 
 Not yet automated: the damage markers left on the track (place them and
 roll for them by hand), and the optional rules.
