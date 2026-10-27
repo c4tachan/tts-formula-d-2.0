@@ -1,6 +1,6 @@
 -- The race panel everyone sees, on the screen: standings, pending black die
--- checks, the rulebook, the issue link, and Undo. Per-player controls live on the
--- dashboards (fd.tts.controls), the race-wide ones on the setup menu
+-- checks, the rulebook, the issue link, and Undo. Per-player controls live
+-- on the dashboards (fd.tts.controls), the race-wide ones on the setup menu
 -- (fd.tts.setup).
 --
 -- Hud.build also sends the Global UI, appended to whatever the Global XML

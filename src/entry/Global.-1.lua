@@ -1636,9 +1636,8 @@ function fdSetupRules(player, value)
 end
 
 --- A new map is on the board. The panels are drawn again: the setup menu
--- says which map it is; turn order
--- goes by its track, its pit boxes take their seats' colours, and the dice
--- move to its name panel.
+-- says which map it is, turn order goes by its track, its pit boxes take
+-- their seats' colours, and the dice move to its name panel.
 -- Longest to wait for a reloaded board tile to be ready, in seconds. Past
 -- that it is drawn on regardless.
 local TILE_WAIT = 15

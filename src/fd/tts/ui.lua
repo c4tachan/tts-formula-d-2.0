@@ -30,19 +30,9 @@ function Ui.value(id, value)
     UI.setValue(id, value)
 end
 
---- Forget what was sent: the UI has been rebuilt from its XML. With
--- `prefix`, only for the elements whose ids start with it.
-function Ui.reset(prefix)
-    if not prefix then
-        attrs, values = {}, {}
-        return
-    end
-    for key in pairs(attrs) do
-        if key:sub(1, #prefix) == prefix then attrs[key] = nil end
-    end
-    for id in pairs(values) do
-        if id:sub(1, #prefix) == prefix then values[id] = nil end
-    end
+--- Forget what was sent: the UI has been rebuilt from its XML.
+function Ui.reset()
+    attrs, values = {}, {}
 end
 
 return Ui
