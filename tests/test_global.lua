@@ -241,6 +241,31 @@ function T.a_fresh_advanced_dashboard_reads_the_right_way_up()
     eq(dash.rot.y, 180, "turned to read from the seat")
 end
 
+function T.a_dashboard_turned_to_the_other_face_still_reads_from_its_seat()
+    local S = world()
+    -- Beginner side up as the bag deals it, reading from Red's seat.
+    S.beginner.rot = S.vec(0, 0, 180)
+    joinRace("Red", S.beginner)
+    fdSetupRules(Player.Red, require("fd.rules.advanced").name)
+    eq(S.beginner.up.y, 1, "turned to the advanced side")
+    -- Over side to side: (180, 0, 180) is a half turn on the table, as a
+    -- fresh advanced dashboard is dealt, not the end-to-end flip that would
+    -- leave it upside down.
+    eq(S.beginner.rot.x, 180)
+    eq(S.beginner.rot.y, 0)
+    eq(S.beginner.rot.z, 180)
+end
+
+function T.switching_to_the_advanced_rules_deals_the_quick_reference()
+    local S = world()
+    local cards = { { name = "Card" }, { name = "Card" }, { name = "Card" }, { name = "Card" } }
+    S.object("Quick Reference Bag", { guid = "490aa3", spawns = "Deck", spawnContents = cards })
+    joinRace("Red", S.beginner)
+    eq(#Player.Red.getHandObjects(), 0, "none under the basic rules")
+    fdSetupRules(Player.Red, require("fd.rules.advanced").name)
+    eq(#Player.Red.getHandObjects(), 4, "dealt to the cars already in")
+end
+
 function T.nobody_is_dealt_in_once_the_race_has_started()
     local S = redRacing()
     onPlayerChangeColor("Blue")
@@ -2699,9 +2724,15 @@ function T.the_rules_button_puts_the_rulebook_in_front_of_your_seat()
     fdRules(Player.Blue)
     assert(S.find("Rulebook Advanced"), "the advanced one once those are the rules")
 
+    -- Out before the rules changed: one click swaps it for the right one.
+    fdSetupRules(Player.Red, require("fd.rules.beginner").name)
+    fdRules(Player.Blue)
+    eq(S.count("Rulebook Advanced"), 0, "the old rules' book goes")
+    eq(S.count("Rulebook Beginner"), 1, "and this rules' comes, in the one click")
+
     S.player("Grey", S.vec(0, 1, 0)).seated = false
     fdRules(Player.Grey)
-    eq(S.count("Rulebook Advanced"), 1, "a spectator has no seat to put one at")
+    eq(S.count("Rulebook Beginner"), 1, "a spectator has no seat to put one at")
     assert(S.logged("Take a seat"))
 end
 

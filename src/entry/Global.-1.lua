@@ -78,7 +78,7 @@ local startKey = nil
 local turnsSet = nil
 local undo = {}
 local joining = {} -- steam id -> true from connecting until moved to the spectators (see bench)
-local rulebooks = {} -- colour -> guid of the rulebook out for them (fdRules)
+local rulebooks = {} -- colour -> { guid, rules } of the rulebook out for them (fdRules)
 local UNDO_LIMIT = 30
 
 --- One roll of the black die, made by the script: only when the die itself
@@ -132,6 +132,9 @@ local SOURCE_BAGS = {
     "a845cd", -- Wear Tracker Bag (fd.tts.dashboard)
     "bbc10d", -- Damage Marker Bag (DAMAGE_BAG, below)
     "ac4939", -- Dice Set Bag: spare dice (fd.tts.dice)
+    "98b2d2", -- Beginner Rulebook Bag (RULEBOOK_BAGS, below)
+    "f04a8d", -- Advanced Rulebook Bag
+    "490aa3", -- the quick reference cards (QUICK_REFERENCE_BAG, below)
 }
 
 --- Hide `obj` where it stands: locked, out of reach, and invisible to all.
@@ -1066,6 +1069,17 @@ local DASH_AHEAD = 7.8
 -- the advanced rules (gearbox, body, engine), so only those deal them.
 local QUICK_REFERENCE_BAG = "490aa3"
 
+--- A spot in front of the seat whose hand zone is `hand`: `ahead` along
+-- the way the zone faces, then `left` to the left as the seat sees it
+-- (the car goes to the right, see carSpot). Returns the spot and the
+-- seat's yaw, which turns a thing to face the seat.
+local function seatSpot(hand, ahead, left)
+    local yaw = hand.rotation and hand.rotation.y or 0
+    local ix, iz = math.sin(math.rad(yaw)), math.cos(math.rad(yaw))
+    local p = hand.position
+    return { x = p.x + ix * ahead - iz * left, y = DROP_Y, z = p.z + iz * ahead + ix * left }, yaw
+end
+
 local delivering = {}  -- colour -> true while their dashboard is on its way
 
 --- Deal `color` the quick reference cards under the advanced rules, unless
@@ -1133,14 +1147,13 @@ deliver = function(color)
         return
     end
     -- Straight ahead of the seat, the way its hand zone faces.
-    local yaw = hand.rotation and hand.rotation.y or 0
-    local ix, iz = math.sin(math.rad(yaw)), math.cos(math.rad(yaw))
+    local spot, yaw = seatSpot(hand, DASH_AHEAD, 0)
     delivering[color] = true
     -- Should the bag never hand it over, the seat is not held up for good;
     -- dealIn checks again, so a late arrival does no harm.
     Wait.time(function() delivering[color] = nil end, 10)
     bag.takeObject({
-        position = { x = hand.position.x + ix * DASH_AHEAD, y = DROP_Y, z = hand.position.z + iz * DASH_AHEAD },
+        position = spot,
         -- Turned to face the seat; the beginner face is the underside. The
         -- two faces are printed opposite ways up (see fd.data.dashboard), so
         -- the advanced one turns a half turn more to read the right way.
@@ -1195,43 +1208,49 @@ end
 local RULEBOOK_BAGS = { beginner = "98b2d2", advanced = "f04a8d" }
 -- How far to the left of where the seat's dashboard goes a rulebook lies.
 local BOOK_SIDE = 9
+local fetchingBook = {} -- colour -> true while their rulebook is on its way
 
 --- The race panel's Rules button: put the rulebook for the rules being
 -- played in front of the clicker's seat, to the left of their dashboard, or
--- put away the one they have out.
+-- put away the one they have out. One for other rules -- they changed
+-- since -- is swapped for this one in the same click.
 function fdRules(player)
     local color = player.color
-    local out = rulebooks[color] and getObjectFromGUID(rulebooks[color])
+    if fetchingBook[color] then
+        return
+    end
+    local had = rulebooks[color]
+    local out = type(had) == "table" and getObjectFromGUID(had.guid)
     rulebooks[color] = nil
     if out then
         out.destruct()
-        return
+        if had.rules == race.rules.id then
+            return
+        end
     end
     local hand = SEATS[color] and player.getHandTransform()
     if not hand then
         broadcastToColor("Take a seat to have the rulebook put in front of you.", color, LEVEL_RGB.info)
         return
     end
-    local bag = getObjectFromGUID(RULEBOOK_BAGS[race.rules.id] or RULEBOOK_BAGS.beginner)
+    local id = RULEBOOK_BAGS[race.rules.id] and race.rules.id or "beginner"
+    local bag = getObjectFromGUID(RULEBOOK_BAGS[id])
     if not bag then
         return
     end
-    -- Ahead of the seat the way its hand zone faces, as a dashboard goes,
-    -- then off to the left, the other side from the car (see carSpot).
-    local yaw = hand.rotation and hand.rotation.y or 0
-    local ix, iz = math.sin(math.rad(yaw)), math.cos(math.rad(yaw))
-    local p = hand.position
+    local spot, yaw = seatSpot(hand, DASH_AHEAD, BOOK_SIDE)
+    -- Until it is out, more clicks would fetch more books, all but the last
+    -- out of reach of this button.
+    fetchingBook[color] = true
+    Wait.time(function() fetchingBook[color] = nil end, 5)
     bag.takeObject({
-        position = {
-            x = p.x + ix * DASH_AHEAD - iz * BOOK_SIDE,
-            y = DROP_Y,
-            z = p.z + iz * DASH_AHEAD + ix * BOOK_SIDE,
-        },
+        position = spot,
         rotation = { x = 0, y = yaw, z = 0 },
         smooth = false,
         callback_function = function(book)
+            fetchingBook[color] = nil
             book.setInvisibleTo({})
-            rulebooks[color] = book.getGUID()
+            rulebooks[color] = { guid = book.getGUID(), rules = id }
         end,
     })
 end
@@ -1532,8 +1551,6 @@ function fdSetupMap(player, value)
     Wait.time(function() fdMapChanged() end, 1)
 end
 
---- The race distance field on the setup menu. Anything but a whole number
--- of laps from 1 up is put back to the distance the race has.
 --- The Report buttons, on the setup menu and the race panel: TTS opens no
 -- browser, so the issue tracker's link goes in a box the player can copy it
 -- from. Should this TTS have no such box -- asking for a missing method
@@ -1549,6 +1566,8 @@ function fdReportIssue(player)
     end
 end
 
+--- The race distance field on the setup menu. Anything but a whole number
+-- of laps from 1 up is put back to the distance the race has.
 function fdSetupLaps(player, value)
     if not admin(player) then return end
     local current = race:serialize().laps
@@ -1584,7 +1603,11 @@ local function turnDashboards(rules, change)
         change()
     end
     for _, dash in ipairs(turning) do
-        dash.flip()
+        -- Over side to side, not end to end as flip() turns it: the faces
+        -- are printed opposite ways up, so this way the other one reads
+        -- from the seat too, as a fresh dashboard of that face would.
+        local r = dash.getRotation()
+        dash.setRotation({ x = (r.x + 180) % 360, y = r.y, z = r.z })
         dashboardMoved(dash)
     end
 end
@@ -1608,6 +1631,10 @@ function fdSetupRules(player, value)
     turnDashboards(rules, function()
         act(function() race:setRules(rules) end)
     end)
+    -- The cars stay in the race, so are not dealt in again.
+    for _, car in ipairs(race:cars()) do
+        dealReference(car.color)
+    end
     -- The screen dashboards, the standings and the menu, for the new rules.
     buildUi()
 end

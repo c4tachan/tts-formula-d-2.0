@@ -174,6 +174,16 @@ function Stub.object(name, props)
     o.setPositionSmooth = function(p) o.pos = vec(p.x, p.y, p.z) end
     o.setPosition = function(p) o.pos = vec(p.x, p.y, p.z) end
     o.setRotationSmooth = function(r) o.rot = r end
+    -- Turned over side to side or end to end, it shows its other face.
+    o.setRotation = function(r)
+        local was = o.rot
+        o.rot = r
+        local dx = ((r.x or 0) - (was.x or 0)) % 360
+        local dz = ((r.z or 0) - (was.z or 0)) % 360
+        if (dx == 180) ~= (dz == 180) then
+            o.up = vec(o.up.x, -o.up.y, o.up.z)
+        end
+    end
     o.isSmoothMoving = function() return false end
     -- A roll counts the throws. A gear die keeps the `value` the test set;
     -- the black die comes up whatever math.random(20) gives, so a test that
