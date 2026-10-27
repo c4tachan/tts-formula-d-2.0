@@ -1,14 +1,12 @@
--- The race panel everyone sees, lying on an empty patch of the board (or on
--- the screen, for a map without one): standings, pending black die checks,
--- and Undo. Per-player controls live on the
--- dashboards (fd.tts.controls), the race-wide ones on the setup menu
+-- The race panel everyone sees, on the screen: standings, pending black die
+-- checks, the rulebook, the issue link, and Undo. Per-player controls live
+-- on the dashboards (fd.tts.controls), the race-wide ones on the setup menu
 -- (fd.tts.setup).
 --
 -- Hud.build also sends the Global UI, appended to whatever the Global XML
--- already holds, so the Big Box menu button survives.
+-- already holds.
 
 local Race = require("fd.core.race")
-local Track = require("fd.tts.track")
 local Ui = require("fd.tts.ui")
 
 local Hud = {}
@@ -80,6 +78,7 @@ local function cellId(row, col)
     return "fdr_r" .. row .. "_" .. col.id
 end
 
+--- The standings, with the zone names as tooltips on their letters.
 local function standingsTable(cols)
     local widths, head = {}, {}
     for i, c in ipairs(cols) do
@@ -117,19 +116,30 @@ local function panelWidth(cols)
     return w
 end
 
--- On the screen: where it was before it went on the board.
+-- Where it sits on the screen; players can drag it.
 local ON_SCREEN = {
     rectAlignment = "UpperLeft", offsetXY = "20 -120",
     allowDragging = "true", returnToOriginalPositionWhenReleased = "false",
 }
 
---- The panel, placed by `place` (ON_SCREEN or from placement).
-local function racePanel(rules, cols, place)
+--- The panel.
+local function racePanel(rules, cols)
     local attrs = { id = "fdr", width = tostring(panelWidth(cols)), height = tostring(PANEL_HEIGHT), color = PANEL_BG }
-    for k, v in pairs(place) do attrs[k] = v end
+    for k, v in pairs(ON_SCREEN) do attrs[k] = v end
     return el("Panel", attrs, {
         el("VerticalLayout", { padding = "8 8 6 6", spacing = "4", childForceExpandHeight = "false" }, {
-            text("fdr_title", "Formula D", { fontSize = "18", fontStyle = "Bold", preferredHeight = "26" }),
+            el("HorizontalLayout", { spacing = "4", preferredHeight = "26", childForceExpandWidth = "false" }, {
+                text("fdr_title", "Formula D", { fontSize = "18", fontStyle = "Bold", flexibleWidth = "1" }),
+                -- For everyone: hands the clicker the rulebook (fdRules).
+                button("fdr_rules_book", "Rules", "fdRules", {
+                    preferredWidth = "64", tooltip = "The rulebook, in front of your seat. Again to put it away.",
+                }),
+                -- Also on the setup menu: the issue tracker's link (fdReportIssue).
+                button("fdr_issue", "Report", "fdReportIssue", {
+                    preferredWidth = "64",
+                    tooltip = "Report a bug or an idea: the link to the issue tracker",
+                }),
+            }),
             text("fdr_rules", rules.name, { fontSize = "12", color = "#AAB0B8", preferredHeight = "16" }),
             standingsTable(cols),
             text("fdr_empty", "No cars yet -- take a coloured seat to join.", { preferredHeight = "18" }),
@@ -144,34 +154,6 @@ local function racePanel(rules, cols, place)
     })
 end
 
--- On the board the panel is the tile's own UI, at the spot the track names
--- (`panel`: centre and width in image pixels). Object UI is laid out at 100
--- units per local unit, then stretched with the object, so the panel is
--- scaled back by the tile's scale and on to the width the track asks for.
---
--- The tile's UI runs with its X along local X and its Y along local Z,
--- which on the board is image left and image down: turned half round, the
--- panel reads the same way up as the picture.
-local UI_PER_LOCAL = 100
-
---- Where the panel with the columns `cols` goes on `tile` for `track`, or
--- nil if the track names no spot for it.
-local function placement(tile, track, cols)
-    local spot = track and track.panel
-    if not spot then
-        return nil
-    end
-    local f = Track.frame(tile, track)
-    local scale = tile.getScale()
-    local l = Track.localIn(f, spot.pos[1], spot.pos[2])
-    local unit = spot.width * f.world / panelWidth(cols) -- world units per UI unit
-    return {
-        position = string.format("%.1f %.1f %.1f", l.x * UI_PER_LOCAL, l.z * UI_PER_LOCAL, -l.y * UI_PER_LOCAL),
-        scale = string.format("%.4f %.4f 1", unit * UI_PER_LOCAL / scale.x, unit * UI_PER_LOCAL / scale.z),
-        rotation = "0 0 180",
-    }
-end
-
 local cols = {}
 
 -- Longest to wait for the UI to finish loading, in seconds. Should TTS
@@ -183,39 +165,16 @@ local function whenLoaded(ui, fn)
     Wait.condition(fn, function() return ui == nil or not ui.loading end, LOAD_WAIT, fn)
 end
 
---- Set the race panel on the board `tile`, where `track` (the map on it)
--- says, and append any `extras` to the Global UI, then call `onReady`. Safe
--- to call again: it replaces what it put there before. With no spot on the
--- board the panel goes on the screen.
-function Hud.build(rules, extras, tile, track, onReady)
+--- Put the race panel on the screen with any `extras`, appended to the
+-- Global UI, then call `onReady`. Safe to call again: it replaces what it
+-- put there before. A game saved while the panel lay on the board `tile`
+-- has it there still: it is taken off.
+function Hud.build(rules, extras, tile, onReady)
     cols = columns(rules)
     -- Hold updates until the new XML has loaded: sent now, they would be lost
     -- with the old elements yet remembered by fd.tts.ui, and the refresh in
     -- onReady would then skip them as repeats.
     ready = false
-    local place = tile and placement(tile, track, cols)
-    local function placePanel()
-        if not place then
-            -- Take a panel left on the board off it. Only if there is one:
-            -- a tile just reloaded has none, and TTS fails inside on an
-            -- empty table ("Object reference not set to an instance of an
-            -- object"), so it is cleared with an empty string.
-            local had = tile and tile.UI.getXmlTable()
-            if had and #had > 0 then tile.UI.setXml("") end
-            Ui.route("fdr", nil)
-            ready = true
-            return onReady()
-        end
-        tile.UI.setXmlTable({ racePanel(rules, cols, place) })
-        Ui.route("fdr", tile.UI)
-        Ui.reset("fdr")
-        Wait.frames(function()
-            whenLoaded(tile ~= nil and tile.UI or nil, function()
-                ready = true
-                onReady()
-            end)
-        end, 2)
-    end
     whenLoaded(UI, function()
         local xml = UI.getXmlTable() or {}
         local kept = {}
@@ -225,25 +184,24 @@ function Hud.build(rules, extras, tile, track, onReady)
                 kept[#kept + 1] = node
             end
         end
-        if not place then
-            kept[#kept + 1] = racePanel(rules, cols, ON_SCREEN)
-        end
+        kept[#kept + 1] = racePanel(rules, cols)
         for _, node in ipairs(extras or {}) do
             kept[#kept + 1] = node
         end
         UI.setXmlTable(kept)
         Ui.reset()           -- every element is back to what the XML says
         Wait.frames(function()
-            whenLoaded(UI, placePanel)
+            whenLoaded(UI, function()
+                -- Only if there is one: TTS fails inside on an empty table
+                -- ("Object reference not set to an instance of an object"),
+                -- so it is cleared with an empty string.
+                local had = tile and tile.UI.getXmlTable()
+                if had and #had > 0 then tile.UI.setXml("") end
+                ready = true
+                onReady()
+            end)
         end, 2)
     end)
-end
-
---- Hold the race panel's updates, its tile about to be reloaded: until
--- Hud.build draws it again, there is nothing to send them to.
-function Hud.hold()
-    ready = false
-    Ui.route("fdr", nil)
 end
 
 --- "12 WP", or with several zones each by its letter: "T5 B3 G2 C3 E3 S2".

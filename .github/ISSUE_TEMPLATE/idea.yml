@@ -1,0 +1,16 @@
+name: An idea
+description: Something the Formula D mod could do, or do better
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: What would you like, and what would it help with?
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot or sketch
+      description: Optional. If it is about something on the table, a picture of where it would go helps. Drag it here, or paste it.

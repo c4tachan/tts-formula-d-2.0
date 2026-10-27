@@ -70,8 +70,8 @@ the only thing needing measurement in game is the tile itself — not each track
                                  // (the map's name panel); default the board's middle
   "dice_side": "up",             // optional: the tray side, on the image, the dice not in
                                  // play line up along; default the side facing the middle
-  "panel": { "pos": [2172, 1410], "width": 400 }, // optional: the race panel's centre
-                                 // and width, on an empty patch; default on the screen
+  "panel": { "pos": [2172, 1410], "width": 400 }, // optional, unused: where the race
+                                 // panel lay when it was on the board (now on the screen)
 
   "pit": {                       // omitted on tracks without a pit lane (below)
     "entry": ["i.s11.0", "i.s11.1"], // the track spaces that lead into it
@@ -186,7 +186,7 @@ out with the rest of the edits.
 Where the grid boxes are printed with their numbers, as on Austin, the
 list can be read straight off the board into the track file instead.
 
-## The dice and the race panel
+## The dice
 
 `tools/extract/find_dice_spot.py` gives a track its first `dice` and
 `dice_side`: the tray over the board's name logo (the Formula D name card,
@@ -194,15 +194,17 @@ or the Formula Dé checkered title box), turned and nudged to keep the
 parked dice as clear of the track as it can. It leaves a track that has a
 spot already alone (`--force` replaces it).
 
-`dice` and `panel` are set in the game, from the board's right-click menu
-(the host only, editor open or not): **Put the dice here** moves the dice
-tray to where you clicked, **Turn the dice** moves the row of dice not in
-play a quarter turn round the tray, **Put the race panel here** centres the panel
-there, and **Race panel larger** / **smaller** change its width by 15% a
-step (150 to 1600 pixels). The tray and panel move at once. The same five
-can be bound as keys under "Board layout" in Options > Game Keys. They are
-kept with the track's edits: save the game and `import_track.py` writes
-them into the track file with the rest.
+`dice` and `dice_side` are set in the game, from the board's right-click menu
+(the host only, editor open or not, once Layout on the setup menu is on):
+**Put the dice here** moves the dice tray to where you clicked, and **Turn the
+dice** moves the row of dice not in play a quarter turn round the tray. The
+tray moves at once. Both can be bound as keys under "Board layout" in
+Options > Game Keys. They are kept with the track's edits: save the game and
+`import_track.py` writes them into the track file with the rest.
+
+The race panel used to lie on the board, at a track's `panel` spot. It is on
+the screen now, as players preferred; the spots are kept in the track files,
+unused.
 
 A fresh scan from `find_grid.py` has plain numbers for ids until
 `find_corners.py` runs; that step renames every link and the arrow reading in

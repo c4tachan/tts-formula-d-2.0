@@ -49,7 +49,6 @@ local TRACKS = {
     FDe03 = require("fd.data.tracks.FDe03"),
 }
 
-mod_packed = false
 setup_packed = false
 
 local race
@@ -79,6 +78,7 @@ local startKey = nil
 local turnsSet = nil
 local undo = {}
 local joining = {} -- steam id -> true from connecting until moved to the spectators (see bench)
+local rulebooks = {} -- colour -> { guid, rules } of the rulebook out for them (fdRules)
 local UNDO_LIMIT = 30
 
 --- One roll of the black die, made by the script: only when the die itself
@@ -111,12 +111,10 @@ local SEATS = {
 
 -- Setup ---------------------------------------------------------------------
 -- The table holds the board and nothing else to set up: the map and rules
--- are chosen on the setup menu (fd.tts.setup). The Big Box menu board stays
--- packed in its bag, and the setup board and everything on it are hidden
--- where they stand -- the script still reaches the bags it deals
--- dashboards, cars and markers from.
+-- are chosen on the setup menu (fd.tts.setup). The setup board and
+-- everything on it are hidden where they stand -- the script still
+-- reaches the bags it deals dashboards, cars and markers from.
 
-local MOD_MENU_BAG = "a57988"
 local SETUP_BAG = "0fde3b"
 -- Everyone a hidden object is hidden from: every seat, the spectators and
 -- the Game Master.
@@ -134,6 +132,9 @@ local SOURCE_BAGS = {
     "a845cd", -- Wear Tracker Bag (fd.tts.dashboard)
     "bbc10d", -- Damage Marker Bag (DAMAGE_BAG, below)
     "ac4939", -- Dice Set Bag: spare dice (fd.tts.dice)
+    "98b2d2", -- Beginner Rulebook Bag (RULEBOOK_BAGS, below)
+    "f04a8d", -- Advanced Rulebook Bag
+    "490aa3", -- the quick reference cards (QUICK_REFERENCE_BAG, below)
 }
 
 --- Hide `obj` where it stands: locked, out of reach, and invisible to all.
@@ -176,15 +177,6 @@ local function hideSetup(onDone)
     end
 end
 
---- Put the Big Box menu board back in its bag, if it is out.
-local function packModMenu()
-    local bag = not mod_packed and getObjectFromGUID(MOD_MENU_BAG)
-    if bag then
-        bag.call("buttonClick_recall", {})
-    end
-    mod_packed = true
-end
-
 --- The map on the board tile, from Maps.list, or nil if it is none we know.
 local function mapOnBoard()
     local tile = Track.tile()
@@ -204,16 +196,15 @@ function onLoad(saved_data)
     local saved = {}
     if saved_data and saved_data ~= "" then
         saved = JSON.decode(saved_data) or {}
-        mod_packed = saved.mp
         setup_packed = saved.sp
     else
-        mod_packed = true
         setup_packed = true
     end
 
     race = Race.new(rulesFor(saved.race and saved.race.rules), saved.race)
     race.autoRolls = true
     damagePieces = saved.damage or {}
+    rulebooks = saved.books or {}
     turnsSet = nil
     Dice.prepareAll()
     Dashboard.scan()
@@ -229,15 +220,14 @@ function onLoad(saved_data)
     Wait.time(function()
         Dashboard.scan()
         dropDashless()
-        packModMenu()
         boardMenu(Editor.isOpen())
         hideSetup(function() layDice() end)
         syncDamage()
     end, 1)
 end
 
---- (Re)build the race panel on the board, the screen dashboards and the
--- setup menu, then fill them in.
+--- (Re)build the race panel, the screen dashboards and the setup menu,
+-- then fill them in.
 function buildUi()
     -- Until the new XML has loaded, updates would go to elements on their way
     -- out and then be skipped as repeats once it has (see fd.tts.ui).
@@ -255,8 +245,7 @@ function buildUi()
         rulesets[i] = { name = r.name, current = r == rules }
     end
     panels[#panels + 1] = Setup.panel(maps, rulesets)
-    local track = map and TRACKS[map.id]
-    Hud.build(rules, panels, Track.tile(), track and Editor.trackFor(track), function()
+    Hud.build(rules, panels, Track.tile(), function()
         Mini.setReady()
         Setup.setReady()
         refresh()
@@ -305,11 +294,13 @@ end
 
 function onSave()
     return JSON.encode({
-        mp = mod_packed, sp = setup_packed, race = race and race:serialize(),
+        sp = setup_packed, race = race and race:serialize(),
         -- Hand edits to track spaces; tools/extract/import_track.py reads them.
         edits = Editor.save(),
         -- The damage marker pieces on the board, by marker id.
         damage = damagePieces,
+        -- The rulebooks players have out, by colour.
+        books = rulebooks,
         -- Editor markers out on the board; removed on load (see Editor.load).
         markers = (function()
             local out = Editor.markerGuids()
@@ -1067,10 +1058,50 @@ end
 local DASHBOARD_BAGS = { beginner = "edfadc", advanced = "4eb678" }
 -- A free dashboard this close to a seat's hand zone is that seat's.
 local SEAT_RANGE = 12
--- How far in front of the hand zone a fresh dashboard goes.
-local DASH_AHEAD = 3.5
+-- How far in front of the hand zone's middle a fresh dashboard goes. The
+-- zones sit at the table's rim (z +-38.4, x +-55.7), the board reaches
+-- z +-26 and x +-44, and a dashboard is 6.5 deep: 7.8 leaves it clear of
+-- both the zone (about 6.4 deep) and the board.
+local DASH_AHEAD = 7.8
+
+-- The quick reference: four cards, one of the 2020 mod's bags. They cover
+-- the advanced rules (gearbox, body, engine), so only those deal them.
+local QUICK_REFERENCE_BAG = "490aa3"
+
+--- A spot in front of the seat whose hand zone is `hand`: `ahead` along
+-- the way the zone faces, then `left` to the left as the seat sees it
+-- (the car goes to the right, see carSpot). Returns the spot and the
+-- seat's yaw, which turns a thing to face the seat.
+local function seatSpot(hand, ahead, left)
+    local yaw = hand.rotation and hand.rotation.y or 0
+    local ix, iz = math.sin(math.rad(yaw)), math.cos(math.rad(yaw))
+    local p = hand.position
+    return { x = p.x + ix * ahead - iz * left, y = DROP_Y, z = p.z + iz * ahead + ix * left }, yaw
+end
 
 local delivering = {}  -- colour -> true while their dashboard is on its way
+
+--- Deal `color` the quick reference cards under the advanced rules, unless
+-- their hand holds them -- or anything -- already: nothing else goes in a
+-- hand here.
+local function dealReference(color)
+    if race.rules.id ~= "advanced" then
+        return
+    end
+    local p = Player[color]
+    local hand = p and p.getHandTransform()
+    local bag = getObjectFromGUID(QUICK_REFERENCE_BAG)
+    if not (hand and bag) or #(p.getHandObjects() or {}) > 0 then
+        return
+    end
+    bag.takeObject({
+        position = { x = hand.position.x, y = DROP_Y, z = hand.position.z },
+        smooth = false,
+        callback_function = function(deck)
+            deck.deal(deck.getQuantity(), color)
+        end,
+    })
+end
 
 local function dealIn(color, dash)
     delivering[color] = nil
@@ -1082,6 +1113,7 @@ local function dealIn(color, dash)
         race:emit("info", race:label(car) .. " is dealt in", color)
         ACTIONS.car(car)
     end)
+    dealReference(color)
 end
 
 --- Deal `color` in, if they are seated, picked the seat themselves, are not
@@ -1114,16 +1146,17 @@ deliver = function(color)
         return
     end
     -- Straight ahead of the seat, the way its hand zone faces.
-    local yaw = hand.rotation and hand.rotation.y or 0
-    local ix, iz = math.sin(math.rad(yaw)), math.cos(math.rad(yaw))
+    local spot, yaw = seatSpot(hand, DASH_AHEAD, 0)
     delivering[color] = true
     -- Should the bag never hand it over, the seat is not held up for good;
     -- dealIn checks again, so a late arrival does no harm.
     Wait.time(function() delivering[color] = nil end, 10)
     bag.takeObject({
-        position = { x = hand.position.x + ix * DASH_AHEAD, y = DROP_Y, z = hand.position.z + iz * DASH_AHEAD },
-        -- Turned to face the seat; the beginner face is the underside.
-        rotation = { x = 0, y = yaw, z = face == "beginner" and 180 or 0 },
+        position = spot,
+        -- Turned to face the seat; the beginner face is the underside. The
+        -- two faces are printed opposite ways up (see fd.data.dashboard), so
+        -- the advanced one turns a half turn more to read the right way.
+        rotation = { x = 0, y = face == "advanced" and (yaw + 180) % 360 or yaw, z = face == "beginner" and 180 or 0 },
         smooth = false,
         callback_function = function(dash)
             Dashboard.track(dash)
@@ -1168,6 +1201,57 @@ dealInSeated = function(onDone)
     Wait.condition(function()
         Wait.condition(onDone, carsReady, 5, onDone)
     end, function() return next(delivering) == nil end, 12, onDone)
+end
+
+-- The rulebook PDFs, one bag per ruleset; the setup board hides the bags.
+local RULEBOOK_BAGS = { beginner = "98b2d2", advanced = "f04a8d" }
+-- How far to the left of where the seat's dashboard goes a rulebook lies.
+local BOOK_SIDE = 9
+local fetchingBook = {} -- colour -> true while their rulebook is on its way
+
+--- The race panel's Rules button: put the rulebook for the rules being
+-- played in front of the clicker's seat, to the left of their dashboard, or
+-- put away the one they have out. One for other rules -- they changed
+-- since -- is swapped for this one in the same click.
+function fdRules(player)
+    local color = player.color
+    if fetchingBook[color] then
+        return
+    end
+    local had = rulebooks[color]
+    local out = type(had) == "table" and getObjectFromGUID(had.guid)
+    rulebooks[color] = nil
+    if out then
+        out.destruct()
+        if had.rules == race.rules.id then
+            return
+        end
+    end
+    local hand = SEATS[color] and player.getHandTransform()
+    if not hand then
+        broadcastToColor("Take a seat to have the rulebook put in front of you.", color, LEVEL_RGB.info)
+        return
+    end
+    local id = RULEBOOK_BAGS[race.rules.id] and race.rules.id or "beginner"
+    local bag = getObjectFromGUID(RULEBOOK_BAGS[id])
+    if not bag then
+        return
+    end
+    local spot, yaw = seatSpot(hand, DASH_AHEAD, BOOK_SIDE)
+    -- Until it is out, more clicks would fetch more books, all but the last
+    -- out of reach of this button.
+    fetchingBook[color] = true
+    Wait.time(function() fetchingBook[color] = nil end, 5)
+    bag.takeObject({
+        position = spot,
+        rotation = { x = 0, y = yaw, z = 0 },
+        smooth = false,
+        callback_function = function(book)
+            fetchingBook[color] = nil
+            book.setInvisibleTo({})
+            rulebooks[color] = { guid = book.getGUID(), rules = id }
+        end,
+    })
 end
 
 --- The car driven by the player with steam id `id`, if any.
@@ -1457,13 +1541,25 @@ function fdSetupMap(player, value)
     custom.image = Assets.url(map.url)
     custom.secondary_image = custom.image
     tile.setCustomObject(custom)
-    -- Reloading takes the race panel with the tile: hold its updates until
-    -- it is drawn again (fdMapChanged).
-    Hud.hold()
     tile.reload()
     printToAll(player.steam_name .. " puts " .. map.name .. " on the board", LEVEL_RGB.info)
-    -- Once the tile is back: the race panel, the menu and the dice follow it.
+    -- Once the tile is back: the menu and the dice follow it.
     Wait.time(function() fdMapChanged() end, 1)
+end
+
+--- The Report buttons, on the setup menu and the race panel: TTS opens no
+-- browser, so the issue tracker's link goes in a box the player can copy it
+-- from. Should this TTS have no such box -- asking for a missing method
+-- throws -- it goes to their chat instead.
+function fdReportIssue(player)
+    local shown = pcall(function()
+        player.showInputDialog("Copy this link into your browser to report a bug or suggest an idea."
+            .. " A screenshot (F12) and what happened help most.", Setup.REPO, function() end)
+    end)
+    if not shown then
+        broadcastToColor("Report a bug or an idea at " .. Setup.REPO
+            .. " -- a screenshot (F12) and what happened help most.", player.color, LEVEL_RGB.info)
+    end
 end
 
 --- The race distance field on the setup menu. Anything but a whole number
@@ -1503,7 +1599,11 @@ local function turnDashboards(rules, change)
         change()
     end
     for _, dash in ipairs(turning) do
-        dash.flip()
+        -- Over side to side, not end to end as flip() turns it: the faces
+        -- are printed opposite ways up, so this way the other one reads
+        -- from the seat too, as a fresh dashboard of that face would.
+        local r = dash.getRotation()
+        dash.setRotation({ x = (r.x + 180) % 360, y = r.y, z = r.z })
         dashboardMoved(dash)
     end
 end
@@ -1527,14 +1627,17 @@ function fdSetupRules(player, value)
     turnDashboards(rules, function()
         act(function() race:setRules(rules) end)
     end)
+    -- The cars stay in the race, so are not dealt in again.
+    for _, car in ipairs(race:cars()) do
+        dealReference(car.color)
+    end
     -- The screen dashboards, the standings and the menu, for the new rules.
     buildUi()
 end
 
---- A new map is on the board. Reloading the tile took the race panel with
--- it, so it is drawn again; the setup menu says which map it is, turn order
--- goes by its track, its pit boxes take their seats' colours, and the dice
--- move to its name panel.
+--- A new map is on the board. The panels are drawn again: the setup menu
+-- says which map it is, turn order goes by its track, its pit boxes take
+-- their seats' colours, and the dice move to its name panel.
 -- Longest to wait for a reloaded board tile to be ready, in seconds. Past
 -- that it is drawn on regardless.
 local TILE_WAIT = 15
@@ -1984,7 +2087,7 @@ local function addAt(color, pos)
     editorStatus()
 end
 
---- The board layout: where the dice tray and the race panel go on the map
+--- The board layout: where the dice tray goes on the map
 -- on the board. Kept with the track's edits (fd.tts.track_editor), and
 -- brought into the repo by import_track.py like the rest of them.
 local function layoutTrack(color)
@@ -2005,16 +2108,6 @@ local function diceAt(color, pos)
         color, LEVEL_RGB.info)
 end
 
-local function panelAt(color, pos)
-    local tile, track = layoutTrack(color)
-    if not (tile and track) then return end
-    local px, py = Track.pixelOf(tile, track, pos)
-    Editor.setPanel(track, px, py)
-    buildUi()
-    broadcastToColor(string.format("Race panel moved to (%d, %d). Save the game to keep it.", px, py),
-        color, LEVEL_RGB.info)
-end
-
 local function turnDice(color)
     local tile, track = layoutTrack(color)
     if not (tile and track) then return end
@@ -2026,21 +2119,6 @@ local function turnDice(color)
     layDice()
     broadcastToColor("The dice now line up along the tray's " .. side
         .. " side (as the board image runs). Save the game to keep it.", color, LEVEL_RGB.info)
-end
-
--- How much each step makes the race panel larger or smaller.
-local PANEL_STEP = 1.15
-
-local function scalePanel(color, factor)
-    local tile, track = layoutTrack(color)
-    if not (tile and track) then return end
-    local width = Editor.scalePanel(track, factor)
-    if not width then
-        broadcastToColor("Put the race panel on the board first (Put the race panel here).", color, LEVEL_RGB.warn)
-        return
-    end
-    buildUi()
-    broadcastToColor(string.format("Race panel %d px wide. Save the game to keep it.", width), color, LEVEL_RGB.info)
 end
 
 -- Whether the board is open for its layout to be set (fdLayout).
@@ -2104,9 +2182,6 @@ boardMenu = function(on)
     end
     item("Put the dice here", diceAt)
     item("Turn the dice", turnDice)
-    item("Put the race panel here", panelAt)
-    item("Race panel larger", function(color) scalePanel(color, PANEL_STEP) end)
-    item("Race panel smaller", function(color) scalePanel(color, 1 / PANEL_STEP) end)
     item("Use the track file", useTrackFile)
     if not on then return end
     item("Pick up spaces here", pickUpAt)
@@ -2124,8 +2199,8 @@ function fdLayout(player)
     layoutOn = not layoutOn
     boardMenu(Editor.isOpen())
     if layoutOn then
-        broadcastToColor("Right-click the board: Put the dice here, Turn the dice, Put the race panel here, "
-            .. "Race panel larger / smaller, Use the track file (drop this game's edits to it). "
+        broadcastToColor("Right-click the board: Put the dice here, Turn the dice, "
+            .. "Use the track file (drop this game's edits to it). "
             .. "Press Layout again when done, and save the game to keep it.",
             player.color, LEVEL_RGB.info)
     else
@@ -2196,7 +2271,7 @@ local function editorKey(fn)
     return function(color, hovered, pointer, up)
         if up or not admin({ color = color }) then return end
         if not Editor.isOpen() then
-            broadcastToColor("Open the track editor first (Edit on the race panel).", color, LEVEL_RGB.warn)
+            broadcastToColor("Open the track editor first (Edit track on the setup menu).", color, LEVEL_RGB.warn)
             return
         end
         fn(color, hovered, pointer)
@@ -2213,9 +2288,6 @@ local function registerEditorKeys()
     end
     addHotkey("Board layout: put the dice here", layoutKey(diceAt))
     addHotkey("Board layout: turn the dice", layoutKey(turnDice))
-    addHotkey("Board layout: put the race panel here", layoutKey(panelAt))
-    addHotkey("Board layout: race panel larger", layoutKey(function(color) scalePanel(color, PANEL_STEP) end))
-    addHotkey("Board layout: race panel smaller", layoutKey(function(color) scalePanel(color, 1 / PANEL_STEP) end))
     addHotkey("Track editor: pick up spaces here", editorKey(function(color, _, pointer)
         pickUpAt(color, pointer)
     end))

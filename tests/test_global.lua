@@ -177,16 +177,6 @@ function T.a_packed_setup_board_is_put_out_and_hidden()
     eq(bag.calls[1], "buttonClick_place", "put out, so its bags can be reached")
 end
 
-function T.the_big_box_menu_stays_in_its_bag()
-    local S = world()
-    local menuBag = S.object("Memory Bag - Mod Menu", { guid = "a57988" })
-    local saved = onSave()
-    saved.json.mp = false -- left out when saved
-    onLoad(saved)
-    eq(menuBag.calls[1], "buttonClick_recall", "packed away")
-    eq(S.ui.showModMenuButton, nil, "and no button to bring it out")
-end
-
 -- The script's die always comes up 10 unless a test loads it, so with two or
 -- more drivers Start race deals them in but leaves the grid tied: the cars
 -- stay where they were dealt.
@@ -224,11 +214,56 @@ function T.a_seat_with_no_dashboard_gets_one_from_the_bag()
     assert(dash ~= S.beginner and dash ~= S.advanced, "a fresh dashboard")
     eq(dash.up.y, -1, "beginner side up")
     eq(dash.rot.y, 0, "turned to face the seat")
-    assert(dash.pos.z > -38 and dash.pos.z < -30, "in front of the seat")
+    assert(dash.pos.z > -38 and dash.pos.z < -28, "in front of the seat")
+    -- Its near edge (3.26 from its middle) clear of the far side of the
+    -- hand zone (about 3.2 from the hand's middle), where the cards stand,
+    -- and its far edge clear of the board's (z -26 on the real table).
+    assert(dash.pos.z - 3.26 > -38 + 3.2, "clear of the hand")
+    assert(dash.pos.z + 3.26 < -26, "clear of the board")
     assert(dash.pos.y > 1, "on the table")
     eq(dash.buttons[1].click_function, "fdNoop", "its status label is drawn")
     assert(getObjectFromGUID(green.tts.car), "and a car")
     assert(getObjectFromGUID(green.tts.markers.gear), "with its gear stick")
+end
+
+function T.a_fresh_advanced_dashboard_reads_the_right_way_up()
+    local S = world()
+    S.object("Advanced Dashboard Bag", { guid = "4eb678", spawns = "Advanced Dashboard" })
+    fdSetupRules(Player.Red, require("fd.rules.advanced").name)
+    S.player("Green", S.vec(-24, 1, -38))
+    onPlayerChangeColor("Green")
+    fdSetupStart(Player.Red)
+    local dash = getObjectFromGUID(state().cars.Green.tts.dash)
+    eq(dash.name, "Advanced Dashboard")
+    eq(dash.up.y, 1, "advanced side up")
+    -- Its art is printed the other way up from the beginner face's, so a
+    -- half turn more than the seat's own facing (0 here).
+    eq(dash.rot.y, 180, "turned to read from the seat")
+end
+
+function T.a_dashboard_turned_to_the_other_face_still_reads_from_its_seat()
+    local S = world()
+    -- Beginner side up as the bag deals it, reading from Red's seat.
+    S.beginner.rot = S.vec(0, 0, 180)
+    joinRace("Red", S.beginner)
+    fdSetupRules(Player.Red, require("fd.rules.advanced").name)
+    eq(S.beginner.up.y, 1, "turned to the advanced side")
+    -- Over side to side: (180, 0, 180) is a half turn on the table, as a
+    -- fresh advanced dashboard is dealt, not the end-to-end flip that would
+    -- leave it upside down.
+    eq(S.beginner.rot.x, 180)
+    eq(S.beginner.rot.y, 0)
+    eq(S.beginner.rot.z, 180)
+end
+
+function T.switching_to_the_advanced_rules_deals_the_quick_reference()
+    local S = world()
+    local cards = { { name = "Card" }, { name = "Card" }, { name = "Card" }, { name = "Card" } }
+    S.object("Quick Reference Bag", { guid = "490aa3", spawns = "Deck", spawnContents = cards })
+    joinRace("Red", S.beginner)
+    eq(#Player.Red.getHandObjects(), 0, "none under the basic rules")
+    fdSetupRules(Player.Red, require("fd.rules.advanced").name)
+    eq(#Player.Red.getHandObjects(), 4, "dealt to the cars already in")
 end
 
 function T.nobody_is_dealt_in_once_the_race_has_started()
@@ -416,7 +451,7 @@ function T.the_host_picks_the_rules_on_the_setup_menu()
     assert(ui.fdm_Red_tiresMark and ui.fdm_Red_handlingMark, "a marker per zone on screen")
     assert(ui.fdm_Red_tires14, "the advanced face's 14 tire slots")
     eq(ui.fdm_Red_wpMark, nil)
-    assert(byId(S.board.xml).fdr_r1_w_tires, "a standings column per zone")
+    assert(byId(S.xml).fdr_r1_w_tires, "a standings column per zone")
     eq(S.ui.fds_rules.value:find(ADVANCED, 1, true) ~= nil, true, "the menu says which rules")
 
     fdUndo(Player.Red)
@@ -2108,7 +2143,6 @@ function T.only_the_host_can_use_the_race_controls()
         for _, c in ipairs(node.children or {}) do walk(c, panel) end
     end
     for _, node in ipairs(S.xml) do walk(node, node.attributes.id) end
-    for _, node in ipairs(S.board.xml) do walk(node, node.attributes.id) end
     eq(rows.fdr, 1, "Undo, on the race panel, is the host's")
     eq(rows.fds, 5, "as are the setup menu's choices, the rules, Start race, the track tools and the editor line")
 
@@ -2162,6 +2196,29 @@ function T.the_setup_menu_shows_from_the_load()
     eq(S.ui.fds_drivers.value, "Drivers (1): RedPlayer", "spectators are not")
     Player.Red.changeColor("Grey")
     assert(S.ui.fds_drivers.value:find("none yet"), S.ui.fds_drivers.value)
+end
+
+function T.report_shows_the_issue_link_to_copy()
+    local S = world()
+    eq(byId(S.xml).fds_issue.attributes.onClick, "fdReportIssue", "on the setup menu")
+    fdReportIssue(Player.Red)
+    eq(Player.Red.dialog[2], "https://github.com/c4tachan/tts-formula-d-2.0/issues/new/choose", "in a box to copy")
+    assert(Player.Red.dialog[1]:find("screenshot"), "asking for a screenshot")
+
+    -- A TTS without the box: asking for it throws, so the link goes to chat.
+    Player.Blue.showInputDialog = nil
+    setmetatable(Player.Blue, { __index = function(_, k) error("no member " .. k) end })
+    fdReportIssue(Player.Blue)
+    assert(S.logged("Report a bug or an idea at https://github.com/"), "or in chat")
+end
+
+function T.the_race_panels_buttons_call_global_with_tooltips()
+    local S = world()
+    local panel = byId(S.xml)
+    eq(panel.fdr_rules_book.attributes.onClick, "fdRules")
+    eq(panel.fdr_issue.attributes.onClick, "fdReportIssue")
+    eq(panel.fdr_undo.attributes.onClick, "fdUndo")
+    assert(panel.fdr_undo.attributes.tooltip, "with tooltips")
 end
 
 function T.the_setup_menu_sets_the_distance()
@@ -2221,25 +2278,17 @@ function T.start_race_needs_drivers_and_the_host()
     assert(S.logged("Nobody is seated yet"))
 end
 
-function T.the_race_panel_lies_on_the_board_where_the_track_says()
+function T.the_race_panel_is_on_the_screen_even_where_the_board_has_a_spot()
     local S = world()
-    local panel = S.board.xml[1].attributes
-    eq(panel.id, "fdr", "drawn on the board tile")
-    for _, node in ipairs(S.xml) do
-        assert(node.attributes.id ~= "fdr", "not on the screen")
-    end
-    -- Monaco's spot, on the Formula D logo: centred on (2172, 1410) of the
-    -- 2474 x 1616 image, which is local (-935 / 2474, 602 / 1616) on a
-    -- 1-unit tile; 400 pixels wide.
-    local x, y = panel.position:match("^(%S+) (%S+)")
-    eq(x, "-37.8")
-    eq(y, "37.3")
-    eq(panel.scale, "0.0425 0.0425 1", "380 UI units across 400 pixels")
-    eq(panel.rotation, "0 0 180", "the same way up as the picture")
-    -- A new map reloads the tile, which loses its UI: it is drawn again.
-    S.board.xml = {}
-    fdMapChanged()
-    eq(S.board.xml[1].attributes.id, "fdr")
+    -- Monaco's track names a spot on the board, from when the panel lay there.
+    assert(require("fd.data.tracks.FDMonaco").panel)
+    assert(byId(S.xml).fdr, "on the screen")
+    eq(#(S.board.xml or {}), 0, "not on the board")
+    -- A game saved while it lay on the board has it there still: taken off.
+    S.board.xml = { { tag = "Panel", attributes = { id = "fdr" }, children = {} } }
+    buildUi()
+    eq(#S.board.xml, 0, "the old one taken off the board")
+    assert(byId(S.xml).fdr, "and on the screen")
 end
 
 function T.the_dice_tray_moves_where_the_board_menu_says_and_is_saved()
@@ -2329,35 +2378,25 @@ function T.turning_the_dice_moves_their_row_a_quarter_round_the_tray()
     eq(table.concat(sides, " "), "right down left up")
 end
 
-function T.the_race_panel_moves_and_resizes_from_the_board_menu()
+function T.the_board_menu_holds_the_layout_and_while_open_the_editor()
     local S = world()
-    local Track = require("fd.tts.track")
-    local FDMonaco = require("fd.data.tracks.FDMonaco")
-    -- Monaco's own spot is 2474 / 2 - 935 = 302 pixels from its middle's x.
-    S.board.rightClick("Put the race panel here", "Red", Track.worldOf(S.board, FDMonaco, 1237, 808))
-    local panel = S.board.xml[1].attributes
-    local x, y = panel.position:match("^(%S+) (%S+)")
-    assert(math.abs(tonumber(x)) < 0.05 and math.abs(tonumber(y)) < 0.05, "centred on the board: " .. x .. " " .. y)
-    eq(panel.scale, "0.0425 0.0425 1", "as wide as before")
-    S.board.menu["Race panel larger"]("Red")
-    eq(S.board.xml[1].attributes.scale, "0.0489 0.0489 1", "15% wider")
-    assert(math.abs(onSave().json.edits.FDMonaco.panel.width - 460) < 1e-6, "saved")
-    S.board.menu["Race panel smaller"]("Red")
-    eq(S.board.xml[1].attributes.scale, "0.0425 0.0425 1")
+    fdLayout({ color = "Red" })
+    assert(S.board.menu["Put the dice here"], "layout items")
+    eq(S.board.menu["Put the race panel here"], nil, "none for the race panel, on the screen now")
     -- The editor's own items join the layout ones while it is open, and go
     -- again when it closes.
     fdEdit({ color = "Red", steam_name = "RedPlayer" })
     assert(S.board.menu["Pick up spaces here"], "editor items while it is open")
     fdEdit({ color = "Red", steam_name = "RedPlayer" })
     eq(S.board.menu["Pick up spaces here"], nil)
-    assert(S.board.menu["Put the race panel here"], "layout items stay")
+    assert(S.board.menu["Put the dice here"], "layout items stay")
 end
 
 function T.the_race_panel_goes_on_the_screen_for_a_map_without_a_spot()
     local S = world()
     S.board.custom = { image = "http://example.invalid/other-map.png" }
     fdMapChanged()
-    eq(#S.board.xml, 0, "off the board")
+    eq(#(S.board.xml or {}), 0, "off the board")
     local found = nil
     for _, node in ipairs(S.xml) do
         if node.attributes.id == "fdr" then found = node end
@@ -2637,6 +2676,66 @@ function T.global_ui_holds_only_the_images_it_uses()
     Assets.register(UI, "-1")
     UI.setCustomAssets = real
     eq(set, 0, "not set again when nothing changed: that would reload the UI")
+end
+
+function T.the_rules_button_puts_the_rulebook_in_front_of_your_seat()
+    local S = world()
+    S.object("Beginner Rulebook Bag", { guid = "98b2d2", spawns = "Rulebook Beginner" })
+    S.object("Advanced Rulebook Bag", { guid = "f04a8d", spawns = "Rulebook Advanced" })
+    fdRules(Player.Red)
+    local book = S.find("Rulebook Beginner")
+    assert(book, "the rulebook for the rules being played")
+    -- Red sits at z = -38 facing +z: ahead as a dashboard goes, then to
+    -- their left (-x), the other side from the car.
+    eq(book.pos.x, -9)
+    eq(book.pos.z, -38 + 7.8)
+    eq(book.rot.y, 0, "facing the seat")
+
+    fdRules(Player.Red)
+    eq(S.count("Rulebook Beginner"), 0, "again puts it away")
+
+    fdRules(Player.Red)
+    local saved = onSave()
+    onLoad(saved)
+    fdRules(Player.Red)
+    eq(S.count("Rulebook Beginner"), 0, "and still knows it after a load")
+
+    fdSetupRules(Player.Red, require("fd.rules.advanced").name)
+    fdRules(Player.Blue)
+    assert(S.find("Rulebook Advanced"), "the advanced one once those are the rules")
+
+    -- Out before the rules changed: one click swaps it for the right one.
+    fdSetupRules(Player.Red, require("fd.rules.beginner").name)
+    fdRules(Player.Blue)
+    eq(S.count("Rulebook Advanced"), 0, "the old rules' book goes")
+    eq(S.count("Rulebook Beginner"), 1, "and this rules' comes, in the one click")
+
+    S.player("Grey", S.vec(0, 1, 0)).seated = false
+    fdRules(Player.Grey)
+    eq(S.count("Rulebook Beginner"), 1, "a spectator has no seat to put one at")
+    assert(S.logged("Take a seat"))
+end
+
+function T.the_basic_rules_deal_no_quick_reference()
+    local S = world()
+    local cards = { { name = "Card" }, { name = "Card" }, { name = "Card" }, { name = "Card" } }
+    S.object("Quick Reference Bag", { guid = "490aa3", spawns = "Deck", spawnContents = cards })
+    fdSetupStart(Player.Red)
+    assert(state().cars.Red, "Red is dealt in")
+    eq(#Player.Red.getHandObjects(), 0, "the cards are for the advanced rules")
+end
+
+function T.being_dealt_in_hands_you_the_quick_reference()
+    local S = world()
+    local cards = { { name = "Card" }, { name = "Card" }, { name = "Card" }, { name = "Card" } }
+    S.object("Quick Reference Bag", { guid = "490aa3", spawns = "Deck", spawnContents = cards })
+    fdSetupRules(Player.Red, require("fd.rules.advanced").name)
+    -- Blue kept the cards from an earlier race.
+    Player.Blue.hand = { { name = "Card" }, { name = "Card" }, { name = "Card" }, { name = "Card" } }
+    fdSetupStart(Player.Red)
+    assert(state().cars.Red and state().cars.Blue, "both are dealt in")
+    eq(#Player.Red.getHandObjects(), 4, "the four cards in Red's hand")
+    eq(#Player.Blue.getHandObjects(), 4, "not a second set for Blue")
 end
 
 function T.the_map_cannot_change_during_the_grid_roll()

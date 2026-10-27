@@ -6,13 +6,13 @@ plus Python tooling for data extraction.
 ## Rules of the road
 
 - **`src/entry/` files are TTS objects.** The filename encodes the object GUID
-  (`Custom Board.9e2fe8.lua`) and must not be renamed — the extension matches
+  (`Game Board Tile.ebde54.lua`) and must not be renamed — the extension matches
   objects by it. `Global.-1.lua` is the global script.
 - **`src/fd/` is never edited in game.** Entry scripts `require("fd.…")` and the
   extension inlines those modules on Save & Play.
-- **Generated files carry a banner comment.** `src/fd/data/maps.lua` and
-  `src/entry/Custom Board.9e2fe8.xml` come from `tools/extract/maps.json` — edit
-  the JSON and rerun `tools/extract/gen_registry.py`, never the output.
+- **Generated files carry a banner comment.** `src/fd/data/maps.lua` comes
+  from `tools/extract/maps.json` — edit the JSON and rerun
+  `tools/extract/gen_registry.py`, never the output.
   `src/fd/data/dice.lua` likewise comes from `tools/extract/dice_faces.json`
   via `gen_dice.py`.
 - **The move icons are drawn by `tools/make_icons.py`** into `assets/icons/`
@@ -28,7 +28,14 @@ plus Python tooling for data extraction.
   saves hold the Steam form. After adding or changing an asset: run
   `tools/extract/download_assets.py` (or `download_maps.py`), commit and push,
   then `python tools/pin_assets.py`; `--save` also writes a copy of the latest
-  save with its objects pointing at the repo.
+  save with its objects pointing at the repo. Every player loads these URLs,
+  so the repo stays public and keeps its name, and pinned commits must stay
+  reachable: merge PRs with a merge commit, never squash, and never
+  force-push `master`.
+- **The save to publish is `Saves/Formula D - clean.json`** in the TTS folder
+  (SaveName "Formula D"): at setup, no cars, hand zones at the table's rim.
+  Save & Play saves whatever is on the table into the loaded save, so load
+  it fresh before Save & Play, never with a race on the table.
 - **`fd.core` and `fd.rules` make no TTS calls.** They are tested under real
   Lua 5.2 (`tools/test_lua.py`). Anything touching objects, UI or `Wait` goes
   in `fd.tts` or the entry scripts. `tests/tts_stub.lua` fakes just enough of

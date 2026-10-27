@@ -174,6 +174,16 @@ function Stub.object(name, props)
     o.setPositionSmooth = function(p) o.pos = vec(p.x, p.y, p.z) end
     o.setPosition = function(p) o.pos = vec(p.x, p.y, p.z) end
     o.setRotationSmooth = function(r) o.rot = r end
+    -- Turned over side to side or end to end, it shows its other face.
+    o.setRotation = function(r)
+        local was = o.rot
+        o.rot = r
+        local dx = ((r.x or 0) - (was.x or 0)) % 360
+        local dz = ((r.z or 0) - (was.z or 0)) % 360
+        if (dx == 180) ~= (dz == 180) then
+            o.up = vec(o.up.x, -o.up.y, o.up.z)
+        end
+    end
     o.isSmoothMoving = function() return false end
     -- A roll counts the throws. A gear die keeps the `value` the test set;
     -- the black die comes up whatever math.random(20) gives, so a test that
@@ -227,6 +237,17 @@ function Stub.object(name, props)
         local out = {}
         for i, c in ipairs(o.contents) do out[i] = { name = c.name, guid = c.guid, index = i - 1 } end
         return out
+    end
+    -- A deck: its cards are its contents, dealt into a player's hand.
+    o.getQuantity = function() return #o.contents end
+    o.deal = function(n, color)
+        local p = Player[color]
+        p.hand = p.hand or {}
+        for _ = 1, n do
+            local c = table.remove(o.contents, 1)
+            if not c then break end
+            p.hand[#p.hand + 1] = c
+        end
     end
     o.takeObject = function(params)
         local r = params.rotation or vec(0, 0, 0)
@@ -334,6 +355,9 @@ function Stub.player(color, handPos, admin)
         end,
         broadcast = function(msg) Stub.log[#Stub.log + 1] = "broadcast to " .. p.color .. ": " .. msg end,
         getPointerPosition = function() return p.pointer or vec(0, 1, 0) end,
+        getHandObjects = function() return p.hand or {} end,
+        -- The last input box shown to the player: { description, text }.
+        showInputDialog = function(description, text) p.dialog = { description, text } end,
         -- The hand zone faces into the table, square to its nearest edge.
         getHandTransform = function()
             local yaw = math.deg(math.atan2(-handPos.x, -handPos.z))

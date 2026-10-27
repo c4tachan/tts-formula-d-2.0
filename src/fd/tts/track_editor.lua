@@ -461,15 +461,11 @@ function Editor.clearGrid()
     return "Grid cleared (" .. #was .. " space(s)). Mark it again from pole."
 end
 
--- The board layout: where the dice tray and the race panel go. Both are
--- spots in image pixels kept with the track's edits, so they are saved with
--- the game and import_track.py carries them into the track file. Unlike the
--- spaces they can be set with the editor closed.
-
--- The race panel's width in image pixels: where a track names none, and
--- the most and least it can be made.
-local PANEL_WIDTH = 400
-local PANEL_MIN, PANEL_MAX = 150, 1600
+-- The board layout: where the dice tray goes, a spot in image pixels kept
+-- with the track's edits, so it is saved with the game and import_track.py
+-- carries it into the track file. Unlike the spaces it can be set with the
+-- editor closed. (Edits from when the race panel lay on the board may still
+-- name a spot for it; that is passed along untouched.)
 
 --- Put the dice tray at (px, py) on `track`.
 function Editor.setDice(track, px, py)
@@ -515,26 +511,6 @@ function Editor.turnDice(track)
     end
     e.dirty = true
     return e.dice_side
-end
-
---- Put the race panel's centre at (px, py) on `track`, at the width it has.
-function Editor.setPanel(track, px, py)
-    local e = working(track)
-    local was = e.panel or track.panel
-    e.panel = { pos = { px, py }, width = was and was.width or PANEL_WIDTH }
-    e.dirty = true
-end
-
---- Make the race panel on `track` `factor` times as wide, within bounds.
--- Returns its new width, or nil if the track names no spot for it yet.
-function Editor.scalePanel(track, factor)
-    local e = working(track)
-    local was = e.panel or track.panel
-    if not was then return nil end
-    local width = math.max(PANEL_MIN, math.min(PANEL_MAX, was.width * factor))
-    e.panel = { pos = { was.pos[1], was.pos[2] }, width = width }
-    e.dirty = true
-    return width
 end
 
 --- How many spaces are on the open track's grid.

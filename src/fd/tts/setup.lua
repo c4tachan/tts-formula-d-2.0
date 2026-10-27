@@ -12,7 +12,9 @@ local Ui = require("fd.tts.ui")
 
 local Setup = {}
 
-local REPO = "https://github.com/c4tachan/tts-formula-d-2.0/issues"
+-- The new issue page, which offers the bug and idea forms
+-- (.github/ISSUE_TEMPLATE/).
+local REPO = "https://github.com/c4tachan/tts-formula-d-2.0/issues/new/choose"
 
 local PANEL_BG = "#15181CF2"
 local DIM = "#AAB0B8"
@@ -102,7 +104,7 @@ function Setup.panel(maps, rulesets)
     local tools = {
         button("fds_track", "Track", "fdTrack", { tooltip = "Show or hide the detected spaces on the board" }),
         button("fds_edit", "Edit track", "fdEdit", { tooltip = "Open or close the track editor for the map on the board" }),
-        button("fds_layout", "Layout", "fdLayout", { tooltip = "Let the board be right-clicked, to move the dice and the race panel" }),
+        button("fds_layout", "Layout", "fdLayout", { tooltip = "Let the board be right-clicked, to move the dice" }),
         button("fds_apply", "Apply", "fdApply", { tooltip = "Put the space markers back into the track" }),
         button("fds_export", "Export", "fdExport", { tooltip = "How to get your edits into the repo" }),
         button("fds_reset", "Reset", "fdReset", { tooltip = "Back to setup, keeping the drivers (Undo restores it)" }),
@@ -133,9 +135,13 @@ function Setup.panel(maps, rulesets)
                 { preferredHeight = "20", color = DIM }),
             el("HorizontalLayout", { spacing = "4", preferredHeight = "28", visibility = ADMIN }, tools),
             text("fds_editor", "", { preferredHeight = "34", fontSize = "12", color = "#9FD3FF", visibility = ADMIN }),
-            text(nil, "Found a bug, or have an idea? Report it here (select the link to copy it):",
-                { preferredHeight = "20", fontSize = "12", color = DIM }),
-            el("InputField", { id = "fds_link", readOnly = "true", preferredHeight = "26", fontSize = "13" }, nil, REPO),
+            el("HorizontalLayout", { spacing = "6", preferredHeight = "28", childForceExpandWidth = "false" }, {
+                text(nil, "Found a bug, or have an idea?", { fontSize = "12", color = DIM, flexibleWidth = "1" }),
+                -- Shows the link to copy (fdReportIssue): TTS opens no browser.
+                button("fds_issue", "Report it", "fdReportIssue", {
+                    preferredWidth = "110", tooltip = "The link to the issue tracker on GitHub, to copy",
+                }),
+            }),
         }),
     })
 end

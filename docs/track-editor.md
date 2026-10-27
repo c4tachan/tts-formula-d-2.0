@@ -73,7 +73,8 @@ lane. Red rings are problems; your selection is cyan, Claude's magenta.
 
 The Space tab edits the selected space's lane, facing and position, and
 lists its links in and out (✕ removes one). It also places the dice tray and
-the race panel, and turns the dice.
+turns the dice. (It can still set a track's race panel spot, which the game
+no longer uses: the panel is on the screen.)
 
 ## Detection
 
