@@ -28,7 +28,14 @@ plus Python tooling for data extraction.
   saves hold the Steam form. After adding or changing an asset: run
   `tools/extract/download_assets.py` (or `download_maps.py`), commit and push,
   then `python tools/pin_assets.py`; `--save` also writes a copy of the latest
-  save with its objects pointing at the repo.
+  save with its objects pointing at the repo. Every player loads these URLs,
+  so the repo stays public and keeps its name, and pinned commits must stay
+  reachable: merge PRs with a merge commit, never squash, and never
+  force-push `master`.
+- **The save to publish is `Saves/Formula D - clean.json`** in the TTS folder
+  (SaveName "Formula D"): at setup, no cars, hand zones at the table's rim.
+  Save & Play saves whatever is on the table into the loaded save, so load
+  it fresh before Save & Play, never with a race on the table.
 - **`fd.core` and `fd.rules` make no TTS calls.** They are tested under real
   Lua 5.2 (`tools/test_lua.py`). Anything touching objects, UI or `Wait` goes
   in `fd.tts` or the entry scripts. `tests/tts_stub.lua` fakes just enough of
