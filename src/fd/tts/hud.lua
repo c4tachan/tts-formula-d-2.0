@@ -1,6 +1,6 @@
 -- The race panel everyone sees, lying on an empty patch of the board (or on
 -- the screen, for a map without one): standings, pending black die checks,
--- and Undo. Per-player controls live on the
+-- the rulebook, and Undo. Per-player controls live on the
 -- dashboards (fd.tts.controls), the race-wide ones on the setup menu
 -- (fd.tts.setup).
 --
@@ -129,7 +129,13 @@ local function racePanel(rules, cols, place)
     for k, v in pairs(place) do attrs[k] = v end
     return el("Panel", attrs, {
         el("VerticalLayout", { padding = "8 8 6 6", spacing = "4", childForceExpandHeight = "false" }, {
-            text("fdr_title", "Formula D", { fontSize = "18", fontStyle = "Bold", preferredHeight = "26" }),
+            el("HorizontalLayout", { spacing = "4", preferredHeight = "26", childForceExpandWidth = "false" }, {
+                text("fdr_title", "Formula D", { fontSize = "18", fontStyle = "Bold", flexibleWidth = "1" }),
+                -- For everyone: hands the clicker the rulebook (fdRules).
+                button("fdr_rules_book", "Rules", "fdRules", {
+                    preferredWidth = "64", tooltip = "The rulebook, in front of your seat. Again to put it away.",
+                }),
+            }),
             text("fdr_rules", rules.name, { fontSize = "12", color = "#AAB0B8", preferredHeight = "16" }),
             standingsTable(cols),
             text("fdr_empty", "No cars yet -- take a coloured seat to join.", { preferredHeight = "18" }),

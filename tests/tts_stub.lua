@@ -228,6 +228,17 @@ function Stub.object(name, props)
         for i, c in ipairs(o.contents) do out[i] = { name = c.name, guid = c.guid, index = i - 1 } end
         return out
     end
+    -- A deck: its cards are its contents, dealt into a player's hand.
+    o.getQuantity = function() return #o.contents end
+    o.deal = function(n, color)
+        local p = Player[color]
+        p.hand = p.hand or {}
+        for _ = 1, n do
+            local c = table.remove(o.contents, 1)
+            if not c then break end
+            p.hand[#p.hand + 1] = c
+        end
+    end
     o.takeObject = function(params)
         local r = params.rotation or vec(0, 0, 0)
         local name, props = o.spawns, {}
@@ -334,6 +345,7 @@ function Stub.player(color, handPos, admin)
         end,
         broadcast = function(msg) Stub.log[#Stub.log + 1] = "broadcast to " .. p.color .. ": " .. msg end,
         getPointerPosition = function() return p.pointer or vec(0, 1, 0) end,
+        getHandObjects = function() return p.hand or {} end,
         -- The hand zone faces into the table, square to its nearest edge.
         getHandTransform = function()
             local yaw = math.deg(math.atan2(-handPos.x, -handPos.z))

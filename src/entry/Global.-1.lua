@@ -78,6 +78,7 @@ local startKey = nil
 local turnsSet = nil
 local undo = {}
 local joining = {} -- steam id -> true from connecting until moved to the spectators (see bench)
+local rulebooks = {} -- colour -> guid of the rulebook out for them (fdRules)
 local UNDO_LIMIT = 30
 
 --- One roll of the black die, made by the script: only when the die itself
@@ -200,6 +201,7 @@ function onLoad(saved_data)
     race = Race.new(rulesFor(saved.race and saved.race.rules), saved.race)
     race.autoRolls = true
     damagePieces = saved.damage or {}
+    rulebooks = saved.books or {}
     turnsSet = nil
     Dice.prepareAll()
     Dashboard.scan()
@@ -295,6 +297,8 @@ function onSave()
         edits = Editor.save(),
         -- The damage marker pieces on the board, by marker id.
         damage = damagePieces,
+        -- The rulebooks players have out, by colour.
+        books = rulebooks,
         -- Editor markers out on the board; removed on load (see Editor.load).
         markers = (function()
             local out = Editor.markerGuids()
@@ -1055,7 +1059,28 @@ local SEAT_RANGE = 12
 -- How far in front of the hand zone a fresh dashboard goes.
 local DASH_AHEAD = 3.5
 
+-- The quick reference: four cards, one of the 2020 mod's bags.
+local QUICK_REFERENCE_BAG = "490aa3"
+
 local delivering = {}  -- colour -> true while their dashboard is on its way
+
+--- Deal `color` the quick reference cards, unless their hand holds them --
+-- or anything -- already: nothing else goes in a hand here.
+local function dealReference(color)
+    local p = Player[color]
+    local hand = p and p.getHandTransform()
+    local bag = getObjectFromGUID(QUICK_REFERENCE_BAG)
+    if not (hand and bag) or #(p.getHandObjects() or {}) > 0 then
+        return
+    end
+    bag.takeObject({
+        position = { x = hand.position.x, y = DROP_Y, z = hand.position.z },
+        smooth = false,
+        callback_function = function(deck)
+            deck.deal(deck.getQuantity(), color)
+        end,
+    })
+end
 
 local function dealIn(color, dash)
     delivering[color] = nil
@@ -1067,6 +1092,7 @@ local function dealIn(color, dash)
         race:emit("info", race:label(car) .. " is dealt in", color)
         ACTIONS.car(car)
     end)
+    dealReference(color)
 end
 
 --- Deal `color` in, if they are seated, picked the seat themselves, are not
@@ -1153,6 +1179,51 @@ dealInSeated = function(onDone)
     Wait.condition(function()
         Wait.condition(onDone, carsReady, 5, onDone)
     end, function() return next(delivering) == nil end, 12, onDone)
+end
+
+-- The rulebook PDFs, one bag per ruleset; the setup board hides the bags.
+local RULEBOOK_BAGS = { beginner = "98b2d2", advanced = "f04a8d" }
+-- How far to the left of where the seat's dashboard goes a rulebook lies.
+local BOOK_SIDE = 9
+
+--- The race panel's Rules button: put the rulebook for the rules being
+-- played in front of the clicker's seat, to the left of their dashboard, or
+-- put away the one they have out.
+function fdRules(player)
+    local color = player.color
+    local out = rulebooks[color] and getObjectFromGUID(rulebooks[color])
+    rulebooks[color] = nil
+    if out then
+        out.destruct()
+        return
+    end
+    local hand = SEATS[color] and player.getHandTransform()
+    if not hand then
+        broadcastToColor("Take a seat to have the rulebook put in front of you.", color, LEVEL_RGB.info)
+        return
+    end
+    local bag = getObjectFromGUID(RULEBOOK_BAGS[race.rules.id] or RULEBOOK_BAGS.beginner)
+    if not bag then
+        return
+    end
+    -- Ahead of the seat the way its hand zone faces, as a dashboard goes,
+    -- then off to the left, the other side from the car (see carSpot).
+    local yaw = hand.rotation and hand.rotation.y or 0
+    local ix, iz = math.sin(math.rad(yaw)), math.cos(math.rad(yaw))
+    local p = hand.position
+    bag.takeObject({
+        position = {
+            x = p.x + ix * DASH_AHEAD - iz * BOOK_SIDE,
+            y = DROP_Y,
+            z = p.z + iz * DASH_AHEAD + ix * BOOK_SIDE,
+        },
+        rotation = { x = 0, y = yaw, z = 0 },
+        smooth = false,
+        callback_function = function(book)
+            book.setInvisibleTo({})
+            rulebooks[color] = book.getGUID()
+        end,
+    })
 end
 
 --- The car driven by the player with steam id `id`, if any.

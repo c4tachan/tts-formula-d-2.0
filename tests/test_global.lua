@@ -2629,6 +2629,50 @@ function T.global_ui_holds_only_the_images_it_uses()
     eq(set, 0, "not set again when nothing changed: that would reload the UI")
 end
 
+function T.the_rules_button_puts_the_rulebook_in_front_of_your_seat()
+    local S = world()
+    S.object("Beginner Rulebook Bag", { guid = "98b2d2", spawns = "Rulebook Beginner" })
+    S.object("Advanced Rulebook Bag", { guid = "f04a8d", spawns = "Rulebook Advanced" })
+    fdRules(Player.Red)
+    local book = S.find("Rulebook Beginner")
+    assert(book, "the rulebook for the rules being played")
+    -- Red sits at z = -38 facing +z: ahead as a dashboard goes, then to
+    -- their left (-x), the other side from the car.
+    eq(book.pos.x, -9)
+    eq(book.pos.z, -38 + 3.5)
+    eq(book.rot.y, 0, "facing the seat")
+
+    fdRules(Player.Red)
+    eq(S.count("Rulebook Beginner"), 0, "again puts it away")
+
+    fdRules(Player.Red)
+    local saved = onSave()
+    onLoad(saved)
+    fdRules(Player.Red)
+    eq(S.count("Rulebook Beginner"), 0, "and still knows it after a load")
+
+    fdSetupRules(Player.Red, require("fd.rules.advanced").name)
+    fdRules(Player.Blue)
+    assert(S.find("Rulebook Advanced"), "the advanced one once those are the rules")
+
+    S.player("Grey", S.vec(0, 1, 0)).seated = false
+    fdRules(Player.Grey)
+    eq(S.count("Rulebook Advanced"), 1, "a spectator has no seat to put one at")
+    assert(S.logged("Take a seat"))
+end
+
+function T.being_dealt_in_hands_you_the_quick_reference()
+    local S = world()
+    local cards = { { name = "Card" }, { name = "Card" }, { name = "Card" }, { name = "Card" } }
+    S.object("Quick Reference Bag", { guid = "490aa3", spawns = "Deck", spawnContents = cards })
+    -- Blue kept the cards from an earlier race.
+    Player.Blue.hand = { { name = "Card" }, { name = "Card" }, { name = "Card" }, { name = "Card" } }
+    fdSetupStart(Player.Red)
+    assert(state().cars.Red and state().cars.Blue, "both are dealt in")
+    eq(#Player.Red.getHandObjects(), 4, "the four cards in Red's hand")
+    eq(#Player.Blue.getHandObjects(), 4, "not a second set for Blue")
+end
+
 function T.the_map_cannot_change_during_the_grid_roll()
     local S = twoCars()
     local Maps = require("fd.data.maps")
