@@ -159,15 +159,16 @@ function Race:join(color, name)
     return car
 end
 
---- Race under `rules` instead, from setup: every car starts afresh, its
--- wear in the new zones.
+--- Race under `rules` instead, from setup or after a race: back to setup,
+-- every car afresh with its wear in the new zones, and nothing left over
+-- from the old rules -- a check one of them has and these lack, say.
 function Race:setRules(rules)
     self.rules = rules
     self.state.rules = rules.id
     for _, car in ipairs(self:cars()) do
         car.start = freshWear(rules)
-        resetCar(rules, car)
     end
+    self:clear()
 end
 
 function Race:leave(color)
@@ -271,17 +272,23 @@ end
 --
 -- With `alone`, where it could end if no other car were on the track.
 --
--- Worked out once per move: nothing it depends on changes while the move
--- is open (the lap the pit lane goes by is the one it started on).
+-- Worked out once per move, and again only if the car's wear is put right
+-- meanwhile (the lap the pit lane goes by is the one it started on).
 function Race:reachable(color, track, alone)
     local car = self:car(color)
     local m = car and car.move
     if not m then
         return nil
     end
+    -- Worked out again if the car's wear has been put right since: what a
+    -- way costs, and whether it puts the car out, go by it.
+    local before = self:wearBefore(car)
+    local parts = {}
+    for _, z in ipairs(self.rules.zones) do parts[#parts + 1] = tostring(before[z.id]) end
+    local wear = table.concat(parts, " ")
     local done = reaches[m]
-    if not (done and done.spaces == track.spaces and done.laps == self.state.laps) then
-        done = { spaces = track.spaces, laps = self.state.laps }
+    if not (done and done.spaces == track.spaces and done.laps == self.state.laps and done.wear == wear) then
+        done = { spaces = track.spaces, laps = self.state.laps, wear = wear }
         reaches[m] = done
     end
     local key = alone and "alone" or "reach"
@@ -294,7 +301,6 @@ function Race:reachable(color, track, alone)
             local s = exempt and exempt.braking and self:space(id)
             return s and s.pit
         end
-        local before = self:wearBefore(car)
         local reach = Moves.reach(track, m.from, m.roll, {
             occupied = occupied, stops = m.stops, pit = self:mayPit(car), color = color,
             cost = function(o)
@@ -351,13 +357,15 @@ end
 
 --- What ending a move as `o` (a Moves.reach option) does to a car that had
 -- `wear` before it, as Rules.moveWear says, with `out` also set when it
--- would wear a zone away.
-function Race:moveEffect(o, wear)
+-- would wear a zone away. `restored` (zone -> value) is what a pit stop
+-- made there gives back.
+function Race:moveEffect(o, wear, restored)
     local e = self.rules.moveWear(o, wear)
     e.wear = e.wear or {}
     if not e.out then
         for _, z in ipairs(self.rules.zones) do
-            if z.eliminateAt and (wear[z.id] or 0) - (e.wear[z.id] or 0) <= z.eliminateAt then
+            local left = (restored and restored[z.id]) or (wear[z.id] or 0) - (e.wear[z.id] or 0)
+            if z.eliminateAt and left <= z.eliminateAt then
                 e.out = "no " .. z.name .. " left"
                 break
             end
@@ -383,17 +391,13 @@ function Race:outcome(color, o)
     -- Wear goes by what the car had before the move: what it has less what
     -- the move has charged so far, and less what a stop made on it gave
     -- unless it stays in the box.
-    local before = self:wearBefore(car)
-    local e = rules.moveWear(o, before)
-    local restored = {}
+    local restored = nil
     if box then
-        for _, id in ipairs(rules.pitRestores) do restored[id] = true end
+        restored = {}
+        for _, id in ipairs(rules.pitRestores) do restored[id] = self:startOf(car, id) end
     end
+    local e = self:moveEffect(o, self:wearBefore(car), restored)
     local out = e.out ~= nil
-    for _, z in ipairs(rules.zones) do
-        local left = restored[z.id] and self:startOf(car, z.id) or (before[z.id] or 0) - (e.wear[z.id] or 0)
-        if z.eliminateAt and left <= z.eliminateAt then out = true end
-    end
     -- No collision for a car out of the race, over the line for the last
     -- time, or in the pit lane where the ruleset spares it.
     local touching = {}
@@ -956,10 +960,6 @@ function Race:pitStop(color)
     self:emit("info", string.format("%s pits: wear restored, leave in %s gear or lower",
         self:label(car), gearName(car.maxGear)), color)
     self:checkElimination(car)
-    -- Where the ruleset times the stop, the black die says how long it takes.
-    if self.rules.checks.pit and self.state.phase == "race" and not car.eliminated then
-        self:queueCheck(car, "pit")
-    end
 end
 
 --- `car` has ended its move in its own pit box: it makes its pit stop,
@@ -971,6 +971,12 @@ function Race:makePitStop(car)
     local gained = {}
     for id, v in pairs(before) do gained[id] = car.wear[id] - v end
     car.move.pit = { gained = gained, maxGear = maxGear }
+    -- Where the ruleset times the stop, the black die says how long it
+    -- takes. Not for one made with the Pit stop button: that is a
+    -- correction, and the car is not on its way out of the pits.
+    if self.rules.checks.pit and not car.eliminated then
+        self:queueCheck(car, "pit")
+    end
 end
 
 --- `car` is no longer in the pit box it stopped in this move: what the stop
@@ -1142,14 +1148,13 @@ function Race:shiftAdvice(car, to)
         notes[#notes + 1] = "no skipping gears on the way up (was in " .. gearName(from) .. ")"
     elseif to < from - 1 and not self:pitExempt(car, "downshift") then
         local skipped = from - to - 1
-        local most = rules.downshiftLimit and rules.downshiftLimit(car.wear) or rules.maxDownshift
+        local most, why = rules.maxDownshift, nil
+        if rules.downshiftLimit then
+            most, why = rules.downshiftLimit(car.wear)
+        end
         if skipped > most then
             legal = false
-            if most == 0 then
-                notes[#notes + 1] = "no gearbox WP left -- shift down one gear at a time"
-            else
-                notes[#notes + 1] = string.format("at most %d gears can be skipped when shifting down", most)
-            end
+            notes[#notes + 1] = why or string.format("at most %d gears can be skipped when shifting down", most)
         else
             wear = rules.downshiftWear(skipped)
         end
@@ -1495,6 +1500,7 @@ function Race:blackDie(value, roller, which)
         -- may leave in. Its turn goes on until it is put down again.
         car.gear = self.rules.pitMaxGear or car.gear
         car.rolledGear = car.gear
+        car.maxGear = nil -- this is it leaving the pits
         car.movedRound = nil
         self:startMove(car, outcome.bonus)
         if not car.move then
@@ -1877,7 +1883,8 @@ function Race:advanceRound()
     self:emit("order", "Round " .. s.round .. " -- " .. self:orderText())
 end
 
-function Race:reset()
+--- Back to setup, the drivers kept.
+function Race:clear()
     local s = self.state
     s.phase = "setup"
     s.round = 0
@@ -1889,6 +1896,10 @@ function Race:reset()
         resetCar(self.rules, car)
         car.gridRolls = nil
     end
+end
+
+function Race:reset()
+    self:clear()
     self:emit("info", "Race reset")
 end
 

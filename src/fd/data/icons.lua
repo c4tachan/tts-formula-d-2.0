@@ -5,16 +5,19 @@
 
 local Icons = {}
 
-Icons.commit = "99d78e3f2f150413b1aea63106f95d0c5e8e216b"
-Icons.base = "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/99d78e3f2f150413b1aea63106f95d0c5e8e216b/assets/icons/"
+Icons.commit = "9cc1497b099a34af82430b0a007df44082fa8daa"
+Icons.base = "https://raw.githubusercontent.com/c4tachan/tts-formula-d-2.0/9cc1497b099a34af82430b0a007df44082fa8daa/assets/icons/"
 
 Icons.names = {
     "blocked",
     "brake",
     "clean",
     "collision",
+    "damage",
     "out",
     "overshoot",
+    "slipstream",
+    "spin",
     "start-Blue",
     "start-Brown",
     "start-Green",

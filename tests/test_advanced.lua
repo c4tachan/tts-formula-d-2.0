@@ -272,46 +272,63 @@ end
 
 -- Pit stops -----------------------------------------------------------------------
 
-function T.a_pit_stop_restores_only_the_tires_and_rolls_the_black_die()
-    local r = started("Red")
-    r:setWear("Red", "tires", 2)
-    r:setWear("Red", "brakes", 1)
+--- Brown, at the end of the first of two laps on Monaco, drives into its
+-- pit box with `tires` tire WP and `brakes` brake WP left.
+local function intoBox(tires, brakes)
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local b = FDMonaco.pit.boxes[2]
+    eq(b.player, "Brown")
+    local r = started("Brown")
+    r:setLaps(2)
+    r:placed("Brown", b.beside, FDMonaco)
+    r:car("Brown").lap = 1
+    r:setWear("Brown", "tires", tires or 6)
+    r:setWear("Brown", "brakes", brakes or 3)
+    rollDie(r, "Brown", 1, 1)
     r:drain()
-    r:pitStop("Red")
-    eq(wear(r, "Red"), "T6 B1 G3 C3 E3 S2")
+    putDown(r, "Brown", b.space, FDMonaco)
+    return r, FDMonaco
+end
+
+function T.a_pit_stop_restores_only_the_tires_and_rolls_the_black_die()
+    local r = intoBox(2, 1)
+    eq(wear(r, "Brown"), "T6 B1 G3 C3 E3 S2")
     eq(r:pendingChecks()[1].kind, "pit")
     assert(hasEvent(r, "info", "pit stop check"))
 end
 
-function T.a_quick_stop_moves_half_the_roll_out_of_the_pits_in_fourth()
+function T.the_pit_stop_button_restores_but_does_not_time_the_stop()
     local r = started("Red")
-    r:placed("Red", "c0")
+    r:setWear("Red", "tires", 2)
     r:pitStop("Red")
-    r:blackDie(7, "Red")
-    eq(r:car("Red").move.roll, 4, "7 halved, rounded up")
-    eq(r:car("Red").rolledGear, 4)
-    eq(r:car("Red").maxGear, 4, "and 4th or lower on its next roll")
+    eq(r:car("Red").wear.tires, 6)
+    eq(#r:pendingChecks(), 0, "a correction: no black die, no move out of the pits")
+end
+
+function T.a_quick_stop_moves_half_the_roll_out_of_the_pits_in_fourth()
+    local r = intoBox()
+    r:blackDie(7, "Brown")
+    eq(r:car("Brown").move.roll, 4, "7 halved, rounded up")
+    eq(r:car("Brown").rolledGear, 4)
+    eq(r:car("Brown").maxGear, nil, "out of the pits now: 5th next round is fine")
+    r:drain()
+    r:shift("Brown", 5)
+    assert(not hasEvent(r, "warn", "limit"))
 end
 
 function T.a_slow_stop_waits_for_the_next_round()
-    local r = started("Red")
-    r:placed("Red", "c0")
-    r:pitStop("Red")
-    r:drain()
-    r:blackDie(15, "Red")
-    eq(r:car("Red").move, nil)
+    local r = intoBox()
+    local from = r:car("Brown").move.from
+    r:blackDie(15, "Brown")
+    eq(r:car("Brown").move.from, from, "no move out of the pits")
+    eq(r:car("Brown").maxGear, 4, "and 4th or lower next round")
     assert(hasEvent(r, "info", "slow stop"))
 end
 
 function T.the_round_waits_for_a_pit_stop_to_be_timed()
-    local track = lane(10)
-    local r = started("Red")
-    r:placed("Red", "c0", track)
-    rollDie(r, "Red", 1, 2)
-    r:pitStop("Red")
-    putDown(r, "Red", "c2", track)
+    local r = intoBox()
     eq(r:serialize().round, 1, "the stop's black die is still to come")
-    r:blackDie(15, "Red")
+    r:blackDie(15, "Brown")
     eq(r:serialize().round, 2)
 end
 
@@ -635,6 +652,26 @@ function T.switching_rules_starts_the_cars_afresh_in_the_new_zones()
     r:setRules(Beginner)
     eq(r:car("Red").wear.wp, 18)
     eq(r:car("Red").wear.tires, nil)
+end
+
+function T.switching_rules_after_a_race_leaves_nothing_of_the_old_rules()
+    local r = started("Red")
+    r:requestCheck("Red", "collision")
+    r:serialize().checks[#r:serialize().checks + 1] = { color = "Red", kind = "pit" }
+    r:serialize().phase = "finished"
+    r:setRules(Beginner)
+    eq(#r:pendingChecks(), 0, "no pit check left for rules without one")
+    eq(r:serialize().phase, "setup")
+end
+
+function T.a_correction_mid_move_reprices_where_the_car_can_go()
+    local track = lane(30)
+    local r = started("Red")
+    r:placed("Red", "c0", track)
+    rollDie(r, "Red", 3, 8)
+    assert(not r:outcome("Red", r:reachable("Red", track).c3).out, "5 short on full brakes and tires")
+    r:setWear("Red", "tires", 1)
+    assert(r:outcome("Red", r:reachable("Red", track).c3).out, "5 short on 1 tire WP is out")
 end
 
 function T.the_state_says_which_rules_it_was_raced_under()

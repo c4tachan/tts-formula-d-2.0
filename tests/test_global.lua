@@ -405,6 +405,7 @@ function T.the_host_picks_the_rules_on_the_setup_menu()
     eq(state().cars.Red.wear.wp, nil)
     -- Red's dashboard is turned to the advanced face, a marker in each zone.
     eq(S.beginner.up.y > 0, true, "flipped over")
+    assert(not S.logged("Flip your dashboard"), "by the script: nobody is told to")
     eq(S.count("Wear Tracker"), 6)
     assert(S.beginner.buttons[1].label:find("T6 B3 G3 C3 E3 S2"), S.beginner.buttons[1].label)
     -- The screen dashboard and the standings show the zones.
@@ -419,6 +420,7 @@ function T.the_host_picks_the_rules_on_the_setup_menu()
     eq(state().rules, "beginner", "Undo takes the choice back")
     eq(state().cars.Red.wear.wp, 18)
     eq(S.beginner.up.y < 0, true, "and turns the dashboard back")
+    assert(not S.logged("Flip your dashboard"))
     eq(S.count("Wear Tracker"), 1)
     assert(byId(S.xml).fdm_Red_wpMark)
 end
@@ -1132,18 +1134,21 @@ function T.an_icon_lies_face_up_on_its_space()
     assert(math.abs(d.position.x - mid.x) < 1e-9 and math.abs(d.position.z - mid.z) < 1e-9, "on the space")
     assert(d.position.y > mid.y, "over the lines")
     eq(d.rotation[1], 90, "face up")
-    -- A badge rides ahead of the icon it is on.
-    decals = Track.marks(S.board, FDMonaco, { { id = id, kind = "brake", badge = "collision" } })
-    eq(#decals, 2)
+    -- Badges ride ahead of the icon they are on, side by side.
+    decals = Track.marks(S.board, FDMonaco, { { id = id, kind = "brake", badges = { "collision", "damage" } } })
+    eq(#decals, 3)
     eq(decals[2].name, "collision")
+    eq(decals[3].name, "damage")
     assert(decals[2].scale[1] < decals[1].scale[1], "smaller")
+    local apart = (decals[2].position.x - decals[3].position.x) ^ 2 + (decals[2].position.z - decals[3].position.z) ^ 2
+    assert(apart > 0, "not on top of each other")
 end
 
 function T.every_icon_the_board_can_show_is_drawn()
     local Icons = require("fd.data.icons")
     local listed = {}
     for _, n in ipairs(Icons.names) do listed[n] = true end
-    local wanted = { "clean", "brake", "overshoot", "collision", "out", "blocked" }
+    local wanted = { "clean", "brake", "overshoot", "collision", "out", "blocked", "spin", "damage", "slipstream" }
     for _, seat in ipairs({ "White", "Brown", "Red", "Orange", "Yellow", "Green", "Teal", "Blue", "Purple", "Pink" }) do
         wanted[#wanted + 1] = "start-" .. seat
     end

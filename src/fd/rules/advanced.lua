@@ -69,11 +69,11 @@ Rules.damageMarkers = { body = true, engine = true }
 -- Most gears a car may drop in one shift.
 Rules.maxDownshift = 3
 
---- Most gears a car with `wear` may drop in one shift: one at a time, with
--- no gearbox left.
+--- Most gears a car with `wear` may skip in one shift down, and why when it
+-- is fewer than usual: none, with no gearbox left.
 function Rules.downshiftLimit(wear)
     if (wear.gearbox or 0) <= 0 then
-        return 0
+        return 0, "no gearbox WP left -- shift down one gear at a time"
     end
     return Rules.maxDownshift
 end
