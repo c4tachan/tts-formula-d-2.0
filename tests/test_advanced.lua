@@ -431,6 +431,155 @@ function T.the_basic_rules_have_no_slipstream()
     assert(not hasEvent(r, "info", "can slipstream"))
 end
 
+-- Damage markers ------------------------------------------------------------------
+
+local function markers(r)
+    local out = {}
+    for _, e in ipairs(r:serialize().damage) do
+        out[#out + 1] = e.color .. "@" .. tostring(e.space) .. ":" .. e.why
+    end
+    return table.concat(out, " ")
+end
+
+--- Red and Blue on a lane, Red on c0 and Blue on `blue`; Red has rolled
+-- `roll` in 3rd.
+local function onLane(roll, blue)
+    local track = lane(30)
+    local r = started("Red", "Blue")
+    r:placed("Red", "c0", track)
+    r:placed("Blue", blue or "c20", track)
+    rollDie(r, "Red", 3, roll)
+    r:drain()
+    return r, track
+end
+
+function T.a_collision_leaves_a_damage_marker_where_the_car_is()
+    local r, track = onLane(5)
+    putDown(r, "Red", "c5", track)
+    r:requestCheck("Red", "collision")
+    r:blackDie(1, "Red")
+    eq(markers(r), "Red@c5:body")
+end
+
+function T.a_marker_left_during_a_move_goes_where_the_move_ends()
+    local r, track = onLane(5)
+    -- Engine strain, rolled before the car is put down.
+    r:leaveMarker(r:car("Red"), "engine")
+    eq(markers(r), "Red@c0:engine")
+    putDown(r, "Red", "c5", track)
+    eq(markers(r), "Red@c5:engine")
+    r:placed("Red", "c4", track)
+    eq(markers(r), "Red@c4:engine", "put down again, it follows")
+    rollDie(r, "Blue", 3, 5)
+    r:placed("Blue", "c25", track)
+    r:putDown("Blue")
+    rollDie(r, "Red", 3, 5)
+    putDown(r, "Red", "c9", track)
+    eq(markers(r), "Red@c4:engine", "and stays once the car rolls again")
+end
+
+function T.skipping_three_gears_down_leaves_a_marker_where_the_move_ends()
+    local track = lane(30)
+    local r = started("Red")
+    r:placed("Red", "c0", track)
+    r:car("Red").rolledGear = 6
+    rollDie(r, "Red", 2, 3)
+    putDown(r, "Red", "c3", track)
+    eq(markers(r), "Red@c3:engine")
+end
+
+function T.going_out_leaves_a_marker_and_coming_back_takes_it_away()
+    local r, track = onLane(8)
+    putDown(r, "Red", "c1", track) -- braked 7: out
+    assert(r:car("Red").eliminated)
+    eq(markers(r), "Red@c1:out")
+    r:placed("Red", "c8", track)
+    assert(not r:car("Red").eliminated)
+    eq(markers(r), "")
+end
+
+function T.a_move_over_or_onto_a_marker_rolls_for_each_one()
+    local r, track = onLane(6)
+    r:serialize().damage = {
+        { id = "d1", space = "c3", color = "Blue", why = "body" },
+        { id = "d2", space = "c6", color = "Blue", why = "body" },
+    }
+    eq(r:outcome("Red", r:reachable("Red", track).c6).hazards, 2, "the board can say so first")
+    putDown(r, "Red", "c6", track)
+    local checks = r:pendingChecks()
+    eq(#checks, 2)
+    eq(checks[1].kind, "damage")
+    eq(checks[1].space, "c3")
+    eq(checks[2].space, "c6")
+    r:blackDie(4, "Red")
+    eq(r:car("Red").wear.handling, 1, "1-4 costs a suspension WP")
+    r:blackDie(5, "Red")
+    eq(r:car("Red").wear.handling, 1, "5 and up, through unharmed")
+end
+
+function T.put_down_short_of_a_marker_the_check_not_yet_rolled_is_dropped()
+    local r, track = onLane(6)
+    r:serialize().damage = {
+        { id = "d1", space = "c3", color = "Blue", why = "body" },
+        { id = "d2", space = "c5", color = "Blue", why = "body" },
+    }
+    putDown(r, "Red", "c6", track)
+    r:blackDie(10, "Red") -- c3's is rolled
+    eq(#r:pendingChecks(), 1)
+    r:placed("Red", "c4", track)
+    eq(#r:pendingChecks(), 0, "c5's dropped; c3's rolled, and stands")
+    r:placed("Red", "c6", track)
+    eq(#r:pendingChecks(), 1, "c5's back, c3's not asked twice")
+end
+
+function T.the_space_a_move_starts_on_is_not_a_hazard()
+    local r, track = onLane(4)
+    r:serialize().damage = { { id = "d1", space = "c0", color = "Blue", why = "body" } }
+    putDown(r, "Red", "c4", track)
+    eq(#r:pendingChecks(), 0)
+end
+
+function T.losing_the_last_suspension_on_a_marker_is_out()
+    local r, track = onLane(4)
+    r:setWear("Red", "handling", 1)
+    r:serialize().damage = { { id = "d1", space = "c2", color = "Blue", why = "body" } }
+    putDown(r, "Red", "c4", track)
+    r:blackDie(1, "Red")
+    assert(r:car("Red").eliminated)
+    eq(markers(r), "Blue@c2:body Red@c4:out")
+end
+
+function T.a_marker_moved_by_hand_counts_where_it_is()
+    local r, track = onLane(4)
+    r:serialize().damage = { { id = "d1", space = "c9", color = "Blue", why = "body" } }
+    r:markerMoved("d1", "c2")
+    putDown(r, "Red", "c4", track)
+    eq(#r:pendingChecks(), 1)
+    r:markerMoved("d1", nil)
+    eq(markers(r), "")
+end
+
+function T.the_basic_rules_leave_no_markers()
+    local track = lane(30)
+    local r = Race.new(Beginner)
+    r:join("Red")
+    r:startRace()
+    r:blackDie(10, "Red")
+    r:placed("Red", "c0", track)
+    r:requestCheck("Red", "collision")
+    r:blackDie(1, "Red")
+    eq(#r:serialize().damage, 0)
+end
+
+function T.a_new_race_starts_with_a_clean_track()
+    local r, track = onLane(5)
+    putDown(r, "Red", "c5", track)
+    r:requestCheck("Red", "collision")
+    r:blackDie(1, "Red")
+    r:reset()
+    eq(markers(r), "")
+end
+
 -- A car's own starting wear -----------------------------------------------------
 
 function T.a_car_built_otherwise_keeps_its_own_starting_wear()

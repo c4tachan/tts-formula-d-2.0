@@ -73,6 +73,8 @@ function Race.new(rules, saved)
     s.checks = s.checks or {}
     s.packs = s.packs or {} -- id -> collision record, see checkCollisions
     s.lastPack = s.lastPack or 0
+    s.damage = s.damage or {} -- damage markers on the track, see leaveMarker
+    s.lastMark = s.lastMark or 0
     s.laps = s.laps or 1
     s.finishers = s.finishers or {} -- colors, in the order they finished
     s.rules = rules.id
@@ -232,6 +234,10 @@ end
 -- made in the corner there, and where the other cars are -- they are what
 -- it has to get round, wherever they go afterwards.
 function Race:startMove(car, roll)
+    -- Markers left on the last move stay where it ended.
+    for _, e in ipairs(self.state.damage) do
+        if e.color == car.color then e.open = nil end
+    end
     if not car.space then
         car.move = nil
         return
@@ -366,6 +372,8 @@ end
 --   out       true if it puts the car out of the race: leaving a corner
 --             without its stops, or wearing a zone away
 --   spin      true if the car spins there
+--   hazards   how many damage markers it passes over or ends on, a black
+--             die check for each
 --   touching  the colours of the cars it would end beside, a collision
 --             check against each
 function Race:outcome(color, o)
@@ -405,7 +413,8 @@ function Race:outcome(color, o)
             end
         end
     end
-    return { out = out, spin = e.spin == true, touching = touching }
+    local hazards = self.rules.checks.damage and #self:hazards(car, o) or 0
+    return { out = out, spin = e.spin == true, touching = touching, hazards = hazards }
 end
 
 --- How bad ending a move this way is, for a car that had `wear` before it,
@@ -504,6 +513,7 @@ function Race:judgeMove(car, track)
                 car.color)
         end
     end
+    self:moveMarkers(car)
     car.crashed = effect.out
     self:checkElimination(car)
     -- Last, so a car that goes out on the move does not take the flag.
@@ -515,6 +525,7 @@ function Race:judgeMove(car, track)
     end
     self:crossLine(car, crossed)
     self:checkCollisions(car, track)
+    self:checkHazards(car, o)
 end
 
 --- Whether a car after `car` in this round's order has rolled already.
@@ -543,6 +554,8 @@ function Race:backToStart(car)
     car.stops = m.stops
     self:checkElimination(car)
     self:crossLine(car, false)
+    self:moveMarkers(car)
+    self:checkHazards(car, nil)
     if m.pack then
         for i = #s.checks, 1, -1 do
             if s.checks[i].pack == m.pack then
@@ -866,9 +879,11 @@ function Race:checkElimination(car)
         car.eliminated = true
         self:dropChecks(car.color)
         self:emit("out", self:label(car) .. " is out of the race (" .. why .. ")", car.color)
+        self:leaveMarker(car, "out")
     elseif not why and car.eliminated then
         car.eliminated = false
         self:emit("info", self:label(car) .. " is back in the race", car.color)
+        self:takeMarkerBack(car, "out")
     end
     self:settleFinish(car)
 end
@@ -970,6 +985,133 @@ function Race:takeBackPitStop(car)
     end
     self:emit("info", self:label(car) .. " is out of its pit box -- pit stop taken back", car.color)
     self:applyWear(car, was.gained, "pit stop taken back")
+end
+
+-- Damage markers ------------------------------------------------------------
+-- Where the ruleset has them (Rules.damageMarkers: the zones whose loss
+-- leaves one), `state.damage` lists the markers on the track, oldest first:
+--   id     "d1", "d2", ... -- the Global script keys the pieces by it
+--   space  the space it is on
+--   color  the car that left it
+--   why    the zone it lost, or "out"
+--   open   left during the move that car has open: it goes where the move
+--          ends, wherever the car is put down, until the car rolls again
+
+--- Whether `car` is on a move it has rolled for and not yet finished.
+function Race:moving(car)
+    local round = self.state.round
+    return car.move ~= nil and car.rolledRound == round and car.movedRound ~= round
+end
+
+--- `car` leaves a damage marker (for `why`) where it is, or where the move
+-- it is on ends.
+function Race:leaveMarker(car, why)
+    local s = self.state
+    if not self.rules.damageMarkers or s.phase ~= "race" or not car.space then
+        return
+    end
+    s.lastMark = s.lastMark + 1
+    s.damage[#s.damage + 1] = { id = "d" .. s.lastMark, space = car.space, color = car.color, why = why,
+        open = self:moving(car) or nil }
+    self:emit("info", self:label(car) .. " leaves a damage marker", car.color)
+end
+
+--- The damage markers losing `wear` (zone -> points) leaves: one a point
+-- in the zones that leave them.
+function Race:markWear(car, wear)
+    local zones = self.rules.damageMarkers
+    for _, z in ipairs(zones and self.rules.zones or {}) do
+        for _ = 1, zones[z.id] and (wear[z.id] or 0) or 0 do
+            self:leaveMarker(car, z.id)
+        end
+    end
+end
+
+--- Take back the last marker `car` left for `why`: what left it is undone.
+function Race:takeMarkerBack(car, why)
+    local d = self.state.damage
+    for i = #d, 1, -1 do
+        if d[i].color == car.color and d[i].why == why then
+            table.remove(d, i)
+            return
+        end
+    end
+end
+
+--- The markers left on the move `car` has open go where it now is.
+function Race:moveMarkers(car)
+    if not car.space then
+        return
+    end
+    for _, e in ipairs(self.state.damage) do
+        if e.color == car.color and e.open then e.space = car.space end
+    end
+end
+
+--- The spaces with a damage marker on, as a set, for `car` to look out
+-- for: not the ones it has left on the move it is on.
+function Race:markedSpaces(car)
+    local out = {}
+    for _, e in ipairs(self.state.damage) do
+        if e.space and not (e.open and e.color == car.color) then out[e.space] = true end
+    end
+    return out
+end
+
+--- The marked spaces the move `o` (a Moves.reach option) passes over or
+-- ends on, in the order it gets to them; not the space it starts from.
+function Race:hazards(car, o)
+    local marked, out = self:markedSpaces(car), {}
+    for k = 2, #(o and o.path or {}) do
+        if marked[o.path[k]] then out[#out + 1] = o.path[k] end
+    end
+    return out
+end
+
+--- The move was judged as `o` (or nil, if it is not one the roll reaches,
+-- or the car is back where it started): a black die check for every marked
+-- space it passes over or ends on. Put down again, the checks for spaces it
+-- no longer crosses are dropped if not yet rolled; what was rolled stands.
+function Race:checkHazards(car, o)
+    local m = car.move
+    if not (self.rules.checks.damage and m) then
+        return
+    end
+    m.hazards = m.hazards or {} -- space id -> "queued" | "rolled"
+    local spaces = (car.eliminated or car.place) and {} or self:hazards(car, o)
+    local wanted = {}
+    for _, id in ipairs(spaces) do wanted[id] = true end
+    local checks = self.state.checks
+    for i = #checks, 1, -1 do
+        local c = checks[i]
+        if c.color == car.color and c.kind == "damage" and not wanted[c.space] and m.hazards[c.space] == "queued" then
+            table.remove(checks, i)
+            m.hazards[c.space] = nil
+        end
+    end
+    for _, id in ipairs(spaces) do
+        if not m.hazards[id] and self:queueCheck(car, "damage", nil, nil, id) then
+            m.hazards[id] = "queued"
+        end
+    end
+end
+
+--- A damage marker was moved by hand onto the space `spaceId`, or off the
+-- track or away (nil): the race goes by where it is.
+function Race:markerMoved(id, spaceId)
+    local d = self.state.damage
+    for i, e in ipairs(d) do
+        if e.id == id then
+            if spaceId then
+                e.space = spaceId
+                e.open = nil
+            else
+                table.remove(d, i)
+                self:emit("info", "A damage marker is taken off the track")
+            end
+            return
+        end
+    end
 end
 
 -- Gears ---------------------------------------------------------------------
@@ -1095,6 +1237,9 @@ function Race:rolled(color, gear, value)
     car.spun = nil -- turned round and off again
     car.rolledRound = self.state.round
     self:startMove(car, value)
+    if adv.wear then
+        self:markWear(car, adv.wear)
+    end
     -- The move is over when the car is put down (see putDown). With no
     -- move to judge -- no track data, or the car not on it -- there is
     -- nothing to wait for, and the turn passes now.
@@ -1228,14 +1373,15 @@ end
 
 --- Ask `car` to roll the black die for a `kind` check. A collision can be
 -- against the car of color `with`, part of the contact recorded as
--- `state.packs[pack]`. Not twice for the same.
-function Race:queueCheck(car, kind, with, pack)
+-- `state.packs[pack]`; a damage marker check is for the marked space
+-- `space`. Not twice for the same.
+function Race:queueCheck(car, kind, with, pack, space)
     for _, c in ipairs(self.state.checks) do
-        if c.color == car.color and c.kind == kind and c.with == with then
+        if c.color == car.color and c.kind == kind and c.with == with and c.space == space then
             return false
         end
     end
-    local c = { color = car.color, kind = kind, with = with, pack = pack }
+    local c = { color = car.color, kind = kind, with = with, pack = pack, space = space }
     self.state.checks[#self.state.checks + 1] = c
     -- Nobody is asked to roll what is being rolled for them (see rollForGrid
     -- and rollChecks).
@@ -1325,6 +1471,9 @@ function Race:blackDie(value, roller, which)
     local outcome = self.rules.checks[check.kind].resolve(value)
     self:emit(outcome.wear and "warn" or "info", string.format("%s rolls %s on the black die (%s): %s",
         self:label(car), tostring(value), self:checkName(check), outcome.text), car.color)
+    if check.kind == "damage" and check.space and car.move and car.move.hazards then
+        car.move.hazards[check.space] = "rolled"
+    end
     if check.kind == "collision" and check.with and check.pack then
         self:collided(check)
     end
@@ -1358,6 +1507,7 @@ function Race:blackDie(value, roller, which)
     end
     if outcome.wear then
         self:applyWear(car, outcome.wear, check.kind)
+        self:markWear(car, outcome.wear)
     end
     self:advanceRound()
 end
@@ -1687,6 +1837,7 @@ function Race:startRace()
     s.round = 1
     s.checks = {}
     s.packs = {}
+    s.damage = {}
     s.finishers = {}
     for _, car in ipairs(self:cars()) do
         resetCar(self.rules, car)
@@ -1732,6 +1883,7 @@ function Race:reset()
     s.round = 0
     s.checks = {}
     s.packs = {}
+    s.damage = {}
     s.finishers = {}
     for _, car in ipairs(self:cars()) do
         resetCar(self.rules, car)

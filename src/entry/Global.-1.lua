@@ -62,6 +62,7 @@ local clearReach -- likewise
 local reachShown = nil -- whose move the marks on the board are for
 local useBoardTrack -- likewise
 local drawPits -- likewise
+local syncDamage, damageMarker, damagePieces -- likewise
 local joinAt -- with the dashboard buttons, below
 local deliver, dealInSeated, dropDashless, bench -- likewise
 local isAdmin -- with the race controls, below
@@ -131,6 +132,7 @@ local SOURCE_BAGS = {
     "4eb678", -- Advanced Dashboard Bag
     "71d89b", -- Gear Stick Bag (fd.tts.dashboard)
     "a845cd", -- Wear Tracker Bag (fd.tts.dashboard)
+    "bbc10d", -- Damage Marker Bag (DAMAGE_BAG, below)
     "ac4939", -- Dice Set Bag: spare dice (fd.tts.dice)
 }
 
@@ -212,6 +214,7 @@ function onLoad(saved_data)
     Rules = rulesFor(saved.race and saved.race.rules)
     race = Race.new(Rules, saved.race)
     race.autoRolls = true
+    damagePieces = saved.damage or {}
     turnsSet = nil
     Dice.prepareAll()
     Dashboard.scan()
@@ -230,6 +233,7 @@ function onLoad(saved_data)
         packModMenu()
         boardMenu(Editor.isOpen())
         hideSetup(function() layDice() end)
+        syncDamage()
     end, 1)
 end
 
@@ -304,6 +308,8 @@ function onSave()
         mp = mod_packed, sp = setup_packed, race = race and race:serialize(),
         -- Hand edits to track spaces; tools/extract/import_track.py reads them.
         edits = Editor.save(),
+        -- The damage marker pieces on the board, by marker id.
+        damage = damagePieces,
         -- Editor markers out on the board; removed on load (see Editor.load).
         markers = (function()
             local out = Editor.markerGuids()
@@ -560,6 +566,7 @@ local function act(fn, followOn)
     race.opened = nil
     relay(race:drain())
     syncDashboards()
+    syncDamage()
     refresh(true)
     if opened then
         showReach(opened)
@@ -880,6 +887,14 @@ function onObjectDrop(color, obj)
     end
     if Dashboard.is(obj) then
         dashboardMoved(obj)
+        return
+    end
+    -- A damage marker moved by hand counts on the space it is put down on,
+    -- or, off the track, no more.
+    local mark = damageMarker(obj.getGUID())
+    if mark then
+        local space = spaceUnder(obj)
+        act(function() race:markerMoved(mark, space) end)
         return
     end
     if CAR_NAMES[obj.getName()] then
@@ -1527,6 +1542,7 @@ function fdMapChanged()
         Track.drawIcons()
         buildUi()
         layDice()
+        syncDamage()
         -- A new map means a reloaded tile, and that has lost its menu.
         boardMenu(Editor.isOpen())
     end)
@@ -1577,6 +1593,7 @@ function fdUndo(player)
     throwChecks()
     relay(race:drain())
     syncDashboards(true)
+    syncDamage()
     refresh()
 end
 
@@ -1663,6 +1680,77 @@ useBoardTrack = function()
     local tile, track = boardTrack()
     race:useTrack(track)
     return tile, track
+end
+
+-- Damage markers -------------------------------------------------------------
+-- A piece from the Damage Marker Bag on each space the race has a damage
+-- marker on (state.damage), locked flat on the board so the cars sit over
+-- it. Kept in step after every change; a piece moved or deleted by hand
+-- moves or takes away the race's marker (see onObjectDrop, onObjectDestroy).
+
+local DAMAGE_BAG = "bbc10d"
+-- The marker's model is 1.1 units long: scaled to this much of a space.
+local DAMAGE_SIZE = 0.55
+local DAMAGE_LENGTH = 1.1
+-- Height above the board face; each more on the same space a bit higher.
+local DAMAGE_LIFT = 0.02
+local DAMAGE_STACK = 0.05
+
+damagePieces = {} -- marker id -> guid of its piece
+
+--- The id of the race's marker that the piece `guid` stands for, if any.
+damageMarker = function(guid)
+    for id, g in pairs(damagePieces) do
+        if g == guid then return id end
+    end
+    return nil
+end
+
+syncDamage = function()
+    -- Nothing on the track and nothing to clear: no call into the game.
+    if #(race.state.damage or {}) == 0 and next(damagePieces) == nil then
+        return
+    end
+    local wanted = {}
+    for _, e in ipairs(race.state.damage or {}) do wanted[e.id] = true end
+    for id, guid in pairs(damagePieces) do
+        if not wanted[id] then
+            -- Forgotten first, so its going is not taken for a hand's.
+            damagePieces[id] = nil
+            local obj = getObjectFromGUID(guid)
+            if obj then obj.destruct() end
+        end
+    end
+    local tile, track = boardTrack()
+    local bag = getObjectFromGUID(DAMAGE_BAG)
+    if not track then
+        return
+    end
+    local f = Track.frame(tile, track)
+    local k = Track.cellWorld(f, track) * DAMAGE_SIZE / DAMAGE_LENGTH
+    local stacked = {}
+    for _, e in ipairs(race.state.damage) do
+        local pos, yaw = Track.seat(tile, f, track, e.space)
+        if pos then
+            local n = stacked[e.space] or 0
+            stacked[e.space] = n + 1
+            local at = { x = pos.x, y = pos.y + DAMAGE_LIFT + n * DAMAGE_STACK, z = pos.z }
+            local rot = { x = 0, y = yaw + 90, z = 0 }
+            local obj = damagePieces[e.id] and getObjectFromGUID(damagePieces[e.id])
+            if obj then
+                local p = obj.getPosition()
+                if not obj.held_by_color and (p.x - at.x) ^ 2 + (p.z - at.z) ^ 2 > 0.01 then
+                    obj.setPositionSmooth(at, false, true)
+                    obj.setRotationSmooth(rot, false, true)
+                end
+            elseif bag then
+                obj = bag.takeObject({ position = at, rotation = rot, smooth = false })
+                obj.setScale({ k, k, k })
+                obj.setLock(true)
+                damagePieces[e.id] = obj.getGUID()
+            end
+        end
+    end
 end
 
 --- Paint each pit box's half of its garage in the colour of the seat it
@@ -2128,6 +2216,12 @@ end
 
 function onObjectDestroy(obj)
     Dashboard.forget(obj)
+    -- A damage marker deleted by hand is gone from the track.
+    local mark = damageMarker(obj.getGUID())
+    if mark then
+        damagePieces[mark] = nil
+        act(function() race:markerMoved(mark, nil) end)
+    end
     -- A driver's dashboard deleted before the start takes them out of the race.
     local driver = race and race.state.phase == "setup" and carOnDash(obj.getGUID())
     if driver then

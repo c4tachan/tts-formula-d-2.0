@@ -137,6 +137,11 @@ local function cellLength(track)
     return c
 end
 
+--- How long a space is on the board, in world units, by the frame `f`.
+function Track.cellWorld(f, track)
+    return cellLength(track) * f.world
+end
+
 --- The space nearest `world`, within `reach` cells of it, skipping any id
 -- listed in `taken`. Returns the space and the frame, or nil.
 function Track.spaceNear(tile, f, track, world, reach, taken)

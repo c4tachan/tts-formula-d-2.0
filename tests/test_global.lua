@@ -2627,4 +2627,47 @@ function T.a_race_runs_under_the_advanced_rules()
     assert(S.advanced.buttons[1].label:find("T6 B3 G3 C3 E3 S2"), S.advanced.buttons[1].label)
 end
 
+function T.damage_markers_go_on_the_board_and_follow_the_hand()
+    local S = twoCars()
+    S.object("Damage Marker Bag", { guid = "bbc10d", spawns = "Damage Marker" })
+    fdSetupRules(Player.Red, "Formula D advanced rules")
+    gridRoll(S, { Red = 4, Blue = 15 })
+    fdStart(Player.Red)
+    -- Blue, on pole, calls a collision check and rolls a 1.
+    local random = math.random
+    math.random = function(m, n)
+        if m == 20 and n == nil then return 1 end
+        return random(m, n)
+    end
+    fdUiCollision(Player.Blue)
+    math.random = random
+    eq(state().cars.Blue.wear.body, 2)
+    local d = state().damage
+    eq(#d, 1)
+    eq(d[1].space, state().cars.Blue.space, "where Blue is")
+    local FDMonaco = require("fd.data.tracks.FDMonaco")
+    local Track = require("fd.tts.track")
+    local piece = S.find("Damage Marker")
+    assert(piece, "a piece out of the bag")
+    eq(piece.locked, true, "locked flat, for the car to sit over")
+    local s = FDMonaco.byId[d[1].space]
+    local at = Track.worldOf(S.board, FDMonaco, s.pos[1], s.pos[2])
+    assert(math.abs(piece.pos.x - at.x) < 0.01 and math.abs(piece.pos.z - at.z) < 0.01, "on its space")
+
+    -- Moved by hand onto another space, it counts there.
+    local other = FDMonaco.byId[FDMonaco.start[5]]
+    piece.pos = Track.worldOf(S.board, FDMonaco, other.pos[1], other.pos[2])
+    onObjectDrop("Blue", piece)
+    eq(state().damage[1].space, other.id)
+    -- Deleted by hand, it is gone from the track; Undo brings it back.
+    piece.destruct()
+    eq(#state().damage, 0)
+    fdUndo(Player.Red)
+    eq(#state().damage, 1)
+    eq(S.count("Damage Marker"), 1, "a fresh piece for it")
+    -- A reset clears the track.
+    fdReset(Player.Red)
+    eq(S.count("Damage Marker"), 0)
+end
+
 return T

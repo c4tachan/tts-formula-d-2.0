@@ -13,7 +13,7 @@ That original is preserved verbatim in [`reference/original-2020/`](reference/or
 |---|---|
 | Project scaffold, build pipeline | done |
 | Auto gear dice selection | done (shared dice set, results read automatically) |
-| Rules automation | Formula D basic rules, and the advanced rules but damage markers and the optional rules |
+| Rules automation | Formula D basic rules, and the advanced rules but the optional rules |
 | Track data | Monaco done: 497 spaces (detected, then hand-edited in game) and its 10 corners with their stop counts |
 | Space snapping + facings | done for Monaco |
 | Damage tracking | done: the basic rules' single 18 WP pool, the advanced rules' six zones |
@@ -113,14 +113,19 @@ for each (T B G C E S).
   tire WP than it has. No brakes or gearbox left, it races on, and its
   dashboards say what that means (one gear down at a time, say); the race
   panel shows the empty zone in orange.
+- **Damage markers:** each body or engine WP lost (a collision, engine strain,
+  three gears skipped) and each car going out leaves a marker on the space
+  where the car's move ends, out of the Damage Marker bag. A move over or
+  onto a marked space rolls the black die for each: 1-4 costs a suspension
+  WP. A marker moved by hand (unlock it first) counts where it is put down,
+  and one deleted is gone from the track.
 - **Setting wear by hand:** click a zone's number on the screen dashboard, or
   move its marker on the table. Clicking the number it is on takes one off,
   which is how a zone gets to 0.
 - Each car keeps its own starting wear, which a pit stop restores and no
   gain goes past -- ready for building your own car (#124).
 
-Not yet automated: the damage markers left on the track (place them and
-roll for them by hand), and the optional rules.
+Not yet automated: the optional rules.
 
 ### Playing
 

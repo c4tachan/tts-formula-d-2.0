@@ -61,6 +61,11 @@ Rules.pitRestores = { "tires" }
 -- WP (see moveWear).
 Rules.slipstream = { minGear = 4, spaces = 3 }
 
+-- Damage markers: a car losing a WP in these zones, or going out of the
+-- race, leaves a marker on the space its move ended on, and a car passing
+-- over or landing on one rolls the black die (checks.damage).
+Rules.damageMarkers = { body = true, engine = true }
+
 -- Most gears a car may drop in one shift.
 Rules.maxDownshift = 3
 
@@ -193,6 +198,16 @@ Rules.checks = {
                     .. "in 4th gear", spaces, spaces == 1 and "" or "s") }
             end
             return { text = "slow stop -- wait in the pits; leave next round in 4th gear or lower" }
+        end,
+    },
+    -- Over or onto a space with a damage marker.
+    damage = {
+        name = "damage marker",
+        resolve = function(v)
+            if v <= 4 then
+                return { wear = { handling = 1 }, text = "the car takes a knock" }
+            end
+            return { text = "through unharmed" }
         end,
     },
     -- Grid order: highest roll takes pole. The race engine handles ties.
