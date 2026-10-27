@@ -7,7 +7,7 @@ The mod's own objects -- meshes, textures, colliders, the table, the sky,
 custom decks, the UI images -- aren't listed anywhere in this repo; TTS only
 knows them as fields buried in a save file. So this reads them out of the
 most recently saved copy of the mod in the local TTS Saves folder
-(SaveName/GameMode "Formula D Big Box Mod").
+(GameMode "Formula D", or "Formula D Big Box Mod" as the 2020 mod had it).
 
 UI images are the CustomUIAssets that something in src/ names (`image="..."`,
 or a Lua string). The save registers ~300 more, thumbnails for boards the mod
@@ -55,6 +55,9 @@ EXT = {"image/jpeg": ".jpg", "image/png": ".png", "image/gif": ".gif", "image/we
 SNIFF = [(b"\xff\xd8\xff", ".jpg"), (b"\x89PNG", ".png"), (b"GIF8", ".gif"),
          (b"RIFF", ".webp"), (b"%PDF", ".pdf")]
 CACHE_DIRS = ["Images", "Models", "PDF", "Assetbundles", "Audio"]
+# The game a save is of. TTS names new saves after it, so the mod's own is
+# "Formula D"; saves from before kept the 2020 mod's.
+GAME_MODES = ("Formula D", "Formula D Big Box Mod")
 REPO_COPY = "https://raw.githubusercontent.com/"
 RETRIES = 3
 
@@ -70,10 +73,10 @@ def find_save(skip=None):
             data = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
-        if isinstance(data, dict) and data.get("GameMode", "").strip() == "Formula D Big Box Mod":
+        if isinstance(data, dict) and data.get("GameMode", "").strip() in GAME_MODES:
             hits.append((f.stat().st_mtime, f, data))
     if not hits:
-        sys.exit('no save with GameMode "Formula D Big Box Mod" found under '
+        sys.exit(f'no save with GameMode {" or ".join(GAME_MODES)} found under '
                   f"{TTS_DIR / 'Saves'} -- open the mod in TTS and save once")
     hits.sort(key=lambda h: h[0])
     _, path, data = hits[-1]
