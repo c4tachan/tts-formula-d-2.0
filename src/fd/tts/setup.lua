@@ -203,6 +203,9 @@ function Setup.refresh(race, map, seated)
     Ui.value("fds_rules", "Rules: " .. race.rules.name .. ", " .. (s.laps == 1 and "1 lap" or (s.laps .. " laps")))
     Ui.value("fds_drivers", driverList(race, seated))
     Ui.value("fds_laps", s.laps)
+    -- An InputField built by setXmlTable comes up empty, whatever its value
+    -- there, until it is set like this.
+    Ui.value("fds_link", REPO)
 end
 
 --- The most laps the field takes.

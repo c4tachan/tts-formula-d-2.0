@@ -2154,6 +2154,12 @@ function T.the_setup_menu_shows_from_the_load()
     assert(S.ui.fds_drivers.value:find("none yet"), S.ui.fds_drivers.value)
 end
 
+function T.the_setup_menu_shows_where_to_report_a_bug()
+    local S = world()
+    eq(S.ui.fds_link.value, "https://github.com/c4tachan/tts-formula-d-2.0/issues",
+        "set once the menu is up, as the XML's own value shows nothing")
+end
+
 function T.the_setup_menu_sets_the_distance()
     local S = world()
     fdSetupLaps(Player.Red, "2")
