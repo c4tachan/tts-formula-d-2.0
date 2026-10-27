@@ -1141,8 +1141,10 @@ deliver = function(color)
     Wait.time(function() delivering[color] = nil end, 10)
     bag.takeObject({
         position = { x = hand.position.x + ix * DASH_AHEAD, y = DROP_Y, z = hand.position.z + iz * DASH_AHEAD },
-        -- Turned to face the seat; the beginner face is the underside.
-        rotation = { x = 0, y = yaw, z = face == "beginner" and 180 or 0 },
+        -- Turned to face the seat; the beginner face is the underside. The
+        -- two faces are printed opposite ways up (see fd.data.dashboard), so
+        -- the advanced one turns a half turn more to read the right way.
+        rotation = { x = 0, y = face == "advanced" and (yaw + 180) % 360 or yaw, z = face == "beginner" and 180 or 0 },
         smooth = false,
         callback_function = function(dash)
             Dashboard.track(dash)

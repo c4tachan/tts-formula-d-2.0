@@ -226,6 +226,21 @@ function T.a_seat_with_no_dashboard_gets_one_from_the_bag()
     assert(getObjectFromGUID(green.tts.markers.gear), "with its gear stick")
 end
 
+function T.a_fresh_advanced_dashboard_reads_the_right_way_up()
+    local S = world()
+    S.object("Advanced Dashboard Bag", { guid = "4eb678", spawns = "Advanced Dashboard" })
+    fdSetupRules(Player.Red, require("fd.rules.advanced").name)
+    S.player("Green", S.vec(-24, 1, -38))
+    onPlayerChangeColor("Green")
+    fdSetupStart(Player.Red)
+    local dash = getObjectFromGUID(state().cars.Green.tts.dash)
+    eq(dash.name, "Advanced Dashboard")
+    eq(dash.up.y, 1, "advanced side up")
+    -- Its art is printed the other way up from the beginner face's, so a
+    -- half turn more than the seat's own facing (0 here).
+    eq(dash.rot.y, 180, "turned to read from the seat")
+end
+
 function T.nobody_is_dealt_in_once_the_race_has_started()
     local S = redRacing()
     onPlayerChangeColor("Blue")
