@@ -9,8 +9,8 @@
     "Get Lua Scripts".
 
     Generated files are skipped on pull so a round trip through TTS cannot
-    overwrite them with its bundled output -- regenerate them instead with
-    tools/extract/gen_registry.py. Pass -Force to pull them anyway.
+    overwrite them with its bundled output; regenerate them instead. Pass
+    -Force to pull them anyway.
 
 .EXAMPLE
     pwsh tools/sync.ps1 push
@@ -31,8 +31,8 @@ $repo = Split-Path -Parent $PSScriptRoot
 $entry = Join-Path $repo 'src\entry'
 $tts = Join-Path $env:TEMP 'TabletopSimulator\Tabletop Simulator Lua'
 
-# Regenerate these from maps.json rather than pulling them back out of TTS.
-$generated = @('Custom Board.9e2fe8.xml')
+# Regenerate these rather than pulling them back out of TTS. None at present.
+$generated = @()
 
 if (-not (Test-Path $tts)) {
     throw "TTS script folder not found: $tts`nOpen the mod in Tabletop Simulator and run 'Get Lua Scripts' once."

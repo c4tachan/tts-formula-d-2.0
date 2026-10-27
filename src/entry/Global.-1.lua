@@ -49,7 +49,6 @@ local TRACKS = {
     FDe03 = require("fd.data.tracks.FDe03"),
 }
 
-mod_packed = false
 setup_packed = false
 
 local race
@@ -111,12 +110,10 @@ local SEATS = {
 
 -- Setup ---------------------------------------------------------------------
 -- The table holds the board and nothing else to set up: the map and rules
--- are chosen on the setup menu (fd.tts.setup). The Big Box menu board stays
--- packed in its bag, and the setup board and everything on it are hidden
--- where they stand -- the script still reaches the bags it deals
--- dashboards, cars and markers from.
+-- are chosen on the setup menu (fd.tts.setup). The setup board and
+-- everything on it are hidden where they stand -- the script still
+-- reaches the bags it deals dashboards, cars and markers from.
 
-local MOD_MENU_BAG = "a57988"
 local SETUP_BAG = "0fde3b"
 -- Everyone a hidden object is hidden from: every seat, the spectators and
 -- the Game Master.
@@ -176,15 +173,6 @@ local function hideSetup(onDone)
     end
 end
 
---- Put the Big Box menu board back in its bag, if it is out.
-local function packModMenu()
-    local bag = not mod_packed and getObjectFromGUID(MOD_MENU_BAG)
-    if bag then
-        bag.call("buttonClick_recall", {})
-    end
-    mod_packed = true
-end
-
 --- The map on the board tile, from Maps.list, or nil if it is none we know.
 local function mapOnBoard()
     local tile = Track.tile()
@@ -204,10 +192,8 @@ function onLoad(saved_data)
     local saved = {}
     if saved_data and saved_data ~= "" then
         saved = JSON.decode(saved_data) or {}
-        mod_packed = saved.mp
         setup_packed = saved.sp
     else
-        mod_packed = true
         setup_packed = true
     end
 
@@ -229,7 +215,6 @@ function onLoad(saved_data)
     Wait.time(function()
         Dashboard.scan()
         dropDashless()
-        packModMenu()
         boardMenu(Editor.isOpen())
         hideSetup(function() layDice() end)
         syncDamage()
@@ -305,7 +290,7 @@ end
 
 function onSave()
     return JSON.encode({
-        mp = mod_packed, sp = setup_packed, race = race and race:serialize(),
+        sp = setup_packed, race = race and race:serialize(),
         -- Hand edits to track spaces; tools/extract/import_track.py reads them.
         edits = Editor.save(),
         -- The damage marker pieces on the board, by marker id.

@@ -177,16 +177,6 @@ function T.a_packed_setup_board_is_put_out_and_hidden()
     eq(bag.calls[1], "buttonClick_place", "put out, so its bags can be reached")
 end
 
-function T.the_big_box_menu_stays_in_its_bag()
-    local S = world()
-    local menuBag = S.object("Memory Bag - Mod Menu", { guid = "a57988" })
-    local saved = onSave()
-    saved.json.mp = false -- left out when saved
-    onLoad(saved)
-    eq(menuBag.calls[1], "buttonClick_recall", "packed away")
-    eq(S.ui.showModMenuButton, nil, "and no button to bring it out")
-end
-
 -- The script's die always comes up 10 unless a test loads it, so with two or
 -- more drivers Start race deals them in but leaves the grid tied: the cars
 -- stay where they were dealt.

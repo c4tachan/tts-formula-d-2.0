@@ -5,7 +5,7 @@
 -- (fd.tts.setup).
 --
 -- Hud.build also sends the Global UI, appended to whatever the Global XML
--- already holds, so the Big Box menu button survives.
+-- already holds.
 
 local Race = require("fd.core.race")
 local Track = require("fd.tts.track")

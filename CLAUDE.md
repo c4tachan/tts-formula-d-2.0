@@ -6,13 +6,13 @@ plus Python tooling for data extraction.
 ## Rules of the road
 
 - **`src/entry/` files are TTS objects.** The filename encodes the object GUID
-  (`Custom Board.9e2fe8.lua`) and must not be renamed — the extension matches
+  (`Game Board Tile.ebde54.lua`) and must not be renamed — the extension matches
   objects by it. `Global.-1.lua` is the global script.
 - **`src/fd/` is never edited in game.** Entry scripts `require("fd.…")` and the
   extension inlines those modules on Save & Play.
-- **Generated files carry a banner comment.** `src/fd/data/maps.lua` and
-  `src/entry/Custom Board.9e2fe8.xml` come from `tools/extract/maps.json` — edit
-  the JSON and rerun `tools/extract/gen_registry.py`, never the output.
+- **Generated files carry a banner comment.** `src/fd/data/maps.lua` comes
+  from `tools/extract/maps.json` — edit the JSON and rerun
+  `tools/extract/gen_registry.py`, never the output.
   `src/fd/data/dice.lua` likewise comes from `tools/extract/dice_faces.json`
   via `gen_dice.py`.
 - **The move icons are drawn by `tools/make_icons.py`** into `assets/icons/`
