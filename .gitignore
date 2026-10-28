@@ -11,3 +11,6 @@ tools/extract/out/
 
 # Python environment for the extraction tools
 .venv/
+
+# Saves built by tools/build_save.py
+build/
